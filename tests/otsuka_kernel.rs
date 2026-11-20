@@ -13,6 +13,54 @@ use quip_solver_cpu::families::otsuka::{
 use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
+#[test]
+fn configured_population_defaults_preserve_the_stock_samples() {
+    use quip_solver_cpu::families::otsuka::{anneal_population_configured, PopulationOptions};
+    let graph = corner_sharing().graph(Weights::FULL).unwrap();
+    let betas: Vec<f64> = (0..128)
+        .map(|i| 0.1 * 100_f64.powf(f64::from(i) / 127.0))
+        .collect();
+    let schedule = Schedule::new(&betas, 1).unwrap();
+    for seed in 0..8 {
+        let stock = anneal_population(&graph, &schedule, 8, seed, None).unwrap();
+        let configured = anneal_population_configured(
+            &graph,
+            &schedule,
+            8,
+            seed,
+            PopulationOptions::default(),
+            || false,
+        )
+        .unwrap();
+        assert_eq!(stock, configured, "seed {seed}");
+    }
+}
+
+#[test]
+fn configured_population_stops_during_a_long_anneal() {
+    use quip_solver_cpu::families::otsuka::{anneal_population_configured, PopulationOptions};
+    use std::cell::Cell;
+    let graph = corner_sharing().graph(Weights::FULL).unwrap();
+    let schedule = Schedule::new(&[3.0; 4096], 1).unwrap();
+    let checks = Cell::new(0);
+    let result = anneal_population_configured(
+        &graph,
+        &schedule,
+        8,
+        12,
+        PopulationOptions {
+            resamples: 512,
+            houdayer_every: 0,
+        },
+        || {
+            checks.set(checks.get() + 1);
+            checks.get() >= 4
+        },
+    );
+    assert!(matches!(result, Err(AnnealError::Cancelled)));
+    assert_eq!(checks.get(), 4);
+}
+
 /// An owned model and its motifs.
 #[derive(Clone)]
 struct Fixture {

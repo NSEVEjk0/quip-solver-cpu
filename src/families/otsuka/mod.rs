@@ -154,6 +154,24 @@ const RESAMPLES: usize = 1024;
 /// so a cluster spans nearly all of them and the move only swaps the pair.
 const HOUDAYER_BETA: f64 = 3.0;
 
+/// Cadence of population resampling and replica-cluster swaps.
+#[derive(Clone, Copy, Debug)]
+pub struct PopulationOptions {
+    /// Resampling checkpoints over the anneal; zero disables resampling.
+    pub resamples: usize,
+    /// Sweeps between Houdayer moves; zero uses the resampling cadence.
+    pub houdayer_every: usize,
+}
+
+impl Default for PopulationOptions {
+    fn default() -> Self {
+        Self {
+            resamples: RESAMPLES,
+            houdayer_every: 1,
+        }
+    }
+}
+
 /// Anneal `replicas` states of `graph` together over one schedule, the
 /// population annealing of Hukushima and Iba (2003) with Otsuka sweeps.
 ///
@@ -180,6 +198,29 @@ pub fn anneal_population(
     seed: u64,
     cancel: Option<(&CancelToken, Option<u64>)>,
 ) -> Result<Vec<Sample>, AnnealError> {
+    anneal_population_configured(
+        graph,
+        schedule,
+        replicas,
+        seed,
+        PopulationOptions::default(),
+        || cancel.is_some_and(|(token, watermark)| token.is_cancelled(watermark)),
+    )
+}
+
+/// Population annealing with an explicit cadence and cancellation callback.
+/// The default options preserve the stock kernel's draws and trajectories.
+///
+/// # Errors
+/// Returns [`AnnealError::Cancelled`] as soon as `stopped` becomes true.
+pub fn anneal_population_configured(
+    graph: &OtsukaGraph,
+    schedule: &Schedule<'_>,
+    replicas: usize,
+    seed: u64,
+    options: PopulationOptions,
+    stopped: impl Fn() -> bool,
+) -> Result<Vec<Sample>, AnnealError> {
     let mut rng = SmallRng::seed_from_u64(seed);
     let mut chains: Vec<Chain<'_>> = (0..replicas)
         .map(|_| Chain::random(graph, &mut rng))
@@ -190,7 +231,16 @@ pub fn anneal_population(
         .zip(&energy)
         .map(|(c, &e)| (c.spins().to_vec(), e))
         .collect();
-    let every = (schedule.betas.len() / RESAMPLES).max(1);
+    let every = schedule
+        .betas
+        .len()
+        .checked_div(options.resamples)
+        .map_or(usize::MAX, |every| every.max(1));
+    let houdayer_every = if options.houdayer_every == 0 {
+        every
+    } else {
+        options.houdayer_every
+    };
     let mut order: Vec<usize> = (0..replicas).collect();
     let mut scratch = Houdayer::new(graph.n);
     let mut last_beta = schedule.betas[0];
@@ -206,7 +256,7 @@ pub fn anneal_population(
             last_beta = beta;
         }
         for ((chain, e), lowest) in chains.iter_mut().zip(&mut energy).zip(&mut best) {
-            if cancel.is_some_and(|(token, watermark)| token.is_cancelled(watermark)) {
+            if stopped() {
                 return Err(AnnealError::Cancelled);
             }
             *e += chain.cluster_sweep(beta, &mut rng);
@@ -218,7 +268,7 @@ pub fn anneal_population(
                 lowest.1 = *e;
             }
         }
-        if replicas > 1 && beta >= HOUDAYER_BETA {
+        if replicas > 1 && beta >= HOUDAYER_BETA && (sweep + 1).is_multiple_of(houdayer_every) {
             order.shuffle(&mut rng);
             for pair in order.chunks_exact(2) {
                 let (a, b) = (pair[0].min(pair[1]), pair[0].max(pair[1]));

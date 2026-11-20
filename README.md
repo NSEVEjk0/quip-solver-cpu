@@ -1,5 +1,10 @@
 # quip-solver-cpu
 
+This fork's `cpu-funnel` branch adds an experimental CPU adaptation of
+BudFox / ntllinh2511's Funnel miner. Read the [CPU setup and attribution](README.cpu-funnel.md)
+and [measured results](docs/cpu-funnel/RESULTS.md). Screening is optional;
+the live trial uses tuned direct annealing. No network win has been established.
+
 CPU Ising miners for the [quip.network](https://gitlab.com/quip.network) v0.3
 mining protocol: simulated annealing (`quip-cpu-sa`), single-site chromatic
 Gibbs (`quip-cpu-gibbs`), and discrete Simulated Bifurcation (`quip-cpu-sb`),
@@ -31,6 +36,7 @@ reads are sequential and cache-local. Energies are scored with the canonical
 | `quip-cpu-mfa` | mean-field annealing (the same kernel at bond dimension 1) | experimental |
 | `quip-cpu-flatiron` | belief-propagation tensor network on the problem graph | experimental |
 | `quip-cpu-otsuka` | Otsuka cluster annealing on `quip/twisted-ice-dimer` jobs, simulated annealing on every other job | experimental |
+| `quip-cpu-funnel` | tuned CPU Otsuka annealing with optional bounded instance screening and exact polishing | experimental |
 | `quip-cpu-ice-sat` | Strong-layer SAT witnesses from an external Kissat on `quip/twisted-ice-dimer` jobs, simulated annealing on every other job | experimental |
 | `quip-cpu-greedy` | exact greedy descent from supplied initial states, a postprocess | experimental |
 | `quip-cpu-pairworm` | pair-aware worm schedule on supplied states of the selected `quip/twisted-ice-dimer` recipes, greedy descent on every other job, a postprocess | experimental |

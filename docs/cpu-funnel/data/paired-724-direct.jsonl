@@ -1,0 +1,3 @@
+{"best_energy_milli":-5043385,"device_access_time_us":0,"diversity_milli":0,"is_pow":true,"job_id":"6c656173653a0100000000000000","n_solutions":0,"passed":true,"raw_best_energy_milli":-5043385,"reads":0,"rejected":false,"salts_done":1,"sweeps":0,"wall_ms":51224,"winners":1}
+{"best_energy_milli":-5045055,"device_access_time_us":0,"diversity_milli":0,"is_pow":true,"job_id":"6c656173653a0000000000000000","n_solutions":0,"passed":true,"raw_best_energy_milli":-5045055,"reads":0,"rejected":false,"salts_done":1,"sweeps":0,"wall_ms":53622,"winners":1}
+{"aggregate":true,"passed":2,"rejected":0,"salts_done":2,"salts_per_s":0.03729812390436761,"throughput_per_s":0.03729812390436761,"total_jobs":2,"wall_ms_total":53622}

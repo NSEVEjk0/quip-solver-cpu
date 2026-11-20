@@ -1,0 +1,12 @@
+{
+  "source": "Read-only local Aglais validator",
+  "at_block_hash": "0x76061049a5eac361075b8f9d19698abd086108990fd6fbc899b1ac5aa3e49fce",
+  "spec_version": 121,
+  "topology_hash": "0x2d130ce6df0fceacff26b90a06811829707bde8227d45e04ef71c804a8a5345c",
+  "nodes": 4560,
+  "edges": 41205,
+  "family_id": "quip/twisted-ice-dimer",
+  "revision": 1,
+  "params_hex": "010100020000000c00020001000000040300020000002d0004000400000046050000",
+  "registered_at": 12904
+}

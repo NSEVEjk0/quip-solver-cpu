@@ -118,6 +118,11 @@ path = "src/bin/quip_cpu_otsuka.rs"
 required-features = ["experimental"]
 
 [[bin]]
+name = "quip-cpu-funnel"
+path = "src/bin/quip_cpu_funnel.rs"
+required-features = ["experimental"]
+
+[[bin]]
 name = "quip-cpu-ice-sat"
 path = "src/bin/quip_cpu_ice_sat.rs"
 required-features = ["experimental"]

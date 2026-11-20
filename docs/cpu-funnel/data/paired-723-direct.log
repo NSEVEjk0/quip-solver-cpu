@@ -1,0 +1,8 @@
+2026-11-20T17:49:54.115743Z  INFO quip_solver_cpu::families::funnel: CPU Funnel configured config=FunnelConfig { screen: false, batch: 128, keep: 4, probe_reads: 4, probe_sweeps: 1024, final_reads: None, final_sweeps: None, tile_milli: 250, pair_milli: 250, weak_scale: 1.5, resamples: 512, houdayer_every: 0, polish_sweeps: 256 }
+2026-11-20T17:50:42.048891Z  INFO quip_solver_cpu::families::funnel: CPU Funnel solve salt_index=0 best_energy_milli=-5058895 reads=16 sweeps=9216 phase="direct"
+2026-11-20T17:50:46.278162Z  INFO quip_solver_cpu::families::funnel: CPU Funnel solve salt_index=0 best_energy_milli=-5040885 reads=16 sweeps=9216 phase="direct"
+#    job_id                  n_sol  best_energy  diversity   pass  wall_ms    salts  winners
+1    6c656173653a0000..          0     -5058895          0   pass    47966        1        1
+2    6c656173653a0100..          0     -5040885          0   pass    52200        1        1
+--- 2 jobs, 2 passed, 0 rejected, 0.04 jobs/s, 2 salts, 0.04 salts/s ---
+--- effective reads 0, sweeps 0 ---

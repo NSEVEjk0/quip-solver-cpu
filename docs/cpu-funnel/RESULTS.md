@@ -1,0 +1,97 @@
+# CPU Funnel measurements — 20 November 2026
+
+This branch adapts BudFox / ntllinh2511's GPU Funnel ideas to upstream CPU
+Otsuka. It improves solve depth on this host, with additional time per sweep.
+Optional screening showed no clear gain in the small paired experiment, so
+the live trial uses direct solving. **No network win or reward is established.**
+
+Hardware: six AMD EPYC 7663 vCPUs, about 5.8 GiB RAM, shared with other
+services. Every benchmark used two logical CPUs, a 768 MiB container limit,
+and the same release build. The live trial uses two CPUs and a 1 GiB limit.
+This is a VPS measurement; other CPUs and host contention can change timing.
+
+## Instance and protocol
+
+The read-only chain snapshot uses runtime spec 121, `quip/twisted-ice-dimer`
+revision 1, weak 45, 1350 pairs, 4560 nodes, and 41205 edges. Topology:
+`0x2d130ce6df0fceacff26b90a06811829707bde8227d45e04ef71c804a8a5345c`.
+Complete [inputs](../../tools/cpu-funnel/inputs) are included.
+
+The instance-selection writeup shared in the community described the older
+`0xcbec1eb4…` topology. These tests use the current recipe and do not reproduce
+its claimed 24/24 result. The imported structural models were fitted to GPU
+labels and an older weak-62 recipe. CPU-specific fitting remains future work.
+
+[Published validator code](https://gitlab.com/quip.network/quip-validator/-/blob/main/pallets/quantum-pow/src/lib.rs#L1077) binds nonces to the previous proof block hash,
+miner account, and salt, and rejects old-round nonces. The device timing
+[field is self-reported](https://gitlab.com/quip.network/quip-validator/-/blob/main/pallets/quantum-pow/src/types.rs#L35); these measurements do not verify accusations about
+any account's reported timing. This branch reports actual CPU hardware and
+scores every proof against the original coefficients.
+
+## Screening at equal sweep counts
+
+Each arm used 294912 total replica-sweeps across two workers. Per worker,
+screening used four 4-read / 1024-sweep probes plus one 16-read / 8192-sweep
+final solve. Direct used one 16-read / 9216-sweep solve. Both used the tuned
+kernel and final polishing. Generation, structural filters, exact scoring,
+and polishing add work beyond the sweep count; reported wall time includes it.
+Arm order alternated across three seeds.
+
+| Seed | Screen best | Direct best | Screen seconds | Direct seconds |
+|---|---:|---:|---:|---:|
+| 722 | -5050.265 | -5058.375 | 57.525 | 52.996 |
+| 723 | -5050.335 | -5058.895 | 57.137 | 52.200 |
+| 724 | -5052.885 | -5045.055 | 55.431 | 53.622 |
+
+Mean round best: screen -5051.162, direct -5054.108. Mean wall time:
+56.698 versus 52.939 seconds, approximately 7% longer for screening.
+All six runs had zero rejected results. Three rounds are insufficient
+to infer a reliable advantage or win rate. Lower energy is better.
+
+## Stock and longer-budget comparison
+
+Seed 725 generated the same two nonce instances in all three arms.
+Each used 16 reads and two vCPUs.
+
+| Solver | Sweeps | Mean energy | Best energy | Wall seconds |
+|---|---:|---:|---:|---:|
+| Stock Otsuka | 8192 | -5033.700 | -5036.485 | 37.270 |
+| Tuned direct | 8192 | -5049.000 | -5050.575 | 47.155 |
+| Tuned direct | 32768 | -5056.390 | -5057.465 | 180.438 |
+
+At equal sweeps, tuned direct gained 15.3 milli while taking 26.5% longer.
+Quadrupling its sweep budget gained another 7.39 milli, at 3.83 times the
+wall time. The live trial starts at 8192 sweeps to try more instances per
+round. This two-instance sample supports testing the tradeoff, not a
+general speed or win-rate claim. All three runs had zero rejected results
+and remained above the -5092 benchmark target.
+
+## Live trial
+
+The previous live miner used one CPU with `quip-cpu-sa` and usually reached
+approximately -4760. The new trial uses the same operator identity and
+coordinator, two CPU workers, 16 reads / 8192 sweeps, and screening off.
+Its first validated results reached -5052.435, using approximately 77 MiB
+RAM and two vCPUs. The observed new-round target was approximately -5093;
+this improvement in energy does not establish competitiveness or rewards.
+The completed observation record is added alongside the benchmark data.
+
+## Reproduce and inspect
+
+Build and run commands are in [README.cpu-funnel.md](../../README.cpu-funnel.md).
+The [harness](../../tools/cpu-funnel/benchmark.py) pins this coordinator image:
+`registry.gitlab.com/quip.network/quip-solver/v0.3/quip-solver@sha256:4050700c2d00ab5ace4fbcc87ab59e3381054d939124ee39dac4a21284c30525`.
+It runs with `--network none`, has no signer or live node data, and makes
+no submissions. The `smoke` suite checks the protocol with small budgets;
+use `screening` and `stock` to reproduce the measured suites.
+
+Raw records and aggregates are in [data](data). Coordinator lease fields
+such as `passed` and `winners` describe accounting, not threshold hits.
+The analysis uses `raw_best_energy_milli`, actual wall time, and rejection
+counts. Gates in the topology input are synthetic benchmark gates.
+
+Validation passed: cached/canonical generation across 64 nonces, exact
+original-energy scoring, monotonic polishing, family/plain session
+conformance including stale leases and deadlines, all 19 Otsuka kernel
+tests, Clippy with warnings denied, and formatting. Source, build settings,
+and AGPL attribution are provided in this branch.

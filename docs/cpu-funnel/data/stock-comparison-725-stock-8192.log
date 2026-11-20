@@ -1,0 +1,6 @@
+2026-11-20T17:57:40.811522Z  WARN quip_solver_core::session::transport: final messages may not have reached the coordinator detail="session transport did not close cleanly: the request body was dropped before its end"
+#    job_id                  n_sol  best_energy  diversity   pass  wall_ms    salts  winners
+1    6c656173653a0100..          0     -5036485          0   pass    36485        1        1
+2    6c656173653a0000..          0     -5030915          0   pass    37270        1        1
+--- 2 jobs, 2 passed, 0 rejected, 0.05 jobs/s, 2 salts, 0.05 salts/s ---
+--- effective reads 0, sweeps 0 ---

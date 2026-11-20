@@ -1,0 +1,44 @@
+[
+  {
+    "seed": 725,
+    "arm": "stock-8192",
+    "energies": [
+      -5036.485,
+      -5030.915
+    ],
+    "round_best": -5036.485,
+    "mean_energy": -5033.7,
+    "wall_seconds": 37.27,
+    "including_startup_seconds": 37.874519215896726,
+    "rejected": 0,
+    "replica_sweeps_total": 262144
+  },
+  {
+    "seed": 725,
+    "arm": "tuned-8192",
+    "energies": [
+      -5050.575,
+      -5047.425
+    ],
+    "round_best": -5050.575,
+    "mean_energy": -5049.0,
+    "wall_seconds": 47.155,
+    "including_startup_seconds": 47.67448249831796,
+    "rejected": 0,
+    "replica_sweeps_total": 262144
+  },
+  {
+    "seed": 725,
+    "arm": "tuned-32768",
+    "energies": [
+      -5055.315,
+      -5057.465
+    ],
+    "round_best": -5057.465,
+    "mean_energy": -5056.389999999999,
+    "wall_seconds": 180.438,
+    "including_startup_seconds": 180.86904969625175,
+    "rejected": 0,
+    "replica_sweeps_total": 1048576
+  }
+]

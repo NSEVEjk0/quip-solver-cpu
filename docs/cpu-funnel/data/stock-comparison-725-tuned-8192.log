@@ -1,0 +1,9 @@
+2026-11-20T17:57:41.432534Z  INFO quip_solver_cpu::families::funnel: CPU Funnel configured config=FunnelConfig { screen: false, batch: 128, keep: 4, probe_reads: 4, probe_sweeps: 1024, final_reads: None, final_sweeps: None, tile_milli: 250, pair_milli: 250, weak_scale: 1.5, resamples: 512, houdayer_every: 0, polish_sweeps: 256 }
+2026-11-20T17:58:25.017611Z  INFO quip_solver_cpu::families::funnel: CPU Funnel solve salt_index=0 best_energy_milli=-5050575 reads=16 sweeps=8192 phase="direct"
+2026-11-20T17:58:28.551200Z  INFO quip_solver_cpu::families::funnel: CPU Funnel solve salt_index=0 best_energy_milli=-5047425 reads=16 sweeps=8192 phase="direct"
+2026-11-20T17:58:28.610522Z  WARN quip_solver_core::session::transport: final messages may not have reached the coordinator detail="session transport did not close cleanly: the request body was dropped before its end"
+#    job_id                  n_sol  best_energy  diversity   pass  wall_ms    salts  winners
+1    6c656173653a0000..          0     -5050575          0   pass    43623        1        1
+2    6c656173653a0100..          0     -5047425          0   pass    47155        1        1
+--- 2 jobs, 2 passed, 0 rejected, 0.04 jobs/s, 2 salts, 0.04 salts/s ---
+--- effective reads 0, sweeps 0 ---
