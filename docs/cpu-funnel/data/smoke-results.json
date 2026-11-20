@@ -1,0 +1,44 @@
+[
+  {
+    "seed": 726,
+    "arm": "smoke-direct",
+    "screen": false,
+    "reads": 4,
+    "sweeps": 64,
+    "batch": 8,
+    "keep": 2,
+    "probe_reads": 4,
+    "probe_sweeps": 32,
+    "energies": [
+      -4916.515,
+      -4915.595
+    ],
+    "round_best": -4916.515,
+    "mean_energy": -4916.055,
+    "wall_seconds": 0.785,
+    "salts_done": 2,
+    "rejected": 0,
+    "replica_sweeps_total": 512
+  },
+  {
+    "seed": 726,
+    "arm": "smoke-screen",
+    "screen": true,
+    "reads": 4,
+    "sweeps": 64,
+    "batch": 8,
+    "keep": 2,
+    "probe_reads": 4,
+    "probe_sweeps": 32,
+    "energies": [
+      -4920.335,
+      -4953.315
+    ],
+    "round_best": -4953.315,
+    "mean_energy": -4936.825,
+    "wall_seconds": 1.173,
+    "salts_done": 16,
+    "rejected": 0,
+    "replica_sweeps_total": 1024
+  }
+]

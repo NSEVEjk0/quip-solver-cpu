@@ -1,0 +1,389 @@
+{
+  "started_at": "2026-11-20T18:06:51.348054355Z",
+  "observed_until": "2026-11-20T18:20:56.769893+00:00",
+  "binary_sha256": "03d35820e75a037cd1b587cf804cecdfa757855273bec67ef99481d91a7f6d90",
+  "backend": "CPU",
+  "cpu_model": "AMD EPYC 7663",
+  "host_vcpus": 6,
+  "cpuset": "0,1",
+  "memory_limit_bytes": 1073741824,
+  "cpu_percent_snapshot": "203.39%",
+  "memory_usage_snapshot": "61.89MiB / 1GiB",
+  "best_reported_energy_milli": -5052435,
+  "last_validation_counter": 31,
+  "jobs_rejected_total": 0,
+  "restart_count": 0,
+  "oom_killed": false,
+  "keys_unchanged": true,
+  "other_services_unchanged": true,
+  "network_win_observed": false,
+  "rounds": [
+    {
+      "timestamp": "2026-11-20T18:06:54.621263Z",
+      "generation": 1,
+      "qblock_id": 1489,
+      "block": 104502,
+      "max_energy_displayed": -5093
+    },
+    {
+      "timestamp": "2026-11-20T18:16:19.383975Z",
+      "generation": 2,
+      "qblock_id": 1490,
+      "block": 104596,
+      "max_energy_displayed": -5092
+    }
+  ],
+  "cancellation_acknowledgments": [
+    {
+      "timestamp": "2026-11-20T18:16:19.349066Z",
+      "generation": 1,
+      "total_ms": 1.6
+    }
+  ],
+  "coordinator_validation_samples": [
+    {
+      "timestamp": "2026-11-20T18:07:55.323601Z",
+      "generation": 1,
+      "results_validated_total": 2
+    },
+    {
+      "timestamp": "2026-11-20T18:08:55.952939Z",
+      "generation": 1,
+      "results_validated_total": 4
+    },
+    {
+      "timestamp": "2026-11-20T18:09:56.465606Z",
+      "generation": 1,
+      "results_validated_total": 6
+    },
+    {
+      "timestamp": "2026-11-20T18:10:56.976616Z",
+      "generation": 1,
+      "results_validated_total": 10
+    },
+    {
+      "timestamp": "2026-11-20T18:11:57.393523Z",
+      "generation": 1,
+      "results_validated_total": 12
+    },
+    {
+      "timestamp": "2026-11-20T18:12:58.079750Z",
+      "generation": 1,
+      "results_validated_total": 14
+    },
+    {
+      "timestamp": "2026-11-20T18:13:58.696581Z",
+      "generation": 1,
+      "results_validated_total": 17
+    },
+    {
+      "timestamp": "2026-11-20T18:14:59.280570Z",
+      "generation": 1,
+      "results_validated_total": 20
+    },
+    {
+      "timestamp": "2026-11-20T18:16:00.028844Z",
+      "generation": 1,
+      "results_validated_total": 22
+    },
+    {
+      "timestamp": "2026-11-20T18:17:01.096563Z",
+      "generation": 2,
+      "results_validated_total": 23
+    },
+    {
+      "timestamp": "2026-11-20T18:18:01.658106Z",
+      "generation": 2,
+      "results_validated_total": 27
+    },
+    {
+      "timestamp": "2026-11-20T18:19:02.189397Z",
+      "generation": 2,
+      "results_validated_total": 29
+    },
+    {
+      "timestamp": "2026-11-20T18:20:02.830662Z",
+      "generation": 2,
+      "results_validated_total": 31
+    }
+  ],
+  "solve_samples": [
+    {
+      "timestamp": "2026-11-20T18:07:40.624580Z",
+      "generation": 1,
+      "salt_index_in_lease": 0,
+      "best_energy_milli": -5050285,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:07:45.027756Z",
+      "generation": 1,
+      "salt_index_in_lease": 0,
+      "best_energy_milli": -5045295,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:08:29.635404Z",
+      "generation": 1,
+      "salt_index_in_lease": 1,
+      "best_energy_milli": -5044035,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:08:33.327559Z",
+      "generation": 1,
+      "salt_index_in_lease": 1,
+      "best_energy_milli": -5052435,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:09:16.568872Z",
+      "generation": 1,
+      "salt_index_in_lease": 2,
+      "best_energy_milli": -5046115,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:09:17.382316Z",
+      "generation": 1,
+      "salt_index_in_lease": 2,
+      "best_energy_milli": -5048645,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:10:00.562677Z",
+      "generation": 1,
+      "salt_index_in_lease": 3,
+      "best_energy_milli": -5037495,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:10:02.995601Z",
+      "generation": 1,
+      "salt_index_in_lease": 3,
+      "best_energy_milli": -5050485,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:10:46.377591Z",
+      "generation": 1,
+      "salt_index_in_lease": 4,
+      "best_energy_milli": -5047035,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:10:49.888675Z",
+      "generation": 1,
+      "salt_index_in_lease": 4,
+      "best_energy_milli": -5049905,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:11:31.186742Z",
+      "generation": 1,
+      "salt_index_in_lease": 5,
+      "best_energy_milli": -5041585,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:11:39.504206Z",
+      "generation": 1,
+      "salt_index_in_lease": 5,
+      "best_energy_milli": -5048515,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:12:13.663440Z",
+      "generation": 1,
+      "salt_index_in_lease": 6,
+      "best_energy_milli": -5049575,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:12:23.755916Z",
+      "generation": 1,
+      "salt_index_in_lease": 6,
+      "best_energy_milli": -5045475,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:13:01.224728Z",
+      "generation": 1,
+      "salt_index_in_lease": 7,
+      "best_energy_milli": -5043855,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:13:13.230385Z",
+      "generation": 1,
+      "salt_index_in_lease": 7,
+      "best_energy_milli": -5041795,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:13:49.521380Z",
+      "generation": 1,
+      "salt_index_in_lease": 8,
+      "best_energy_milli": -5050385,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:14:01.802316Z",
+      "generation": 1,
+      "salt_index_in_lease": 8,
+      "best_energy_milli": -5043725,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:14:36.518632Z",
+      "generation": 1,
+      "salt_index_in_lease": 9,
+      "best_energy_milli": -5046065,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:14:49.836790Z",
+      "generation": 1,
+      "salt_index_in_lease": 9,
+      "best_energy_milli": -5043425,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:15:21.397894Z",
+      "generation": 1,
+      "salt_index_in_lease": 10,
+      "best_energy_milli": -5048025,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:15:34.924500Z",
+      "generation": 1,
+      "salt_index_in_lease": 10,
+      "best_energy_milli": -5044895,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:16:06.680034Z",
+      "generation": 1,
+      "salt_index_in_lease": 11,
+      "best_energy_milli": -5047655,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:17:02.969162Z",
+      "generation": 2,
+      "salt_index_in_lease": 0,
+      "best_energy_milli": -5041725,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:17:05.075197Z",
+      "generation": 2,
+      "salt_index_in_lease": 0,
+      "best_energy_milli": -5049255,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:17:49.203167Z",
+      "generation": 2,
+      "salt_index_in_lease": 1,
+      "best_energy_milli": -5036675,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:17:50.884450Z",
+      "generation": 2,
+      "salt_index_in_lease": 1,
+      "best_energy_milli": -5049115,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:18:34.782267Z",
+      "generation": 2,
+      "salt_index_in_lease": 2,
+      "best_energy_milli": -5041045,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:18:37.233100Z",
+      "generation": 2,
+      "salt_index_in_lease": 2,
+      "best_energy_milli": -5048495,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:19:20.342048Z",
+      "generation": 2,
+      "salt_index_in_lease": 3,
+      "best_energy_milli": -5045055,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:19:23.136380Z",
+      "generation": 2,
+      "salt_index_in_lease": 3,
+      "best_energy_milli": -5048645,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:20:04.140377Z",
+      "generation": 2,
+      "salt_index_in_lease": 4,
+      "best_energy_milli": -5048375,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:20:10.139496Z",
+      "generation": 2,
+      "salt_index_in_lease": 4,
+      "best_energy_milli": -5041315,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-20T18:20:46.977621Z",
+      "generation": 2,
+      "salt_index_in_lease": 5,
+      "best_energy_milli": -5034315,
+      "reads": 16,
+      "sweeps": 8192
+    }
+  ],
+  "notes": [
+    "Validation counters are sampled coordinator counters.",
+    "Cancellation acknowledgment measures the control protocol, not total kernel shutdown time.",
+    "No network win was observed during this observation window."
+  ]
+}

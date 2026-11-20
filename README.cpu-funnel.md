@@ -33,6 +33,13 @@ the binary implements its normal solver session protocol and has no signer.
 Install the binary at the configured path, then use this backend table in
 the operator's existing config. Keep the operator's other tables and keys.
 
+From your node deployment directory, install the built binary:
+
+```sh
+mkdir -p data/cpu-funnel/bin
+install -m 755 /path/to/quip-solver-cpu/target/release/quip-cpu-funnel data/cpu-funnel/bin/quip-cpu-funnel
+```
+
 ```toml
 [cpu]
 binary = "/data/cpu-funnel/bin/quip-cpu-funnel"
@@ -52,6 +59,13 @@ funnel_polish_sweeps = 256
 Restrict the miner container to two CPUs as well. Longer solves trade
 latency for lower energy; this budget is an experimental starting point.
 It does not establish that a CPU can beat current GPU miners.
+
+For the `nodes.quip.network` Docker deployment, set `QUIP_MINER_CPUSET=0,1`
+and `QUIP_MINER_MEM_LIMIT=1g` in its existing `.env`, then validate and
+recreate the CPU service with `docker compose --profile cpu config --quiet`
+and `docker compose --profile cpu up -d --no-deps --pull never cpu`.
+The downloadable Linux x86_64 build requires glibc 2.34 or later and
+the standard GNU runtime libraries. The measured coordinator image works.
 
 ## Optional screening
 

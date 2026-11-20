@@ -17,6 +17,10 @@ revision 1, weak 45, 1350 pairs, 4560 nodes, and 41205 edges. Topology:
 `0x2d130ce6df0fceacff26b90a06811829707bde8227d45e04ef71c804a8a5345c`.
 Complete [inputs](../../tools/cpu-funnel/inputs) are included.
 
+Different miner salts still produce different family instances. Screening
+is an attempt to spend solver time on favorable instances; its value must
+be measured for the specific recipe, hardware, and budget.
+
 The instance-selection writeup shared in the community described the older
 `0xcbec1eb4…` topology. These tests use the current recipe and do not reproduce
 its claimed 24/24 result. The imported structural models were fitted to GPU
@@ -71,10 +75,17 @@ and remained above the -5092 benchmark target.
 The previous live miner used one CPU with `quip-cpu-sa` and usually reached
 approximately -4760. The new trial uses the same operator identity and
 coordinator, two CPU workers, 16 reads / 8192 sweeps, and screening off.
-Its first validated results reached -5052.435, using approximately 77 MiB
-RAM and two vCPUs. The observed new-round target was approximately -5093;
+The observed best reached -5052.435. RAM snapshots were approximately
+62 and 77 MiB, with about two vCPUs in use. The observed new-round target was approximately -5093;
 this improvement in energy does not establish competitiveness or rewards.
-The completed observation record is added alongside the benchmark data.
+At qblock 1490, the coordinator recorded a 1.6 ms cancellation acknowledgement
+and fresh results followed in the new round. No rejected work was observed.
+The [observation record](data/live-observation.json) contains the sampled
+energies, coordinator validation counters, round transitions, and resource
+snapshot. Cancellation acknowledgement measures the control protocol;
+it is not a solver-time or hardware-performance claim.
+The observation ended at 18:20:56 UTC, with 31 validated results at the
+latest coordinator counter sample and 11 new-round solves reported.
 
 ## Reproduce and inspect
 
