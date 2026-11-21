@@ -12,14 +12,14 @@ every emitted result is independently rescored against the canonical instance.
 
 ## Technical contributions
 
-| Contribution | Implementation and purpose |
-|---|---|
-| Packed adjacency fusion | A 64-bit neighbor entry carries full and residual couplings, allowing cluster flips to patch fields and component deltas in one traversal. |
-| Monotone union-find specialization | Inlined path halving and union operations preserve deterministic component numbering and random-draw order. |
-| Shared transition probabilities | Temperature-local, collision-free tables reuse exact heat-bath and Metropolis probabilities across replicas. |
-| Exact resampling state transfer | Reusable parent snapshots copy spins and local fields, replacing repeated adjacency reconstruction. |
-| Original-objective candidate archive | Record candidates survive population ancestry replacement and receive canonical scoring and independent refinement. |
-| Motif-domain energy conversion | Uniform weak couplings permit exact original-energy evaluation from tracked search energy and strong motifs. Full canonical rescoring remains the final proof check. |
+| Entry | Contribution | Implementation and purpose |
+|---|---|---|
+| [C01](docs/cpu-native/FINDINGS.md#c01) | Packed adjacency fusion | A 64-bit neighbor entry carries full and residual couplings, allowing cluster flips to patch fields and component deltas in one traversal. |
+| [C02](docs/cpu-native/FINDINGS.md#c02) | Monotone union-find specialization | Inlined path halving and union operations preserve deterministic component numbering and random-draw order. |
+| [C03](docs/cpu-native/FINDINGS.md#c03) | Shared transition probabilities | Temperature-local, collision-free tables reuse exact heat-bath and Metropolis probabilities across replicas. |
+| [C04](docs/cpu-native/FINDINGS.md#c04) | Exact resampling state transfer | Reusable parent snapshots copy spins and local fields, replacing repeated adjacency reconstruction. |
+| [C05](docs/cpu-native/FINDINGS.md#c05) | Original-objective candidate archive | Record candidates survive population ancestry replacement and receive canonical scoring and independent refinement. |
+| [C06](docs/cpu-native/FINDINGS.md#c06) | Motif-domain energy conversion | Uniform weak couplings permit exact original-energy evaluation from tracked search energy and strong motifs. Full canonical rescoring remains the final proof check. |
 
 The execution changes are independently selectable. Mechanical tests require
 identical trajectories and energies relative to the reference implementation.
@@ -48,6 +48,7 @@ reproduces the comparisons offline without a node or signing key.
 
 ## Engineering documentation
 
+- [Numbered findings and work log](docs/cpu-native/FINDINGS.md): implementation decisions, parameter experiments, protocol checks, and node observations, with stable entry numbers and evidence links.
 - [Execution and algorithm design](docs/cpu-native/TECHNICAL_REPORT.md): equations, data layouts, state invariants, and the original-energy archive.
 - [Experiments and raw evidence](docs/cpu-native/EXPERIMENTS.md): profiler-guided ablations, full-budget confirmation, and parameter studies.
 - [Quip node and proof pipeline](docs/cpu-native/NODE_RESEARCH.md): nonce derivation, canonical instances, coordinator responsibilities, validation, and cancellation.

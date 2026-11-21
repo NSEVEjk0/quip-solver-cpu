@@ -6,6 +6,10 @@ give a **1.122× median paired execution speedup**. A separate original-objectiv
 archive preserves earlier useful states; exact motif scoring reduces its cost.
 This report separates execution, candidate selection, and parameter experiments.
 
+The [numbered findings log](FINDINGS.md) gives each implementation change,
+operating decision, and source investigation a stable reference. This report
+retains the full measurement setup and study tables.
+
 ## Hardware, model, and measurement
 
 | Item | Evaluated setting |
