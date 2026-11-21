@@ -1,0 +1,90 @@
+[
+  {
+    "repository": "quip-solver",
+    "revision": "b60c27117ae00219c4a03a1f77c2a591bd34292f",
+    "commit_date": "2026-11-20T07:19:54Z",
+    "path": "README.md",
+    "url": "https://raw.githubusercontent.com/QuipNetwork/quip-solver/b60c27117ae00219c4a03a1f77c2a591bd34292f/README.md",
+    "bytes": 6334
+  },
+  {
+    "repository": "quip-solver",
+    "revision": "b60c27117ae00219c4a03a1f77c2a591bd34292f",
+    "commit_date": "2026-11-20T07:19:54Z",
+    "path": "docs/COORDINATOR.md",
+    "url": "https://raw.githubusercontent.com/QuipNetwork/quip-solver/b60c27117ae00219c4a03a1f77c2a591bd34292f/docs/COORDINATOR.md",
+    "bytes": 60684
+  },
+  {
+    "repository": "quip-solver",
+    "revision": "b60c27117ae00219c4a03a1f77c2a591bd34292f",
+    "commit_date": "2026-11-20T07:19:54Z",
+    "path": "docs/NEWMINER.md",
+    "url": "https://raw.githubusercontent.com/QuipNetwork/quip-solver/b60c27117ae00219c4a03a1f77c2a591bd34292f/docs/NEWMINER.md",
+    "bytes": 4840
+  },
+  {
+    "repository": "quip-solver-core",
+    "revision": "3a6b11ee2d58453fca535b774c40c8d25069b83b",
+    "commit_date": "2026-11-20T06:03:40Z",
+    "path": "README.md",
+    "url": "https://raw.githubusercontent.com/QuipNetwork/quip-solver-core/3a6b11ee2d58453fca535b774c40c8d25069b83b/README.md",
+    "bytes": 8219
+  },
+  {
+    "repository": "quip-solver-core",
+    "revision": "3a6b11ee2d58453fca535b774c40c8d25069b83b",
+    "commit_date": "2026-11-20T06:03:40Z",
+    "path": "SPEC.md",
+    "url": "https://raw.githubusercontent.com/QuipNetwork/quip-solver-core/3a6b11ee2d58453fca535b774c40c8d25069b83b/SPEC.md",
+    "bytes": 61530
+  },
+  {
+    "repository": "quip-validator",
+    "revision": "651d4a678b4152ad4bc0320615ab586a0cf88df9",
+    "commit_date": "2026-11-20T15:28:39Z",
+    "path": "README.md",
+    "url": "https://raw.githubusercontent.com/QuipNetwork/quip-validator/651d4a678b4152ad4bc0320615ab586a0cf88df9/README.md",
+    "bytes": 22118
+  },
+  {
+    "repository": "quip-validator",
+    "revision": "651d4a678b4152ad4bc0320615ab586a0cf88df9",
+    "commit_date": "2026-11-20T15:28:39Z",
+    "path": "pallets/quantum-pow/src/lib.rs",
+    "url": "https://raw.githubusercontent.com/QuipNetwork/quip-validator/651d4a678b4152ad4bc0320615ab586a0cf88df9/pallets/quantum-pow/src/lib.rs",
+    "bytes": 74232
+  },
+  {
+    "repository": "quip-validator",
+    "revision": "651d4a678b4152ad4bc0320615ab586a0cf88df9",
+    "commit_date": "2026-11-20T15:28:39Z",
+    "path": "pallets/quantum-pow/src/types.rs",
+    "url": "https://raw.githubusercontent.com/QuipNetwork/quip-validator/651d4a678b4152ad4bc0320615ab586a0cf88df9/pallets/quantum-pow/src/types.rs",
+    "bytes": 11094
+  },
+  {
+    "repository": "nodes.quip.network",
+    "revision": "fdcc8ce7e4235574e389308ddd186c890efeb311",
+    "commit_date": "2026-11-13T11:49:01Z",
+    "path": "README.md",
+    "url": "https://raw.githubusercontent.com/QuipNetwork/nodes.quip.network/fdcc8ce7e4235574e389308ddd186c890efeb311/README.md",
+    "bytes": 46461
+  },
+  {
+    "repository": "nodes.quip.network",
+    "revision": "fdcc8ce7e4235574e389308ddd186c890efeb311",
+    "commit_date": "2026-11-13T11:49:01Z",
+    "path": "AGENTS.md",
+    "url": "https://raw.githubusercontent.com/QuipNetwork/nodes.quip.network/fdcc8ce7e4235574e389308ddd186c890efeb311/AGENTS.md",
+    "bytes": 31290
+  },
+  {
+    "repository": "isingmark",
+    "revision": "9c26c84a33f2457f4ec468c3703ed2aafebb3e54",
+    "commit_date": "2026-11-19T22:10:29Z",
+    "path": "README.md",
+    "url": "https://raw.githubusercontent.com/QuipNetwork/isingmark/9c26c84a33f2457f4ec468c3703ed2aafebb3e54/README.md",
+    "bytes": 8101
+  }
+]

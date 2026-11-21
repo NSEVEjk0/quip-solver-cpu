@@ -14,6 +14,105 @@ use rand::rngs::SmallRng;
 use rand::SeedableRng;
 
 #[test]
+fn every_cpu_execution_combination_preserves_population_trajectories() {
+    use quip_solver_cpu::families::otsuka::{anneal_population_configured, PopulationOptions};
+    let fixture = corner_sharing();
+    let betas: Vec<_> = (0..96)
+        .map(|i| 0.03 * 1000_f64.powf(f64::from(i) / 95.0))
+        .collect();
+    let schedule = Schedule::new(&betas, 1).unwrap();
+    for weights in [
+        Weights::FULL,
+        Weights {
+            tile_milli: 250,
+            pair_milli: 250,
+        },
+        Weights {
+            tile_milli: 500,
+            pair_milli: 0,
+        },
+    ] {
+        let graph = fixture.graph(weights).unwrap();
+        let options = PopulationOptions {
+            resamples: 24,
+            houdayer_every: 4,
+            ..PopulationOptions::default()
+        };
+        for seed in 0..4 {
+            let reference =
+                anneal_population_configured(&graph, &schedule, 8, seed, options, || false)
+                    .unwrap();
+            for mask in 1..16 {
+                let native = anneal_population_configured(
+                    &graph,
+                    &schedule,
+                    8,
+                    seed,
+                    PopulationOptions {
+                        shared_cache: mask & 1 != 0,
+                        copy_resampling: mask & 2 != 0,
+                        inline_union: mask & 4 != 0,
+                        fused_updates: mask & 8 != 0,
+                        cache_slots: 16,
+                        ..options
+                    },
+                    || false,
+                )
+                .unwrap();
+                assert_eq!(
+                    reference, native,
+                    "weights {weights:?}, seed {seed}, flags {mask}"
+                );
+                for sample in native {
+                    assert_eq!(sample.energy_milli, fixture.direct_energy(&sample.spins));
+                }
+            }
+        }
+    }
+}
+
+#[test]
+fn fused_cluster_and_cached_metropolis_preserve_each_move() {
+    use quip_solver_cpu::families::otsuka::SweepCache;
+    let fixture = corner_sharing();
+    for weights in [
+        Weights::FULL,
+        Weights {
+            tile_milli: 250,
+            pair_milli: 250,
+        },
+        Weights {
+            tile_milli: 1,
+            pair_milli: 0,
+        },
+    ] {
+        let graph = fixture.graph(weights).unwrap();
+        for seed in 0..8 {
+            let spins: Vec<_> = (0..fixture.h.len())
+                .map(|u| if (seed >> (u % 3)) & 1 == 0 { 1 } else { -1 })
+                .collect();
+            let mut scalar = Chain::new(&graph, spins.clone()).unwrap();
+            let mut native = Chain::new(&graph, spins).unwrap();
+            let mut left = SmallRng::seed_from_u64(seed);
+            let mut right = SmallRng::seed_from_u64(seed);
+            let mut cache = SweepCache::new(16);
+            for sweep in 0..128 {
+                let beta = 0.01 * 10_000_f64.powf(f64::from(sweep) / 127.0);
+                let a = scalar.cluster_sweep(beta, &mut left);
+                let b =
+                    native.cluster_sweep_optimized(beta, Some(&mut cache), true, true, &mut right);
+                assert_eq!(a, b);
+                assert_eq!(scalar.spins(), native.spins());
+                let a = scalar.single_sweep(beta, &mut left);
+                let b = native.single_sweep_cached(beta, &mut cache, &mut right);
+                assert_eq!(a, b);
+                assert_eq!(scalar.spins(), native.spins());
+            }
+        }
+    }
+}
+
+#[test]
 fn configured_population_defaults_preserve_the_stock_samples() {
     use quip_solver_cpu::families::otsuka::{anneal_population_configured, PopulationOptions};
     let graph = corner_sharing().graph(Weights::FULL).unwrap();
@@ -51,6 +150,7 @@ fn configured_population_stops_during_a_long_anneal() {
         PopulationOptions {
             resamples: 512,
             houdayer_every: 0,
+            ..PopulationOptions::default()
         },
         || {
             checks.set(checks.get() + 1);

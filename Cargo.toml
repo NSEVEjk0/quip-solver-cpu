@@ -123,6 +123,11 @@ path = "src/bin/quip_cpu_funnel.rs"
 required-features = ["experimental"]
 
 [[bin]]
+name = "quip-cpu-native"
+path = "src/bin/quip_cpu_native.rs"
+required-features = ["experimental"]
+
+[[bin]]
 name = "quip-cpu-ice-sat"
 path = "src/bin/quip_cpu_ice_sat.rs"
 required-features = ["experimental"]
@@ -232,6 +237,7 @@ tracing-flame = "0.2"
 tracing-subscriber = { version = "0.3", features = ["env-filter"] }
 
 [dev-dependencies]
+blake3 = "1"
 proptest = "1.11.0"
 quip-solver-conformance = "0.0.15"
 tokio = { version = "1", features = ["rt-multi-thread", "macros", "net", "time", "signal", "io-util", "sync", "process"] }

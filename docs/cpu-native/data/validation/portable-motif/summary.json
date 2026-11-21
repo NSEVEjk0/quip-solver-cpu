@@ -1,0 +1,22 @@
+{
+  "suite": "motif",
+  "instances": 1,
+  "settings": {
+    "before": {
+      "mean_seconds": 39.143054116,
+      "mean_best_energy": -5044.945,
+      "best_energy": -5044.945
+    },
+    "native": {
+      "mean_seconds": 40.041720498,
+      "mean_best_energy": -5044.945,
+      "best_energy": -5044.945
+    }
+  },
+  "median_speedup": 0.9775567490401698,
+  "bootstrap95_median": [
+    0.9775567490401698,
+    0.9775567490401698
+  ],
+  "exact_output_pairs": 1
+}

@@ -39,6 +39,133 @@ impl Breakup {
     }
 }
 
+/// Counters for the temperature-local transition cache.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct CacheStats {
+    /// Heat-bath lookups served without evaluating an exponential.
+    pub heat_hits: u64,
+    /// Heat-bath probabilities computed and retained.
+    pub heat_misses: u64,
+    /// Metropolis lookups served from the shared table.
+    pub metropolis_hits: u64,
+    /// Metropolis probabilities computed and retained.
+    pub metropolis_misses: u64,
+    /// Energy changes outside the bounded table, evaluated directly.
+    pub fallbacks: u64,
+    /// Temperature or bond-weight changes that rebuilt the breakup values.
+    pub temperatures: u64,
+}
+
+/// One bounded probability table shared by the replicas at a temperature.
+///
+/// Integer energy changes index the table without hash collisions. Epoch
+/// tags invalidate entries when beta changes, without clearing every slot.
+/// The scalar expressions and random draws remain identical to the stock
+/// update. Large or odd energy changes take the scalar path.
+#[derive(Debug)]
+pub struct SweepCache {
+    beta: f64,
+    weights: Weights,
+    breakup: Breakup,
+    epoch: u32,
+    slots: usize,
+    heat: Vec<f64>,
+    heat_epoch: Vec<u32>,
+    metropolis: Vec<f64>,
+    metropolis_epoch: Vec<u32>,
+    stats: CacheStats,
+}
+
+impl SweepCache {
+    /// Allocate a bounded table. `slots` is clamped to `1..=65536`.
+    /// Heat-bath entries cover signed half-deltas; Metropolis entries
+    /// cover positive half-deltas. No graph-size allocation is required.
+    #[must_use]
+    pub fn new(slots: usize) -> Self {
+        let slots = slots.clamp(1, 65_536);
+        Self {
+            beta: f64::NAN,
+            weights: Weights::FULL,
+            breakup: Breakup::new(1.0, Weights::FULL),
+            epoch: 0,
+            slots,
+            heat: vec![0.0; 2 * slots + 1],
+            heat_epoch: vec![0; 2 * slots + 1],
+            metropolis: vec![0.0; slots + 1],
+            metropolis_epoch: vec![0; slots + 1],
+            stats: CacheStats::default(),
+        }
+    }
+
+    /// Aggregate lookup counters for this table's lifetime.
+    #[must_use]
+    pub fn stats(&self) -> CacheStats {
+        self.stats
+    }
+
+    /// Bytes occupied by table payloads, excluding the small struct.
+    #[must_use]
+    pub fn table_bytes(&self) -> usize {
+        (self.heat.len() + self.metropolis.len()) * (size_of::<f64>() + size_of::<u32>())
+    }
+
+    fn prepare(&mut self, beta: f64, weights: Weights) {
+        if beta.to_bits() == self.beta.to_bits() && weights == self.weights {
+            return;
+        }
+        self.beta = beta;
+        self.weights = weights;
+        self.breakup = Breakup::new(beta, weights);
+        self.epoch = self.epoch.wrapping_add(1);
+        if self.epoch == 0 {
+            self.heat_epoch.fill(0);
+            self.metropolis_epoch.fill(0);
+            self.epoch = 1;
+        }
+        self.stats.temperatures += 1;
+    }
+
+    fn heat_probability(&mut self, delta: i64) -> f64 {
+        let slot = delta / 2 + self.slots as i64;
+        if delta % 2 != 0 || !(0..self.heat.len() as i64).contains(&slot) {
+            self.stats.fallbacks += 1;
+            return heat_probability(self.beta * delta as f64 / 1000.0);
+        }
+        let slot = slot as usize;
+        if self.heat_epoch[slot] == self.epoch {
+            self.stats.heat_hits += 1;
+            return self.heat[slot];
+        }
+        let probability = heat_probability(self.beta * delta as f64 / 1000.0);
+        self.heat[slot] = probability;
+        self.heat_epoch[slot] = self.epoch;
+        self.stats.heat_misses += 1;
+        probability
+    }
+
+    fn metropolis_probability(&mut self, delta: i64) -> f64 {
+        let slot = delta / 2;
+        if delta % 2 != 0 || !(0..self.metropolis.len() as i64).contains(&slot) {
+            self.stats.fallbacks += 1;
+            return (-self.beta * delta as f64 / 1000.0).exp();
+        }
+        let slot = slot as usize;
+        if self.metropolis_epoch[slot] == self.epoch {
+            self.stats.metropolis_hits += 1;
+            return self.metropolis[slot];
+        }
+        let probability = (-self.beta * delta as f64 / 1000.0).exp();
+        self.metropolis[slot] = probability;
+        self.metropolis_epoch[slot] = self.epoch;
+        self.stats.metropolis_misses += 1;
+        probability
+    }
+
+    fn heat_bath(&mut self, delta: i64, rng: &mut SmallRng) -> bool {
+        rng.gen::<f64>() < self.heat_probability(delta)
+    }
+}
+
 /// Union-find and component lists, reused across sweeps. Components are
 /// numbered densely in the order of their smallest node.
 #[derive(Debug)]
@@ -155,8 +282,42 @@ impl Workspace {
         }
     }
 
+    #[inline(always)]
+    fn find_inline(&mut self, mut u: u32) -> u32 {
+        loop {
+            let up = self.parent[u as usize];
+            if up == u {
+                return u;
+            }
+            let grand = self.parent[up as usize];
+            self.parent[u as usize] = grand;
+            u = grand;
+        }
+    }
+
+    #[inline(always)]
+    fn join_selected<const INLINE: bool>(&mut self, a: u32, b: u32) {
+        if !INLINE {
+            self.join(a, b);
+            return;
+        }
+        let a = self.find_inline(a);
+        let b = self.find_inline(b);
+        if a < b {
+            self.parent[b as usize] = a;
+        } else if b < a {
+            self.parent[a as usize] = b;
+        }
+    }
+
     /// Draw the bonds of every tile and pair, then list the components.
-    fn partition(&mut self, graph: &OtsukaGraph, s: &[i8], p: &Breakup, rng: &mut SmallRng) {
+    fn partition<const INLINE: bool>(
+        &mut self,
+        graph: &OtsukaGraph,
+        s: &[i8],
+        p: &Breakup,
+        rng: &mut SmallRng,
+    ) {
         for (u, parent) in self.parent.iter_mut().enumerate() {
             *parent = u as u32;
         }
@@ -185,21 +346,27 @@ impl Workspace {
                     continue;
                 }
                 if r < p.single_ice {
-                    self.join(up[(x & 1) as usize], down[((x >> 1) & 1) as usize]);
+                    self.join_selected::<INLINE>(
+                        up[(x & 1) as usize],
+                        down[((x >> 1) & 1) as usize],
+                    );
                 } else {
                     let c = (x & 1) as usize;
-                    self.join(up[0], down[c]);
-                    self.join(up[1], down[1 - c]);
+                    self.join_selected::<INLINE>(up[0], down[c]);
+                    self.join_selected::<INLINE>(up[1], down[1 - c]);
                 }
             } else if r >= p.zero_defect {
                 // The source took the partner from the low bits modulo three,
                 // which favours the first. A separate range draw is uniform.
-                self.join(up[rng.gen_range(0..ups)], down[rng.gen_range(0..downs)]);
+                self.join_selected::<INLINE>(
+                    up[rng.gen_range(0..ups)],
+                    down[rng.gen_range(0..downs)],
+                );
             }
         }
         for &(u, v) in &graph.pairs {
             if s[u as usize] == s[v as usize] && rng.gen::<f64>() < p.pair_link {
-                self.join(u, v);
+                self.join_selected::<INLINE>(u, v);
             }
         }
         // Number the components, count their nodes, then list the nodes.
@@ -245,7 +412,21 @@ impl Workspace {
         rng: &mut SmallRng,
     ) -> i64 {
         let p = Breakup::new(beta, graph.weights);
-        self.partition(graph, s, &p, rng);
+        self.cluster_sweep_using::<false, false>(graph, s, &p, rng, |d, rng| {
+            heat_bath(beta * d as f64 / 1000.0, rng)
+        })
+    }
+
+    fn cluster_sweep_using<const INLINE: bool, const FUSED: bool>(
+        &mut self,
+        graph: &OtsukaGraph,
+        s: &mut [i8],
+        p: &Breakup,
+        rng: &mut SmallRng,
+        mut draw: impl FnMut(i64, &mut SmallRng) -> bool,
+    ) -> i64 {
+        self.partition::<INLINE>(graph, s, p, rng);
+        let fused = FUSED.then(|| graph.fused());
         // delta[c] = -2 * sum over the weak edges that leave c of J s_u s_v.
         self.delta.fill(0);
         let (label, delta) = (&self.label, &mut self.delta);
@@ -264,20 +445,35 @@ impl Workspace {
         // deltas of its neighbours are patched before the next one draws.
         for c in 0..self.delta.len() {
             let d = self.delta[c];
-            if !heat_bath(beta * d as f64 / 1000.0, rng) {
+            if !draw(d, rng) {
                 continue;
             }
             for at in self.start[c] as usize..self.start[c + 1] as usize {
                 let u = self.members[at] as usize;
                 let su = i64::from(s[u]);
-                for &link in graph.weak.row(u) {
-                    let v = link.node();
-                    let lv = self.label[v] as usize;
-                    if lv != c {
-                        self.delta[lv] += 4 * i64::from(link.j()) * su * i64::from(s[v]);
+                if let Some(rows) = fused {
+                    let twice = 2 * su;
+                    change -= twice * self.field[u];
+                    for &link in rows.row(u) {
+                        let v = link.node();
+                        let residual = link.residual();
+                        let lv = self.label[v] as usize;
+                        if residual != 0 && lv != c {
+                            self.delta[lv] += 4 * i64::from(residual) * su * i64::from(s[v]);
+                        }
+                        self.field[v] -= twice * i64::from(link.full());
                     }
+                    s[u] = -s[u];
+                } else {
+                    for &link in graph.weak.row(u) {
+                        let v = link.node();
+                        let lv = self.label[v] as usize;
+                        if lv != c {
+                            self.delta[lv] += 4 * i64::from(link.j()) * su * i64::from(s[v]);
+                        }
+                    }
+                    change += self.flip(graph, s, u);
                 }
-                change += self.flip(graph, s, u);
             }
             self.delta[c] = -d;
         }
@@ -293,6 +489,15 @@ fn heat_bath(x: f64, rng: &mut SmallRng) -> bool {
     } else {
         let e = (-x).exp();
         rng.gen::<f64>() < e / (1.0 + e)
+    }
+}
+
+fn heat_probability(x: f64) -> f64 {
+    if x <= 0.0 {
+        1.0 / (1.0 + x.exp())
+    } else {
+        let e = (-x).exp();
+        e / (1.0 + e)
     }
 }
 
@@ -387,6 +592,78 @@ impl<'g> Chain<'g> {
             .cluster_sweep(self.graph, &mut self.spins, beta, rng)
     }
 
+    /// A cluster sweep using a probability table shared with other replicas.
+    /// The table is prepared for this graph's weights and `beta` on demand.
+    pub fn cluster_sweep_cached(
+        &mut self,
+        beta: f64,
+        cache: &mut SweepCache,
+        rng: &mut SmallRng,
+    ) -> i64 {
+        cache.prepare(beta, self.graph.weights);
+        let breakup = cache.breakup;
+        self.work.cluster_sweep_using::<false, false>(
+            self.graph,
+            &mut self.spins,
+            &breakup,
+            rng,
+            |delta, rng| cache.heat_bath(delta, rng),
+        )
+    }
+
+    /// A cluster sweep with independently selectable CPU update layouts.
+    /// Component numbering, random draws, and full-model energy changes
+    /// remain identical to the scalar path.
+    pub fn cluster_sweep_optimized(
+        &mut self,
+        beta: f64,
+        cache: Option<&mut SweepCache>,
+        inline_union: bool,
+        fused_updates: bool,
+        rng: &mut SmallRng,
+    ) -> i64 {
+        macro_rules! run {
+            ($inline:literal, $fused:literal) => {
+                if let Some(cache) = cache {
+                    cache.prepare(beta, self.graph.weights);
+                    let p = cache.breakup;
+                    self.work.cluster_sweep_using::<$inline, $fused>(
+                        self.graph,
+                        &mut self.spins,
+                        &p,
+                        rng,
+                        |d, rng| cache.heat_bath(d, rng),
+                    )
+                } else {
+                    let p = Breakup::new(beta, self.graph.weights);
+                    self.work.cluster_sweep_using::<$inline, $fused>(
+                        self.graph,
+                        &mut self.spins,
+                        &p,
+                        rng,
+                        |d, rng| heat_bath(beta * d as f64 / 1000.0, rng),
+                    )
+                }
+            };
+        }
+        match (inline_union, fused_updates) {
+            (false, false) => run!(false, false),
+            (true, false) => run!(true, false),
+            (false, true) => run!(false, true),
+            (true, true) => run!(true, true),
+        }
+    }
+
+    pub(super) fn save_state(&self, spins: &mut [i8], fields: &mut [i64]) {
+        spins.copy_from_slice(&self.spins);
+        fields.copy_from_slice(&self.work.field);
+    }
+
+    pub(super) fn restore_state(&mut self, spins: &[i8], fields: &[i64]) {
+        self.spins.copy_from_slice(spins);
+        self.work.field.copy_from_slice(fields);
+    }
+
     /// Flip every node of `nodes` once. Returns the model energy change in
     /// milli.
     pub(crate) fn flip_nodes(&mut self, nodes: &[u32]) -> i64 {
@@ -407,5 +684,66 @@ impl<'g> Chain<'g> {
             }
         }
         change
+    }
+
+    /// A Metropolis sweep using the population's shared probability table.
+    /// It uses the same acceptance expression and random draws as the scalar
+    /// sweep, including the unconditional acceptance of nonpositive deltas.
+    pub fn single_sweep_cached(
+        &mut self,
+        beta: f64,
+        cache: &mut SweepCache,
+        rng: &mut SmallRng,
+    ) -> i64 {
+        cache.prepare(beta, self.graph.weights);
+        let (graph, s, work) = (self.graph, &mut self.spins, &mut self.work);
+        let mut change = 0;
+        for u in 0..graph.n {
+            let delta = -2 * i64::from(s[u]) * work.field[u];
+            if delta <= 0 || rng.gen::<f64>() < cache.metropolis_probability(delta) {
+                change += work.flip(graph, s, u);
+            }
+        }
+        change
+    }
+}
+
+#[cfg(test)]
+mod cache_tests {
+    use super::*;
+
+    #[test]
+    fn cached_probabilities_match_scalar_bits_and_epoch_changes() {
+        let mut cache = SweepCache::new(64);
+        for beta in [0.001, 0.5, 1.0, 12.0, 48.0, 700.0, 1.0] {
+            cache.prepare(beta, Weights::FULL);
+            for delta in (-300..300).chain([i64::MIN, i64::MAX]) {
+                let expected = heat_probability(beta * delta as f64 / 1000.0);
+                for _ in 0..2 {
+                    assert_eq!(cache.heat_probability(delta).to_bits(), expected.to_bits());
+                }
+                if delta > 0 {
+                    let expected = (-beta * delta as f64 / 1000.0).exp();
+                    for _ in 0..2 {
+                        assert_eq!(
+                            cache.metropolis_probability(delta).to_bits(),
+                            expected.to_bits()
+                        );
+                    }
+                }
+            }
+        }
+        cache.epoch = u32::MAX;
+        cache.prepare(0.002, Weights::FULL);
+        assert_eq!(cache.epoch, 1);
+        assert_eq!(
+            cache.heat_probability(2).to_bits(),
+            heat_probability(0.002 * 2.0 / 1000.0).to_bits()
+        );
+        assert!(
+            cache.stats.heat_hits > 0
+                && cache.stats.metropolis_hits > 0
+                && cache.stats.fallbacks > 0
+        );
     }
 }

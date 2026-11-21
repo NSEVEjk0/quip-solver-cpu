@@ -1,0 +1,36 @@
+{
+  "suite": "temperature",
+  "instances": 1,
+  "settings": {
+    "beta10": {
+      "mean_seconds": 0.264692968,
+      "mean_best_energy": -4928.735,
+      "best_energy": -4928.735
+    },
+    "beta12": {
+      "mean_seconds": 0.233976605,
+      "mean_best_energy": -4904.265,
+      "best_energy": -4904.265
+    },
+    "beta16": {
+      "mean_seconds": 0.234552866,
+      "mean_best_energy": -4916.835,
+      "best_energy": -4916.835
+    },
+    "beta18": {
+      "mean_seconds": 0.221180898,
+      "mean_best_energy": -4918.795,
+      "best_energy": -4918.795
+    },
+    "beta24": {
+      "mean_seconds": 0.229497314,
+      "mean_best_energy": -4928.025,
+      "best_energy": -4928.025
+    },
+    "beta8": {
+      "mean_seconds": 0.245900746,
+      "mean_best_energy": -4925.035,
+      "best_energy": -4925.035
+    }
+  }
+}

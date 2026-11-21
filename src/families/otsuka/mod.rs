@@ -29,7 +29,7 @@ use std::fmt;
 pub use graph::{
     GraphError, Model, Motifs, OtsukaGraph, Weights, MAX_NODES, PAIR_MILLI, STRONG_MILLI,
 };
-pub use update::{Chain, SpinError};
+pub use update::{CacheStats, Chain, SpinError, SweepCache};
 
 /// Why a schedule cannot drive an anneal.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
@@ -161,6 +161,16 @@ pub struct PopulationOptions {
     pub resamples: usize,
     /// Sweeps between Houdayer moves; zero uses the resampling cadence.
     pub houdayer_every: usize,
+    /// Share temperature-local transition probabilities across replicas.
+    pub shared_cache: bool,
+    /// Positive half-delta slots in the bounded probability table.
+    pub cache_slots: usize,
+    /// Transfer spins and their exact local fields during resampling.
+    pub copy_resampling: bool,
+    /// Inline the monotone union-find path in the cluster draw.
+    pub inline_union: bool,
+    /// Patch residual deltas and full local fields in one neighbor pass.
+    pub fused_updates: bool,
 }
 
 impl Default for PopulationOptions {
@@ -168,7 +178,71 @@ impl Default for PopulationOptions {
         Self {
             resamples: RESAMPLES,
             houdayer_every: 1,
+            shared_cache: false,
+            cache_slots: 8192,
+            copy_resampling: false,
+            inline_union: false,
+            fused_updates: false,
         }
+    }
+}
+
+/// Operation counts for one population anneal.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct PopulationMetrics {
+    /// Cluster sweeps executed across replicas.
+    pub replica_sweeps: usize,
+    /// Population-resampling checkpoints executed.
+    pub resamples: usize,
+    /// Local-field rebuilds from adjacency, including initial states.
+    pub field_rebuilds: usize,
+    /// Replica fields restored from a captured parent state.
+    pub field_copies: usize,
+    /// Adjacency entries not revisited because parent fields were copied.
+    pub coefficient_visits_avoided: usize,
+    /// Record-improvement states passed to the observer.
+    pub observer_records: usize,
+    /// Probability table size in bytes.
+    pub cache_bytes: usize,
+    /// Temperature-local probability counters.
+    pub cache: CacheStats,
+}
+
+/// Population samples and the operation counts of their anneal.
+#[derive(Debug)]
+pub struct PopulationOutcome {
+    /// Best retained state of each replica.
+    pub samples: Vec<Sample>,
+    /// Executed work and cache activity.
+    pub metrics: PopulationMetrics,
+}
+
+/// Fixed-size storage of parent spins and fields, reused at every checkpoint.
+struct PopulationSnapshot {
+    nodes: usize,
+    spins: Vec<i8>,
+    fields: Vec<i64>,
+}
+
+impl PopulationSnapshot {
+    fn new(replicas: usize, nodes: usize) -> Self {
+        Self {
+            nodes,
+            spins: vec![0; replicas * nodes],
+            fields: vec![0; replicas * nodes],
+        }
+    }
+
+    fn capture(&mut self, chains: &[Chain<'_>]) {
+        for (i, chain) in chains.iter().enumerate() {
+            let row = i * self.nodes..(i + 1) * self.nodes;
+            chain.save_state(&mut self.spins[row.clone()], &mut self.fields[row]);
+        }
+    }
+
+    fn restore(&self, chain: &mut Chain<'_>, parent: usize) {
+        let row = parent * self.nodes..(parent + 1) * self.nodes;
+        chain.restore_state(&self.spins[row.clone()], &self.fields[row]);
     }
 }
 
@@ -221,6 +295,26 @@ pub fn anneal_population_configured(
     options: PopulationOptions,
     stopped: impl Fn() -> bool,
 ) -> Result<Vec<Sample>, AnnealError> {
+    anneal_population_observed(graph, schedule, replicas, seed, options, stopped, |_, _| {})
+        .map(|outcome| outcome.samples)
+}
+
+/// Population annealing with CPU update options and a record-state observer.
+/// The observer sees initial states and replica record improvements,
+/// including cluster states before a following Metropolis sweep.
+/// It does not change replica ancestry or random draws.
+///
+/// # Errors
+/// Returns [`AnnealError::Cancelled`] when `stopped` becomes true.
+pub fn anneal_population_observed(
+    graph: &OtsukaGraph,
+    schedule: &Schedule<'_>,
+    replicas: usize,
+    seed: u64,
+    options: PopulationOptions,
+    stopped: impl Fn() -> bool,
+    mut observe: impl FnMut(i64, &[i8]),
+) -> Result<PopulationOutcome, AnnealError> {
     let mut rng = SmallRng::seed_from_u64(seed);
     let mut chains: Vec<Chain<'_>> = (0..replicas)
         .map(|_| Chain::random(graph, &mut rng))
@@ -231,6 +325,20 @@ pub fn anneal_population_configured(
         .zip(&energy)
         .map(|(c, &e)| (c.spins().to_vec(), e))
         .collect();
+    let mut metrics = PopulationMetrics {
+        field_rebuilds: replicas,
+        ..PopulationMetrics::default()
+    };
+    for (chain, &e) in chains.iter().zip(&energy) {
+        observe(e, chain.spins());
+        metrics.observer_records += 1;
+    }
+    let mut cache = options
+        .shared_cache
+        .then(|| SweepCache::new(options.cache_slots));
+    let mut snapshot = options
+        .copy_resampling
+        .then(|| PopulationSnapshot::new(replicas, graph.n));
     let every = schedule
         .betas
         .len()
@@ -247,10 +355,22 @@ pub fn anneal_population_configured(
     for (sweep, &beta) in schedule.betas.iter().enumerate() {
         if sweep > 0 && sweep % every == 0 && replicas > 1 {
             let picks = resample(&energy, beta - last_beta, &mut rng);
-            let states: Vec<Vec<i8>> = picks.iter().map(|&i| chains[i].spins().to_vec()).collect();
-            for (chain, state) in chains.iter_mut().zip(&states) {
-                chain.reset(state).expect("a state of the same graph");
+            if let Some(snapshot) = &mut snapshot {
+                snapshot.capture(&chains);
+                for (chain, &parent) in chains.iter_mut().zip(&picks) {
+                    snapshot.restore(chain, parent);
+                }
+                metrics.field_copies += replicas;
+                metrics.coefficient_visits_avoided += replicas * graph.all.link_count();
+            } else {
+                let states: Vec<Vec<i8>> =
+                    picks.iter().map(|&i| chains[i].spins().to_vec()).collect();
+                for (chain, state) in chains.iter_mut().zip(&states) {
+                    chain.reset(state).expect("a state of the same graph");
+                }
+                metrics.field_rebuilds += replicas;
             }
+            metrics.resamples += 1;
             energy = picks.iter().map(|&i| energy[i]).collect();
             best = picks.iter().map(|&i| best[i].clone()).collect();
             last_beta = beta;
@@ -259,9 +379,32 @@ pub fn anneal_population_configured(
             if stopped() {
                 return Err(AnnealError::Cancelled);
             }
-            *e += chain.cluster_sweep(beta, &mut rng);
+            metrics.replica_sweeps += 1;
+            if options.shared_cache || options.inline_union || options.fused_updates {
+                *e += chain.cluster_sweep_optimized(
+                    beta,
+                    cache.as_mut(),
+                    options.inline_union,
+                    options.fused_updates,
+                    &mut rng,
+                );
+            } else {
+                *e += chain.cluster_sweep(beta, &mut rng);
+            }
+            if *e < lowest.1 {
+                observe(*e, chain.spins());
+                metrics.observer_records += 1;
+            }
             if schedule.single_every > 0 && (sweep + 1).is_multiple_of(schedule.single_every) {
-                *e += chain.single_sweep(beta, &mut rng);
+                *e += if let Some(cache) = &mut cache {
+                    chain.single_sweep_cached(beta, cache, &mut rng)
+                } else {
+                    chain.single_sweep(beta, &mut rng)
+                };
+                if *e < lowest.1 {
+                    observe(*e, chain.spins());
+                    metrics.observer_records += 1;
+                }
             }
             if *e < lowest.1 {
                 lowest.0.copy_from_slice(chain.spins());
@@ -279,6 +422,8 @@ pub fn anneal_population_configured(
                     energy[b] += db;
                     for i in [a, b] {
                         if energy[i] < best[i].1 {
+                            observe(energy[i], chains[i].spins());
+                            metrics.observer_records += 1;
                             best[i].0.copy_from_slice(chains[i].spins());
                             best[i].1 = energy[i];
                         }
@@ -287,14 +432,21 @@ pub fn anneal_population_configured(
             }
         }
     }
-    Ok(best
-        .into_iter()
-        .map(|(spins, energy_milli)| Sample {
-            spins,
-            energy_milli,
-            sweeps: schedule.betas.len(),
-        })
-        .collect())
+    if let Some(cache) = cache {
+        metrics.cache = cache.stats();
+        metrics.cache_bytes = cache.table_bytes();
+    }
+    Ok(PopulationOutcome {
+        samples: best
+            .into_iter()
+            .map(|(spins, energy_milli)| Sample {
+                spins,
+                energy_milli,
+                sweeps: schedule.betas.len(),
+            })
+            .collect(),
+        metrics,
+    })
 }
 
 /// Scratch space of a Houdayer move.

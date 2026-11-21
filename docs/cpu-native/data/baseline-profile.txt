@@ -1,0 +1,29 @@
+# To display the perf.data header info, please use --header/--header-only options.
+#
+#
+# Total Lost Samples: 0
+#
+# Samples: 3K of event 'cycles:u'
+# Event count (approx.): 44930883293
+#
+# Overhead  Symbol                                                                                                                                                                                                                                                            IPC   [IPC Coverage]
+# ........  ................................................................................................................................................................................................................................................................  ....................
+#
+    66.50%  [.] <quip_solver_cpu::families::otsuka::update::Chain>::cluster_sweep                                                                                                                                                                                             -      -
+            |
+            |--33.71%--0x141e9
+            |
+             --29.87%--0x11cf
+
+    14.80%  [.] <quip_solver_cpu::families::otsuka::update::Workspace>::join                                                                                                                                                                                                  -      -
+     9.11%  [.] <quip_solver_cpu::families::otsuka::update::Chain>::single_sweep                                                                                                                                                                                              -      -
+     3.14%  [.] <quip_solver_cpu::families::otsuka::update::Chain>::reset                                                                                                                                                                                                     -      -
+            |
+            ---0x7ff
+
+     1.85%  [.] exp                                                                                                                                                                                                                                                           -      -
+
+
+#
+# (Cannot load tips.txt file, please install perf!)
+#

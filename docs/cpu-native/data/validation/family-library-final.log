@@ -1,0 +1,37 @@
+   Compiling quip-solver-cpu v0.3.6 (/root/quip-cpu-lab-20261120/quip-solver-cpu)
+    Finished `release` profile [optimized] target(s) in 39.09s
+     Running unittests src/lib.rs (target/release/deps/quip_solver_cpu-939214e7a39613a4)
+
+running 30 tests
+test families::dimer_weighted::tests::bad_block_memberships_are_refused ... ok
+test families::dimer_weighted::tests::blocks_outside_two_through_eight_spins_are_refused ... ok
+test families::dimer_weighted::tests::exact_blocks_reach_the_boundary_conditioned_minimum_in_every_lane ... ok
+test families::dimer_weighted::tests::block_flip_deltas_exclude_all_internal_bonds_at_large_degree ... ok
+test families::dimer_weighted_sampler::tests::a_family_job_with_a_field_is_declined_before_sampling ... ok
+test families::dimer_weighted_sampler::tests::a_reference_instance_samples_and_rescores_on_the_job_graph ... ok
+test families::dimer_weighted_sampler::tests::a_short_job_graph_does_not_fit_the_instance ... ok
+test families::dipolar_sampler::tests::a_family_job_returns_every_read_rescored ... ok
+test families::dipolar_sampler::tests::a_physical_job_without_calibration_is_declined ... ok
+test families::dipolar_sampler::tests::a_plain_job_is_annealed ... ok
+test families::dipolar_sampler::tests::refused_settings_decline_family_jobs ... ok
+test families::dipolar_sampler::tests::the_declaration_names_exactly_revision_1 ... ok
+test families::flow_loops_sampler::tests::a_plain_job_is_annealed ... ok
+test families::flow_loops_sampler::tests::budget_s_sets_the_declared_budget_and_refuses_bad_values ... ok
+test families::flow_loops_sampler::tests::the_declaration_lists_exactly_the_p_and_f_revisions ... ok
+test families::flow_sampler::tests::a_plain_job_is_annealed ... ok
+test families::flow_sampler::tests::the_declaration_lists_exactly_the_two_baseline_revisions ... ok
+test families::dimer_weighted::tests::fields_inexact_couplings_and_overflowing_sums_are_refused ... ok
+test families::funnel::tests::cached_generator_matches_64_canonical_nonces ... ok
+test families::funnel::tests::motif_original_energy_conversion_matches_full_canonical_rescoring ... ok
+test families::funnel::tests::native_execution_preserves_pipeline_reads_and_archive_never_loses_the_best ... ok
+test families::ice_sat_sampler::tests::a_job_with_no_witness_is_declined ... ok
+test families::funnel::tests::biased_anneals_report_original_energies_and_polish_never_raises_them ... ok
+test families::ice_sat_sampler::tests::a_missing_or_unusable_kissat_is_reported ... ok
+test families::ice_sat_sampler::tests::the_metadata_gauges_agree_with_the_couplings_of_reference_instances ... ok
+test families::otsuka::update::cache_tests::cached_probabilities_match_scalar_bits_and_epoch_changes ... ok
+test families::otsuka_sampler::tests::a_reference_twisted_dimer_instance_takes_the_otsuka_path ... ok
+test families::otsuka_sampler::tests::a_section_is_found_by_its_kind ... ok
+test families::otsuka_sampler::tests::pairs_parse_from_their_count_and_positions ... ok
+test families::ice_sat_sampler::tests::a_later_failed_read_keeps_the_earlier_witnesses ... ok
+
+test result: ok. 30 passed; 0 failed; 0 ignored; 0 measured; 427 filtered out; finished in 0.75s

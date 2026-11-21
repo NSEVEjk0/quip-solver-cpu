@@ -1,0 +1,2 @@
+# Evaluated plotting environment: Python 3.14, matplotlib 3.11.2.
+matplotlib==3.11.2

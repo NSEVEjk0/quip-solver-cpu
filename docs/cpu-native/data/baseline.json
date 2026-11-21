@@ -1,0 +1,6 @@
+{
+  "revision": "17107d1445a10b432126d911f2a8f1bef81ac34f",
+  "binary": "baseline-quip-cpu-funnel",
+  "cpu_affinity": "3,4",
+  "current_recipe": "weak 45 / pairs 1350"
+}

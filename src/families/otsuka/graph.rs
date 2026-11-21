@@ -4,6 +4,7 @@
 
 use std::collections::HashMap;
 use std::fmt;
+use std::sync::OnceLock;
 
 /// The strong tile coupling, in milli. A tile edge between positions `a` and
 /// `b` carries `STRONG_MILLI * g[a] * g[b]`.
@@ -209,6 +210,71 @@ impl Csr {
     pub(crate) fn row(&self, u: usize) -> &[Link] {
         &self.adj[self.start[u]..self.start[u + 1]]
     }
+
+    pub(crate) fn link_count(&self) -> usize {
+        self.adj.len()
+    }
+}
+
+/// A neighbor, its full coupling, and its residual coupling in one word.
+/// Node positions use 21 bits; each coupling uses 11 biased signed bits.
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct FusedLink(u64);
+
+impl FusedLink {
+    fn new(node: u32, full: i32, residual: i32) -> Self {
+        Self((u64::from(node) << 22) | (((full + 1024) as u64) << 11) | (residual + 1024) as u64)
+    }
+
+    #[inline]
+    pub(crate) fn node(self) -> usize {
+        (self.0 >> 22) as usize
+    }
+
+    #[inline]
+    pub(crate) fn full(self) -> i32 {
+        ((self.0 >> 11) & 2047) as i32 - 1024
+    }
+
+    #[inline]
+    pub(crate) fn residual(self) -> i32 {
+        (self.0 & 2047) as i32 - 1024
+    }
+}
+
+/// Rows that update full local fields and residual component deltas together.
+#[derive(Debug)]
+pub(crate) struct FusedCsr {
+    start: Vec<usize>,
+    adj: Vec<FusedLink>,
+}
+
+impl FusedCsr {
+    fn build(graph: &OtsukaGraph) -> Self {
+        let residual: HashMap<_, _> = graph
+            .weak_edges
+            .iter()
+            .map(|&(u, link)| (key(u as usize, link.node()), link.j()))
+            .collect();
+        let start = graph.all.start.clone();
+        let mut fill = start.clone();
+        let mut adj = vec![FusedLink(0); graph.all.adj.len()];
+        for &(u, v, full) in &graph.edges {
+            let weak = residual
+                .get(&key(u as usize, v as usize))
+                .copied()
+                .unwrap_or(0);
+            for (from, to) in [(u, v), (v, u)] {
+                adj[fill[from as usize]] = FusedLink::new(to, full, weak);
+                fill[from as usize] += 1;
+            }
+        }
+        Self { start, adj }
+    }
+
+    pub(crate) fn row(&self, u: usize) -> &[FusedLink] {
+        &self.adj[self.start[u]..self.start[u + 1]]
+    }
 }
 
 /// A validated gauged-ice graph split into strong and weak layers.
@@ -226,6 +292,7 @@ pub struct OtsukaGraph {
     pub(crate) weak: Csr,
     /// Every coupling, for single-spin moves.
     pub(crate) all: Csr,
+    fused: OnceLock<FusedCsr>,
 }
 
 /// An edge and its coupling in milli. Node positions fit `u32`, because the
@@ -396,6 +463,7 @@ impl OtsukaGraph {
             weights,
             weak: Csr::build(n, &weak_edges),
             all: Csr::build(n, &edges),
+            fused: OnceLock::new(),
             weak_edges: weak_edges
                 .iter()
                 .map(|&(u, v, j)| (u, Link::new(v, j)))
@@ -410,6 +478,10 @@ impl OtsukaGraph {
         self.n
     }
 
+    pub(crate) fn fused(&self) -> &FusedCsr {
+        self.fused.get_or_init(|| FusedCsr::build(self))
+    }
+
     /// The model energy of `s`, in milli.
     #[must_use]
     pub fn energy(&self, s: &[i8]) -> i64 {
@@ -417,6 +489,29 @@ impl OtsukaGraph {
             .iter()
             .map(|&(u, v, j)| i64::from(j) * i64::from(s[u as usize] * s[v as usize]))
             .sum()
+    }
+
+    /// Energy of physical strong couplings, independent of draw weights.
+    /// Tiles and pairs were checked against full +/-1000 couplings at
+    /// graph admission, so their motif formula is an exact strong sum.
+    #[must_use]
+    pub fn full_strong_energy(&self, s: &[i8]) -> i64 {
+        let tiles: i64 = self
+            .tiles
+            .iter()
+            .map(|tile| {
+                let q: i64 = (0..4)
+                    .map(|k| i64::from(tile.gauge[k] * s[tile.nodes[k] as usize]))
+                    .sum();
+                1000 * (q * q - 4) / 2
+            })
+            .sum();
+        let pairs: i64 = self
+            .pairs
+            .iter()
+            .map(|&(u, v)| -1000 * i64::from(s[u as usize] * s[v as usize]))
+            .sum();
+        tiles + pairs
     }
 
     /// The energy of the strong layer at the graph's weights, in milli.

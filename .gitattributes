@@ -1,0 +1,3 @@
+# Keep generated measurements and figures collapsible in source reviews.
+docs/cpu-native/data/** linguist-generated=true
+docs/cpu-native/figures/** linguist-generated=true

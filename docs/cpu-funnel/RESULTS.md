@@ -1,9 +1,8 @@
-# CPU Funnel measurements — 20 November 2026
+# CPU baseline measurements — 20 November 2026
 
-This branch adapts BudFox / ntllinh2511's GPU Funnel ideas to upstream CPU
-Otsuka. It improves solve depth on this host, with additional time per sweep.
-Optional screening showed no clear gain in the small paired experiment, so
-the live trial uses direct solving. **No network win or reward is established.**
+These records establish the initial CPU configuration and tuning baseline.
+Current CPU-native implementation measurements are documented in
+[the native experiment report](../cpu-native/EXPERIMENTS.md).
 
 Hardware: six AMD EPYC 7663 vCPUs, about 5.8 GiB RAM, shared with other
 services. Every benchmark used two logical CPUs, a 768 MiB container limit,
@@ -21,15 +20,9 @@ Different miner salts still produce different family instances. Screening
 is an attempt to spend solver time on favorable instances; its value must
 be measured for the specific recipe, hardware, and budget.
 
-The instance-selection writeup shared in the community described the older
-`0xcbec1eb4…` topology. These tests use the current recipe and do not reproduce
-its claimed 24/24 result. The imported structural models were fitted to GPU
-labels and an older weak-62 recipe. CPU-specific fitting remains future work.
-
 [Published validator code](https://gitlab.com/quip.network/quip-validator/-/blob/main/pallets/quantum-pow/src/lib.rs#L1077) binds nonces to the previous proof block hash,
 miner account, and salt, and rejects old-round nonces. The device timing
-[field is self-reported](https://gitlab.com/quip.network/quip-validator/-/blob/main/pallets/quantum-pow/src/types.rs#L35); these measurements do not verify accusations about
-any account's reported timing. This branch reports actual CPU hardware and
+[field is self-reported](https://gitlab.com/quip.network/quip-validator/-/blob/main/pallets/quantum-pow/src/types.rs#L35); the analysis uses measured wall time. The implementation reports CPU hardware and
 scores every proof against the original coefficients.
 
 ## Screening at equal sweep counts
@@ -63,8 +56,9 @@ Each used 16 reads and two vCPUs.
 | Tuned direct | 8192 | -5049.000 | -5050.575 | 47.155 |
 | Tuned direct | 32768 | -5056.390 | -5057.465 | 180.438 |
 
-At equal sweeps, tuned direct gained 15.3 milli while taking 26.5% longer.
-Quadrupling its sweep budget gained another 7.39 milli, at 3.83 times the
+At equal sweeps, tuned direct gained 15.3 energy units (15,300 milli units)
+while taking 26.5% longer. Quadrupling its sweep budget gained another
+7.39 energy units (7,390 milli units), at 3.83 times the
 wall time. The live trial starts at 8192 sweeps to try more instances per
 round. This two-instance sample supports testing the tradeoff, not a
 general speed or win-rate claim. All three runs had zero rejected results
@@ -77,7 +71,7 @@ approximately -4760. The new trial uses the same operator identity and
 coordinator, two CPU workers, 16 reads / 8192 sweeps, and screening off.
 The observed best reached -5052.435. RAM snapshots were approximately
 62 and 77 MiB, with about two vCPUs in use. The observed new-round target was approximately -5093;
-this improvement in energy does not establish competitiveness or rewards.
+block eligibility is evaluated separately against the round target.
 At qblock 1490, the coordinator recorded a 1.6 ms cancellation acknowledgement
 and fresh results followed in the new round. No rejected work was observed.
 The [observation record](data/live-observation.json) contains the sampled

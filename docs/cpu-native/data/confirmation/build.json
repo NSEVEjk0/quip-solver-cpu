@@ -1,0 +1,6 @@
+{
+  "binary_sha256": "5f99242b0010fb44e6162c1ac8de1eb2338073796d0c71295355b043d1260856",
+  "stage": "Before motif-domain archive scoring",
+  "reads": 16,
+  "sweeps": 8192
+}

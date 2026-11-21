@@ -1,0 +1,7 @@
+{
+  "pairs": 8,
+  "median_speedup": 1.0852003499033107,
+  "mean_before_seconds": 42.321410408375,
+  "mean_native_seconds": 39.388362045125,
+  "exact_output_pairs": 8
+}

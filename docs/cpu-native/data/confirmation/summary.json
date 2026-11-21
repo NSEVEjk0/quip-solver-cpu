@@ -1,0 +1,34 @@
+{
+  "reference": {
+    "instances": 8,
+    "mean_seconds": 43.648908186374996,
+    "mean_energy": -5048.92,
+    "best_energy": -5059.455
+  },
+  "native-execution": {
+    "instances": 8,
+    "mean_seconds": 39.2932518085,
+    "mean_energy": -5048.92,
+    "best_energy": -5059.455
+  },
+  "native-archive": {
+    "instances": 8,
+    "mean_seconds": 40.29706182225,
+    "mean_energy": -5049.1075,
+    "best_energy": -5059.455
+  },
+  "native-beta10": {
+    "instances": 8,
+    "mean_seconds": 39.5112334535,
+    "mean_energy": -5045.46125,
+    "best_energy": -5051.115
+  },
+  "execution": {
+    "median_speedup": 1.12222128924806,
+    "bootstrap95_median": [
+      1.1037078122812114,
+      1.1405054326669073
+    ],
+    "exact_trajectory_pairs": 8
+  }
+}

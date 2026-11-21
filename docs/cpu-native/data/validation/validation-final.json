@@ -1,0 +1,138 @@
+[
+  {
+    "check": "fmt-final",
+    "command": [
+      "cargo",
+      "fmt",
+      "--all",
+      "--check"
+    ],
+    "exit_code": 0,
+    "seconds": 0.7997247837483883
+  },
+  {
+    "check": "family-library-final",
+    "command": [
+      "cargo",
+      "test",
+      "--release",
+      "--locked",
+      "--features",
+      "experimental",
+      "--lib",
+      "families::",
+      "-j",
+      "2"
+    ],
+    "exit_code": 0,
+    "seconds": 39.957596557214856
+  },
+  {
+    "check": "otsuka_kernel-final-compile",
+    "command": [
+      "rustup",
+      "run",
+      "1.97.1",
+      "rustc",
+      "--test",
+      "--edition=2021",
+      "--cfg",
+      "feature=\"experimental\"",
+      "/root/quip-cpu-lab-20261120/quip-solver-cpu/tests/otsuka_kernel.rs",
+      "-C",
+      "opt-level=3",
+      "-L",
+      "dependency=/root/quip-cpu-lab-20261120/quip-solver-cpu/target/release/deps",
+      "-o",
+      "/root/quip-cpu-research-20261121/otsuka_kernel-final-tests",
+      "--extern",
+      "quip_solver_cpu=/root/quip-cpu-lab-20261120/quip-solver-cpu/target/release/libquip_solver_cpu.rlib",
+      "--extern",
+      "quip_solver_core=/root/quip-cpu-lab-20261120/quip-solver-cpu/target/release/deps/libquip_solver_core-543d6c560b455763.rlib",
+      "--extern",
+      "rand=/root/quip-cpu-lab-20261120/quip-solver-cpu/target/release/deps/librand-7144b85924860b9c.rlib",
+      "--extern",
+      "tokio=/root/quip-cpu-lab-20261120/quip-solver-cpu/target/release/deps/libtokio-b2900d8d35e7cfb7.rlib",
+      "--extern",
+      "quip_solver_conformance=/root/quip-cpu-lab-20261120/quip-solver-cpu/target/release/deps/libquip_solver_conformance-2495bd1f51f4b153.rlib"
+    ],
+    "exit_code": 0,
+    "seconds": 2.899466412141919
+  },
+  {
+    "check": "otsuka_kernel-final",
+    "command": [
+      "/root/quip-cpu-research-20261121/otsuka_kernel-final-tests",
+      "--test-threads=2"
+    ],
+    "exit_code": 0,
+    "seconds": 2.376565597951412
+  },
+  {
+    "check": "native_conformance-final-compile",
+    "command": [
+      "rustup",
+      "run",
+      "1.97.1",
+      "rustc",
+      "--test",
+      "--edition=2021",
+      "--cfg",
+      "feature=\"experimental\"",
+      "/root/quip-cpu-lab-20261120/quip-solver-cpu/tests/native_conformance.rs",
+      "-C",
+      "opt-level=3",
+      "-L",
+      "dependency=/root/quip-cpu-lab-20261120/quip-solver-cpu/target/release/deps",
+      "-o",
+      "/root/quip-cpu-research-20261121/native_conformance-final-tests",
+      "--extern",
+      "quip_solver_cpu=/root/quip-cpu-lab-20261120/quip-solver-cpu/target/release/libquip_solver_cpu.rlib",
+      "--extern",
+      "quip_solver_core=/root/quip-cpu-lab-20261120/quip-solver-cpu/target/release/deps/libquip_solver_core-543d6c560b455763.rlib",
+      "--extern",
+      "rand=/root/quip-cpu-lab-20261120/quip-solver-cpu/target/release/deps/librand-7144b85924860b9c.rlib",
+      "--extern",
+      "tokio=/root/quip-cpu-lab-20261120/quip-solver-cpu/target/release/deps/libtokio-b2900d8d35e7cfb7.rlib",
+      "--extern",
+      "quip_solver_conformance=/root/quip-cpu-lab-20261120/quip-solver-cpu/target/release/deps/libquip_solver_conformance-2495bd1f51f4b153.rlib"
+    ],
+    "exit_code": 0,
+    "seconds": 6.899780385196209
+  },
+  {
+    "check": "native_conformance-final",
+    "command": [
+      "/root/quip-cpu-research-20261121/native_conformance-final-tests",
+      "--test-threads=2"
+    ],
+    "exit_code": 0,
+    "seconds": 0.13118312135338783
+  },
+  {
+    "check": "clippy-final",
+    "command": [
+      "cargo",
+      "clippy",
+      "--locked",
+      "--features",
+      "experimental",
+      "--lib",
+      "--bin",
+      "quip-cpu-native",
+      "--example",
+      "cpu_native_bench",
+      "--test",
+      "otsuka_kernel",
+      "--test",
+      "native_conformance",
+      "-j",
+      "2",
+      "--",
+      "-D",
+      "warnings"
+    ],
+    "exit_code": 0,
+    "seconds": 6.866583980619907
+  }
+]

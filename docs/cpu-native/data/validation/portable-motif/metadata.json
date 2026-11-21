@@ -1,0 +1,28 @@
+{
+  "started_utc": "2026-11-21T05:19:29.949342+00:00",
+  "suite": "motif",
+  "source_revision": "17107d1445a10b432126d911f2a8f1bef81ac34f",
+  "source_dirty": true,
+  "binary_sha256": "c1f90ab3a4e809016c28d4a3be4c192c9d2a0a47701ac9ecca87a0f9e6db3f6b",
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.97.1\nLLVM version: 22.1.6",
+  "platform": "Linux-7.0.0-14-generic-x86_64-with-glibc2.43",
+  "cpu_model": "AMD EPYC 7663 56-Core Processor",
+  "cpu_count": 6,
+  "cpus": [
+    3,
+    4
+  ],
+  "concurrent_processes": 2,
+  "seed_start": 1021,
+  "instances": 1,
+  "reads": 16,
+  "sweeps": 8192,
+  "polish_beta": 20,
+  "inputs": {
+    "tools/cpu-funnel/inputs/current-topology.spec.json": "a8e00f86543c45eb14a91f12725ff4dad42f5482451923d12d639a606bbd0e15",
+    "tools/cpu-funnel/inputs/current-family.params": "dcb359726b1efb2a453b6af7c158b163155855f63ada4b6a5ae6d0f9dab2081d"
+  },
+  "confirmation_archive_scoring": "full-edge (motif conversion disabled)",
+  "timing_scope": "harness-reported elapsed time; startup and instance generation excluded",
+  "completed_utc": "2026-11-21T05:20:10.147540+00:00"
+}

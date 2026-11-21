@@ -1,0 +1,46 @@
+{
+  "suite": "ablation",
+  "instances": 1,
+  "variants": {
+    "cache": {
+      "pairs": 1,
+      "median_speedup": 1.0359892707871203,
+      "bootstrap95_median": [
+        1.0359892707871203,
+        1.0359892707871203
+      ]
+    },
+    "copy": {
+      "pairs": 1,
+      "median_speedup": 1.1490622191628161,
+      "bootstrap95_median": [
+        1.1490622191628161,
+        1.1490622191628161
+      ]
+    },
+    "union": {
+      "pairs": 1,
+      "median_speedup": 0.9301317249394234,
+      "bootstrap95_median": [
+        0.9301317249394234,
+        0.9301317249394234
+      ]
+    },
+    "fusion": {
+      "pairs": 1,
+      "median_speedup": 0.8834490903072972,
+      "bootstrap95_median": [
+        0.8834490903072972,
+        0.8834490903072972
+      ]
+    },
+    "core": {
+      "pairs": 1,
+      "median_speedup": 1.5042919571109483,
+      "bootstrap95_median": [
+        1.5042919571109483,
+        1.5042919571109483
+      ]
+    }
+  }
+}

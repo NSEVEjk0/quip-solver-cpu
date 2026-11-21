@@ -1,0 +1,25 @@
+
+running 21 tests
+test a_cancelled_token_stops_the_anneal_before_a_sweep ... ok
+test a_chain_refuses_spins_that_do_not_fit_the_graph ... ok
+test a_cluster_sweep_reports_the_exact_energy_change ... ok
+test a_lone_tile_visits_each_charge_class_at_its_boltzmann_rate ... ok
+test a_population_anneal_reaches_the_ground_state_with_exact_energies ... ok
+test a_population_anneal_repeats_for_a_seed_and_stops_on_cancel ... ok
+test a_single_sweep_reports_the_exact_energy_change ... ok
+test a_single_tile_is_all_strong_energy ... ok
+test an_anneal_reaches_the_ground_state_of_the_fixture ... ok
+test an_anneal_with_soft_weights_reaches_the_ground_state ... ok
+test cluster_sweeps_sample_the_boltzmann_distribution ... ok
+test configured_population_defaults_preserve_the_stock_samples ... ok
+test configured_population_stops_during_a_long_anneal ... ok
+test every_cpu_execution_combination_preserves_population_trajectories ... ok
+test fused_cluster_and_cached_metropolis_preserve_each_move ... ok
+test malformed_motifs_are_refused ... ok
+test the_energy_splits_exactly_for_every_state_and_soft_weight ... ok
+test the_same_seed_gives_the_same_sample ... ok
+test unsupported_schedules_are_refused_before_an_anneal ... ok
+test unsupported_weights_and_fields_are_refused ... ok
+test a_defect_tile_bonds_each_partner_equally ... ok
+
+test result: ok. 21 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 2.37s

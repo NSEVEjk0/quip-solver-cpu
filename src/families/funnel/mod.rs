@@ -1,10 +1,10 @@
-//! CPU adaptation of BudFox's Funnel branch (ntllinh2511/quip-solver-cuda,
-//! revision 77bfd821). The three screen modules retain their AGPL source.
+//! CPU population-solver orchestration and canonical result handling.
 //!
-//! Each worker screens a bounded batch, trials a few survivors, deep-solves
-//! the best trial, and polishes with the original coefficients. Generation
-//! is checked against the canonical family generator before a survivor runs.
-//! A lease and its candidate pool never outlive their round.
+//! Each worker processes a bounded lease-local candidate set and polishes
+//! against original coefficients. Legacy structural screen modules retain
+//! their AGPL source; provenance is recorded in ACKNOWLEDGMENTS.md.
+//! CPU-native execution and candidate-preservation paths are independently
+//! configurable. No lease or candidate archive outlives its round.
 
 mod fast_dimer;
 #[expect(
@@ -19,8 +19,8 @@ mod stage0;
 mod stage0v2;
 
 use super::otsuka::{
-    anneal_population_configured, AnnealError, Chain, Model, Motifs, OtsukaGraph,
-    PopulationOptions, Schedule, Weights,
+    anneal_population_observed, AnnealError, Chain, Model, Motifs, OtsukaGraph, PopulationOptions,
+    Schedule, SweepCache, Weights,
 };
 use super::otsuka_sampler::{parse_pairs, section, PAIRS_SECTION};
 use crate::sampler_core::{
@@ -79,6 +79,24 @@ pub struct FunnelConfig {
     pub houdayer_every: usize,
     /// Cold cluster continuation sweeps on the four best reads.
     pub polish_sweeps: usize,
+    /// Share temperature-local probabilities across replicas.
+    pub shared_cache: bool,
+    /// Positive half-delta capacity of the shared probability table.
+    pub cache_slots: usize,
+    /// Copy parent local fields at population resampling checkpoints.
+    pub copy_resampling: bool,
+    /// Inline the monotone union-find path.
+    pub inline_union: bool,
+    /// Fuse full-field and residual-delta adjacency updates.
+    pub fused_updates: bool,
+    /// Preserve original-energy record candidates outside replica ancestry.
+    pub archive: bool,
+    /// Use exact motif-domain energy conversion for archive evaluation.
+    pub motif_score: bool,
+    /// Optional final beta measured in units of the biased weak coupling.
+    pub weak_beta_end: Option<f64>,
+    /// Inverse temperature of original-objective cluster polishing.
+    pub polish_beta: f64,
 }
 
 impl Default for FunnelConfig {
@@ -97,6 +115,15 @@ impl Default for FunnelConfig {
             resamples: 512,
             houdayer_every: 0,
             polish_sweeps: 256,
+            shared_cache: false,
+            cache_slots: 8192,
+            copy_resampling: false,
+            inline_union: false,
+            fused_updates: false,
+            archive: false,
+            motif_score: true,
+            weak_beta_end: None,
+            polish_beta: 20.0,
         }
     }
 }
@@ -115,6 +142,36 @@ impl FunnelConfig {
     fn apply(&mut self, table: &toml::Table) -> Result<(), String> {
         if let Some(v) = table.get("funnel_screen") {
             self.screen = v.as_bool().ok_or("funnel_screen must be boolean")?;
+        }
+        for (key, value) in [
+            ("funnel_shared_cache", &mut self.shared_cache),
+            ("funnel_copy_resampling", &mut self.copy_resampling),
+            ("funnel_inline_union", &mut self.inline_union),
+            ("funnel_fused_updates", &mut self.fused_updates),
+            ("funnel_archive", &mut self.archive),
+            ("funnel_motif_score", &mut self.motif_score),
+        ] {
+            if let Some(v) = table.get(key) {
+                *value = v
+                    .as_bool()
+                    .ok_or_else(|| format!("{key} must be boolean"))?;
+            }
+        }
+        self.cache_slots = Self::read(table, "funnel_cache_slots", self.cache_slots, 65_536)?;
+        if let Some(v) = table.get("funnel_weak_beta_end") {
+            self.weak_beta_end = Some(
+                v.as_float()
+                    .or_else(|| v.as_integer().map(|n| n as f64))
+                    .filter(|n| n.is_finite() && (0.1..=8.0).contains(n))
+                    .ok_or("funnel_weak_beta_end must be in 0.1..=8")?,
+            );
+        }
+        if let Some(v) = table.get("funnel_polish_beta") {
+            self.polish_beta = v
+                .as_float()
+                .or_else(|| v.as_integer().map(|n| n as f64))
+                .filter(|n| n.is_finite() && (1.0..=256.0).contains(n))
+                .ok_or("funnel_polish_beta must be in 1..=256")?;
         }
         self.batch = Self::read(table, "funnel_batch", self.batch, 4096)?;
         self.keep = Self::read(table, "funnel_keep", self.keep, 64)?.min(self.batch);
@@ -166,7 +223,10 @@ impl FunnelConfig {
     }
 
     fn from_environment() -> Self {
-        let mut config = Self::default();
+        Self::from_prefixed_environment("QUIP_CPU_FUNNEL", Self::default())
+    }
+
+    fn from_prefixed_environment(prefix: &str, mut config: Self) -> Self {
         let mut table = toml::Table::new();
         for key in [
             "screen",
@@ -182,13 +242,27 @@ impl FunnelConfig {
             "resamples",
             "houdayer_every",
             "polish_sweeps",
+            "shared_cache",
+            "cache_slots",
+            "copy_resampling",
+            "inline_union",
+            "fused_updates",
+            "archive",
+            "motif_score",
+            "weak_beta_end",
+            "polish_beta",
         ] {
-            let Ok(raw) = std::env::var(format!("QUIP_CPU_FUNNEL_{}", key.to_uppercase())) else {
+            let Ok(raw) = std::env::var(format!("{prefix}_{}", key.to_uppercase())) else {
                 continue;
             };
             let value = match key {
-                "screen" => raw.parse::<bool>().ok().map(toml::Value::Boolean),
-                "weak_scale" => raw.parse::<f64>().ok().map(toml::Value::Float),
+                "screen" | "shared_cache" | "copy_resampling" | "inline_union"
+                | "fused_updates" | "archive" | "motif_score" => {
+                    raw.parse::<bool>().ok().map(toml::Value::Boolean)
+                }
+                "weak_scale" | "weak_beta_end" | "polish_beta" => {
+                    raw.parse::<f64>().ok().map(toml::Value::Float)
+                }
                 _ => raw.parse::<i64>().ok().map(toml::Value::Integer),
             };
             if let Some(value) = value {
@@ -243,6 +317,29 @@ impl FunnelSampler {
     #[must_use]
     pub fn new() -> Self {
         Self::default()
+    }
+
+    /// A CPU-native configuration with independent execution optimizations.
+    #[must_use]
+    pub fn native() -> Self {
+        let sampler = Self::default();
+        let mut config = sampler
+            .config
+            .lock()
+            .unwrap_or_else(PoisonError::into_inner);
+        *config = FunnelConfig::from_prefixed_environment(
+            "QUIP_CPU_NATIVE",
+            FunnelConfig {
+                shared_cache: true,
+                copy_resampling: true,
+                inline_union: true,
+                fused_updates: true,
+                archive: true,
+                ..FunnelConfig::default()
+            },
+        );
+        drop(config);
+        sampler
     }
 
     fn acquire(&self, sink: &LeaseSink) -> Option<Slot<'_>> {
@@ -310,7 +407,12 @@ fn graph_of(instance: &Instance) -> IsingGraph {
     )
 }
 
-fn prepared(
+/// Prepare a CPU graph from a canonical instance and explicit search weights.
+/// `bias` scales weak couplings in the internal search model only.
+///
+/// # Errors
+/// Returns capacity when the metadata or weights do not fit the kernel.
+pub fn prepared(
     instance: &Instance,
     config: &FunnelConfig,
     bias: bool,
@@ -324,7 +426,7 @@ fn prepared(
         .iter()
         .map(|&v| {
             if bias && v.abs() < 1000 {
-                (f64::from(v) * config.weak_scale) as i32
+                ((f64::from(v) * config.weak_scale) as i32).clamp(-999, 999)
             } else {
                 v
             }
@@ -408,7 +510,24 @@ pub fn tuned_reads(
     let truth = prepared(instance, config, false)?;
     let graph = graph_of(instance);
     let params = SampleParams {
-        beta_range: Some(params.beta_range.unwrap_or((1.0, 12.0))),
+        beta_range: Some(params.beta_range.unwrap_or_else(|| {
+            let weak = instance
+                .j()
+                .iter()
+                .map(|v| v.abs())
+                .filter(|&v| v > 0 && v < 1000)
+                .max();
+            match (config.weak_beta_end, weak) {
+                (Some(target), Some(weak)) => {
+                    let biased_weak = ((f64::from(weak) * config.weak_scale) as i32).min(999);
+                    (
+                        1.0,
+                        (target * 1000.0 / f64::from(biased_weak)).clamp(1.0, 128.0),
+                    )
+                }
+                _ => (1.0, 12.0),
+            }
+        })),
         ..params.clone()
     };
     let per_beta = effective_sweeps_per_beta(params.num_sweeps, params.sweeps_per_beta);
@@ -417,7 +536,13 @@ pub fn tuned_reads(
         .flat_map(|beta| std::iter::repeat_n(beta, per_beta))
         .collect();
     let schedule = Schedule::new(&betas, 1).map_err(|_| SampleError::Capacity)?;
-    let samples = match anneal_population_configured(
+    let weak_levels = config
+        .motif_score
+        .then(|| uniform_weak_levels(instance, config))
+        .flatten();
+    let mut archive: Option<SamplerResult> = None;
+    let mut last_scored: Option<SamplerResult> = None;
+    let outcome = match anneal_population_observed(
         &biased,
         &schedule,
         params.num_reads,
@@ -425,13 +550,49 @@ pub fn tuned_reads(
         PopulationOptions {
             resamples: config.resamples,
             houdayer_every: config.houdayer_every,
+            shared_cache: config.shared_cache,
+            cache_slots: config.cache_slots,
+            copy_resampling: config.copy_resampling,
+            inline_union: config.inline_union,
+            fused_updates: config.fused_updates,
         },
         &stopped,
+        |biased_energy, spins| {
+            if !config.archive {
+                return;
+            }
+            let energy_milli = if let Some(previous) = &last_scored {
+                if previous.spins == spins {
+                    previous.energy_milli
+                } else {
+                    original_record_energy(&biased, &truth, weak_levels, biased_energy, spins)
+                }
+            } else {
+                original_record_energy(&biased, &truth, weak_levels, biased_energy, spins)
+            };
+            if last_scored.as_ref().is_none_or(|r| r.spins != spins) {
+                last_scored = Some(SamplerResult {
+                    spins: spins.to_vec(),
+                    energy_milli,
+                });
+            }
+            if archive
+                .as_ref()
+                .is_none_or(|r| energy_milli < r.energy_milli)
+            {
+                archive = Some(SamplerResult {
+                    spins: spins.to_vec(),
+                    energy_milli,
+                });
+            }
+        },
     ) {
-        Ok(samples) => samples,
+        Ok(outcome) => outcome,
         Err(AnnealError::Cancelled) => return Ok(None),
     };
-    let mut reads: Vec<SamplerResult> = samples
+    tracing::debug!(metrics=?outcome.metrics, "CPU native population metrics");
+    let mut reads: Vec<SamplerResult> = outcome
+        .samples
         .into_iter()
         .map(|sample| {
             let energy_milli = truth.energy(&sample.spins);
@@ -442,6 +603,9 @@ pub fn tuned_reads(
         })
         .collect();
     if config.polish_sweeps == 0 {
+        if let Some(record) = archive {
+            retain_record(&mut reads, record, params.num_reads);
+        }
         return Ok(Some(reads));
     }
     for read in &mut reads {
@@ -453,6 +617,7 @@ pub fn tuned_reads(
     let mut order: Vec<usize> = (0..reads.len()).collect();
     order.sort_unstable_by_key(|&i| reads[i].energy_milli);
     let mut rng = SmallRng::seed_from_u64(params.seed ^ 0x713c_0145_504f_4c49);
+    let mut polish_cache = SweepCache::new(config.cache_slots);
     for i in order.into_iter().take(4) {
         let read = &mut reads[i];
         let mut chain =
@@ -462,8 +627,18 @@ pub fn tuned_reads(
             if stopped() {
                 return Ok(None);
             }
-            energy += chain.cluster_sweep(20.0, &mut rng);
-            energy += chain.single_sweep(20.0, &mut rng);
+            energy += chain.cluster_sweep_optimized(
+                config.polish_beta,
+                config.shared_cache.then_some(&mut polish_cache),
+                config.inline_union,
+                config.fused_updates,
+                &mut rng,
+            );
+            energy += if config.shared_cache {
+                chain.single_sweep_cached(config.polish_beta, &mut polish_cache, &mut rng)
+            } else {
+                chain.single_sweep(config.polish_beta, &mut rng)
+            };
             if energy < read.energy_milli {
                 read.spins.copy_from_slice(chain.spins());
                 read.energy_milli = energy;
@@ -474,7 +649,96 @@ pub fn tuned_reads(
         }
         read.energy_milli = truth.energy(&read.spins);
     }
+    if let Some(mut record) = archive {
+        if !reads.iter().any(|r| r.spins == record.spins) {
+            if !greedy(instance, &mut record.spins, &stopped) {
+                return Ok(None);
+            }
+            record.energy_milli = truth.energy(&record.spins);
+            let mut chain =
+                Chain::new(&truth, record.spins.clone()).map_err(|_| SampleError::Capacity)?;
+            let mut rng = SmallRng::seed_from_u64(params.seed ^ 0x4350_555f_4152_4348);
+            let mut energy = record.energy_milli;
+            let mut cache = SweepCache::new(config.cache_slots);
+            for _ in 0..config.polish_sweeps {
+                if stopped() {
+                    return Ok(None);
+                }
+                energy += chain.cluster_sweep_optimized(
+                    config.polish_beta,
+                    config.shared_cache.then_some(&mut cache),
+                    config.inline_union,
+                    config.fused_updates,
+                    &mut rng,
+                );
+                energy += if config.shared_cache {
+                    chain.single_sweep_cached(config.polish_beta, &mut cache, &mut rng)
+                } else {
+                    chain.single_sweep(config.polish_beta, &mut rng)
+                };
+                if energy < record.energy_milli {
+                    record.spins.copy_from_slice(chain.spins());
+                    record.energy_milli = energy;
+                }
+            }
+            if !greedy(instance, &mut record.spins, &stopped) {
+                return Ok(None);
+            }
+            record.energy_milli = truth.energy(&record.spins);
+        }
+        retain_record(&mut reads, record, params.num_reads);
+    }
     Ok(Some(reads))
+}
+
+fn retain_record(reads: &mut Vec<SamplerResult>, record: SamplerResult, limit: usize) {
+    if reads.iter().any(|r| r.spins == record.spins) {
+        return;
+    }
+    reads.push(record);
+    reads.sort_by_key(|r| r.energy_milli);
+    reads.truncate(limit);
+}
+
+fn uniform_weak_levels(instance: &Instance, config: &FunnelConfig) -> Option<(i64, i64)> {
+    let weak = instance
+        .j()
+        .iter()
+        .map(|j| j.abs())
+        .filter(|&j| j < 1000)
+        .max()?;
+    if instance
+        .j()
+        .iter()
+        .any(|j| j.abs() < 1000 && j.abs() != weak)
+    {
+        return None;
+    }
+    Some((
+        i64::from(weak),
+        i64::from(((f64::from(weak) * config.weak_scale) as i32).min(999)),
+    ))
+}
+
+fn original_record_energy(
+    biased: &OtsukaGraph,
+    truth: &OtsukaGraph,
+    levels: Option<(i64, i64)>,
+    energy: i64,
+    spins: &[i8],
+) -> i64 {
+    let Some((original_weak, search_weak)) = levels else {
+        return truth.energy(spins);
+    };
+    if search_weak == 0 {
+        return energy;
+    }
+    let strong = biased.full_strong_energy(spins);
+    let weak_energy = energy - strong;
+    if weak_energy % search_weak != 0 {
+        return truth.energy(spins);
+    }
+    strong + (weak_energy / search_weak) * original_weak
 }
 
 fn offset_reads(instance: &Instance, reads: &mut [SamplerResult]) {
@@ -819,18 +1083,23 @@ impl Sampler for FunnelSampler {
         128
     }
     fn apply_config(&self, backend_toml: &str) {
-        self.stock.apply_config(backend_toml);
-        if let Err(error) = crate::apply_num_cpus(&self.num_cpus, backend_toml) {
-            crate::reject_num_cpus(error);
-        }
         match backend_toml.parse::<toml::Table>() {
             Ok(table) => {
+                let mut common = toml::Table::new();
+                if let Some(value) = table.get("num_cpus") {
+                    common.insert("num_cpus".into(), value.clone());
+                }
+                let common = toml::to_string(&common).unwrap_or_default();
+                self.stock.apply_config(&common);
+                if let Err(error) = crate::apply_num_cpus(&self.num_cpus, &common) {
+                    crate::reject_num_cpus(error);
+                }
                 let mut stored = self.config.lock().unwrap_or_else(PoisonError::into_inner);
                 let mut updated = stored.clone();
                 match updated.apply(&table) {
                     Ok(()) => {
                         *stored = updated;
-                        tracing::info!(config=?*stored, "CPU Funnel configured");
+                        tracing::info!(config=?*stored, "CPU population solver configured");
                     }
                     Err(error) => {
                         tracing::error!(%error, "CPU Funnel config rejected; retaining previous settings")
@@ -961,6 +1230,102 @@ mod tests {
                     instance_energy(instance, &polished.spins),
                     polished.energy_milli + instance.offset_milli()
                 );
+            }
+        }
+    }
+
+    #[test]
+    fn native_execution_preserves_pipeline_reads_and_archive_never_loses_the_best() {
+        let (_, _, instances) = reference();
+        for instance in instances.iter().take(4) {
+            let params = SampleParams {
+                num_reads: 4,
+                num_sweeps: 96,
+                seed: 3311,
+                ..SampleParams::default()
+            };
+            let baseline = FunnelConfig {
+                polish_sweeps: 16,
+                ..FunnelConfig::default()
+            };
+            let native = FunnelConfig {
+                shared_cache: true,
+                copy_resampling: true,
+                inline_union: true,
+                fused_updates: true,
+                ..baseline.clone()
+            };
+            let a = tuned_reads(instance, &params, &baseline, || false)
+                .unwrap()
+                .unwrap();
+            let b = tuned_reads(instance, &params, &native, || false)
+                .unwrap()
+                .unwrap();
+            assert_eq!(a.len(), b.len());
+            for (left, right) in a.iter().zip(&b) {
+                assert_eq!(left.spins, right.spins);
+                assert_eq!(left.energy_milli, right.energy_milli);
+            }
+            let archive = FunnelConfig {
+                archive: true,
+                ..native
+            };
+            let c = tuned_reads(instance, &params, &archive, || false)
+                .unwrap()
+                .unwrap();
+            let scalar_archive = FunnelConfig {
+                motif_score: false,
+                ..archive.clone()
+            };
+            let scalar = tuned_reads(instance, &params, &scalar_archive, || false)
+                .unwrap()
+                .unwrap();
+            for (left, right) in c.iter().zip(&scalar) {
+                assert_eq!(left.spins, right.spins);
+                assert_eq!(left.energy_milli, right.energy_milli);
+            }
+            assert_eq!(c.len(), params.num_reads);
+            assert!(lowest(&c) <= lowest(&b));
+            for read in c {
+                assert_eq!(
+                    read.energy_milli + instance.offset_milli(),
+                    instance_energy(instance, &read.spins)
+                );
+            }
+        }
+    }
+
+    #[test]
+    fn motif_original_energy_conversion_matches_full_canonical_rescoring() {
+        use rand::Rng;
+        let (_, _, instances) = reference();
+        let mut rng = SmallRng::seed_from_u64(87142);
+        for instance in instances.iter().take(4) {
+            for scale in [1.0, 1.25, 1.5] {
+                let config = FunnelConfig {
+                    weak_scale: scale,
+                    ..FunnelConfig::default()
+                };
+                let biased = prepared(instance, &config, true).unwrap();
+                let truth = prepared(instance, &config, false).unwrap();
+                let levels = uniform_weak_levels(instance, &config);
+                assert!(levels.is_some());
+                for _ in 0..32 {
+                    let spins: Vec<i8> = (0..instance.h().len())
+                        .map(|_| if rng.gen::<bool>() { 1 } else { -1 })
+                        .collect();
+                    let actual = original_record_energy(
+                        &biased,
+                        &truth,
+                        levels,
+                        biased.energy(&spins),
+                        &spins,
+                    );
+                    assert_eq!(
+                        actual + instance.offset_milli(),
+                        instance_energy(instance, &spins)
+                    );
+                }
             }
         }
     }
