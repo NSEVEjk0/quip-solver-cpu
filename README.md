@@ -51,6 +51,7 @@ reproduces the comparisons offline without a node or signing key.
 - [Execution and algorithm design](docs/cpu-native/TECHNICAL_REPORT.md): equations, data layouts, state invariants, and the original-energy archive.
 - [Experiments and raw evidence](docs/cpu-native/EXPERIMENTS.md): profiler-guided ablations, full-budget confirmation, and parameter studies.
 - [Quip node and proof pipeline](docs/cpu-native/NODE_RESEARCH.md): nonce derivation, canonical instances, coordinator responsibilities, validation, and cancellation.
+- [Live CPU operation](docs/cpu-native/LIVE_OPERATION.md): native deployment, coordinator-validated salt results, resource measurements, and qblock transition handling.
 - [Build, configuration, and reproduction](docs/cpu-native/OPERATOR_GUIDE.md): installation, CPU settings, benchmark commands, and validation checks.
 
 ## Build

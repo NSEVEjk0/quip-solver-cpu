@@ -1,0 +1,339 @@
+{
+  "backend": "quip-cpu-native",
+  "started_at": "2026-11-21T05:29:22.649259958Z",
+  "observed_until": "2026-11-21T05:35:54.212706+00:00",
+  "binary_sha256": "fe569da1d7ff5a460b7c118341305ac725c86ba647e57806e52afef25eb5b40c",
+  "source_revision": "27815b4548d7c5b4c917183d41ae651338fe2d42",
+  "cpu_model": "AMD EPYC 7663 56-Core Processor",
+  "host_vcpus": 6,
+  "id": "22ad22418820a13606df7ba92a8df28d97323ab2d6f4aabe64d5162ccec9b84e",
+  "image_id": "sha256:4050700c2d00ab5ace4fbcc87ab59e3381054d939124ee39dac4a21284c30525",
+  "running": true,
+  "oom_killed": false,
+  "restart_count": 0,
+  "cpuset": "0,1",
+  "memory_limit_bytes": 1073741824,
+  "configuration_log": "FunnelConfig { screen: false, batch: 128, keep: 4, probe_reads: 4, probe_sweeps: 1024, final_reads: Some(16), final_sweeps: Some(8192), tile_milli: 250, pair_milli: 250, weak_scale: 1.5, resamples: 512, houdayer_every: 0, polish_sweeps: 256, shared_cache: true, cache_slots: 8192, copy_resampling: true, inline_union: true, fused_updates: true, archive: true, motif_score: true, weak_beta_end: None, polish_beta: 20.0 }",
+  "rounds": [
+    {
+      "timestamp": "2026-11-21T05:29:24.542386503Z",
+      "generation": 1,
+      "qblock_id": 1576,
+      "block": 111113,
+      "spec_version": 121,
+      "nodes": 4560,
+      "edges": 41205,
+      "max_energy": -5093,
+      "min_solutions": 1,
+      "min_diversity_milli": 0,
+      "cancelled_jobs": 0
+    },
+    {
+      "timestamp": "2026-11-21T05:31:25.147887677Z",
+      "generation": 2,
+      "qblock_id": 1577,
+      "block": 111133,
+      "spec_version": 121,
+      "nodes": 4560,
+      "edges": 41205,
+      "max_energy": -5093,
+      "min_solutions": 1,
+      "min_diversity_milli": 0,
+      "cancelled_jobs": 2
+    }
+  ],
+  "solve_samples": [
+    {
+      "timestamp": "2026-11-21T05:30:03.729227920Z",
+      "generation_at_log_time": 1,
+      "salt_index": 0,
+      "best_energy_milli": -5046205,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-21T05:30:04.168798481Z",
+      "generation_at_log_time": 1,
+      "salt_index": 0,
+      "best_energy_milli": -5043665,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-21T05:30:44.390143875Z",
+      "generation_at_log_time": 1,
+      "salt_index": 1,
+      "best_energy_milli": -5043385,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-21T05:30:44.673981146Z",
+      "generation_at_log_time": 1,
+      "salt_index": 1,
+      "best_energy_milli": -5048845,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-21T05:31:23.762860569Z",
+      "generation_at_log_time": 1,
+      "salt_index": 2,
+      "best_energy_milli": -5040665,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-21T05:31:24.358896943Z",
+      "generation_at_log_time": 1,
+      "salt_index": 2,
+      "best_energy_milli": -5050085,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-21T05:32:04.715493420Z",
+      "generation_at_log_time": 2,
+      "salt_index": 0,
+      "best_energy_milli": -5046515,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-21T05:32:05.707357705Z",
+      "generation_at_log_time": 2,
+      "salt_index": 0,
+      "best_energy_milli": -5039905,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-21T05:32:43.827686787Z",
+      "generation_at_log_time": 2,
+      "salt_index": 1,
+      "best_energy_milli": -5050925,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-21T05:32:48.546561179Z",
+      "generation_at_log_time": 2,
+      "salt_index": 1,
+      "best_energy_milli": -5045895,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-21T05:33:23.712518107Z",
+      "generation_at_log_time": 2,
+      "salt_index": 2,
+      "best_energy_milli": -5048195,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-21T05:33:26.410654334Z",
+      "generation_at_log_time": 2,
+      "salt_index": 2,
+      "best_energy_milli": -5048385,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-21T05:34:03.927012274Z",
+      "generation_at_log_time": 2,
+      "salt_index": 3,
+      "best_energy_milli": -5039425,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-21T05:34:07.649680790Z",
+      "generation_at_log_time": 2,
+      "salt_index": 3,
+      "best_energy_milli": -5054005,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-21T05:34:44.437532387Z",
+      "generation_at_log_time": 2,
+      "salt_index": 0,
+      "best_energy_milli": -5054175,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-21T05:34:49.435355083Z",
+      "generation_at_log_time": 2,
+      "salt_index": 0,
+      "best_energy_milli": -5044945,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-21T05:35:24.184288468Z",
+      "generation_at_log_time": 2,
+      "salt_index": 1,
+      "best_energy_milli": -5044245,
+      "reads": 16,
+      "sweeps": 8192
+    },
+    {
+      "timestamp": "2026-11-21T05:35:29.193999465Z",
+      "generation_at_log_time": 2,
+      "salt_index": 1,
+      "best_energy_milli": -5042085,
+      "reads": 16,
+      "sweeps": 8192
+    }
+  ],
+  "coordinator_validation_samples": [
+    {
+      "timestamp": "2026-11-21T05:30:24.536603752Z",
+      "generation": 1,
+      "qblock_id": 1576,
+      "block": 111122,
+      "results_validated": 2,
+      "our_best_energy_this_round": -5047
+    },
+    {
+      "timestamp": "2026-11-21T05:31:25.181207243Z",
+      "generation": 2,
+      "qblock_id": 1577,
+      "block": 111133,
+      "results_validated": 6,
+      "our_best_energy_this_round": null
+    },
+    {
+      "timestamp": "2026-11-21T05:32:25.828749726Z",
+      "generation": 2,
+      "qblock_id": 1577,
+      "block": 111143,
+      "results_validated": 8,
+      "our_best_energy_this_round": -5047
+    },
+    {
+      "timestamp": "2026-11-21T05:33:26.339306402Z",
+      "generation": 2,
+      "qblock_id": 1577,
+      "block": 111151,
+      "results_validated": 11,
+      "our_best_energy_this_round": -5051
+    },
+    {
+      "timestamp": "2026-11-21T05:34:26.902885779Z",
+      "generation": 2,
+      "qblock_id": 1577,
+      "block": 111158,
+      "results_validated": 14,
+      "our_best_energy_this_round": -5055
+    },
+    {
+      "timestamp": "2026-11-21T05:35:27.277793134Z",
+      "generation": 2,
+      "qblock_id": 1577,
+      "block": 111168,
+      "results_validated": 17,
+      "our_best_energy_this_round": -5055
+    }
+  ],
+  "cancellation_acknowledgments": [
+    {
+      "timestamp": "2026-11-21T05:31:25.102213326Z",
+      "max_generation": 1,
+      "abandoned_generation": 1,
+      "send_wait_ms": 0.0,
+      "queue_delay_ms": 1.0,
+      "ack_wait_ms": 0.4,
+      "total_ms": 1.4
+    }
+  ],
+  "throughput_samples": [
+    {
+      "timestamp": "2026-11-21T05:30:24.536487204Z",
+      "jobs_completed_total": 0,
+      "jobs_rejected_total": 0,
+      "staged": 2,
+      "window": 2
+    },
+    {
+      "timestamp": "2026-11-21T05:31:25.181151188Z",
+      "jobs_completed_total": 0,
+      "jobs_rejected_total": 0,
+      "staged": 2,
+      "window": 2
+    },
+    {
+      "timestamp": "2026-11-21T05:32:25.828654888Z",
+      "jobs_completed_total": 0,
+      "jobs_rejected_total": 0,
+      "staged": 2,
+      "window": 2
+    },
+    {
+      "timestamp": "2026-11-21T05:33:26.339119492Z",
+      "jobs_completed_total": 0,
+      "jobs_rejected_total": 0,
+      "staged": 2,
+      "window": 2
+    },
+    {
+      "timestamp": "2026-11-21T05:34:26.902790561Z",
+      "jobs_completed_total": 2,
+      "jobs_rejected_total": 0,
+      "staged": 2,
+      "window": 2
+    },
+    {
+      "timestamp": "2026-11-21T05:35:27.277714456Z",
+      "jobs_completed_total": 2,
+      "jobs_rejected_total": 0,
+      "staged": 2,
+      "window": 2
+    }
+  ],
+  "last_validation_counter": 17,
+  "jobs_rejected_total": 0,
+  "best_reported_energy_milli": -5054175,
+  "error_log_lines": 0,
+  "resource_samples": [
+    {
+      "timestamp": "2026-11-21T05:35:22.896443+00:00",
+      "cpu_percent": 200.09,
+      "memory_usage": "95.01MiB / 1GiB",
+      "pids": 14
+    },
+    {
+      "timestamp": "2026-11-21T05:35:54.212673+00:00",
+      "cpu_percent": 201.45,
+      "memory_usage": "96.75MiB / 1GiB",
+      "pids": 14
+    }
+  ],
+  "coordinator_controller": {
+    "contexts_dispatched": 10,
+    "duplicate_result_drops": 4,
+    "heads_observed": 59,
+    "proofs_submitted": 0,
+    "results_received": 18,
+    "stale_drops": 0,
+    "submission_errors": 0
+  },
+  "chain_head_number": 111171,
+  "miner_registered": true,
+  "is_mining": true,
+  "miner_proofs_won": 0,
+  "notes": [
+    "results_validated is the coordinator's cumulative canonical-candidate counter.",
+    "Solver salt indices are local to a lease; generation_at_log_time is a timestamp association.",
+    "Cancel acknowledgement is control-protocol latency, separate from solver execution time.",
+    "Controller duplicate-result drops are recorded separately from validation and job rejection.",
+    "Round targets and coordinator best-energy summaries use rounded log values; solver energies are exact integer milli units."
+  ],
+  "keys_unchanged": true,
+  "other_services_unchanged": true,
+  "coordinator_version": "0.3.9-rc10 / protocol 2",
+  "source_url": "https://38-49-214-201.sslip.io/files/nodes/cpu-native/source.tar.gz",
+  "rollback_available": true
+}

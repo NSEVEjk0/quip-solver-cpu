@@ -54,7 +54,7 @@ current configuration, validate and recreate the CPU service:
 
 ```sh
 docker compose --profile cpu config --quiet
-docker compose --profile cpu up -d --no-deps --pull never cpu
+docker compose --profile cpu up -d --no-deps --pull never --force-recreate cpu
 ```
 
 The binary's effective configuration is logged on startup. `native_*` backend
@@ -116,6 +116,10 @@ Confirm coordinator validation counters, job rejection counts, affinity,
 memory use, and work after a qblock transition. Canonical energy includes
 the family offset in lease results. Block eligibility is evaluated against
 the live target, solution count, and diversity requirements.
+
+The [live observer](../../tools/cpu-native/observe_node.py) captures those
+measurements from Docker and the coordinator's HTTPS API. Its results are
+documented in [live operation](LIVE_OPERATION.md).
 
 Rollback restores the prior CPU binary and configuration from the operator's
 saved deployment snapshot. The research deployment retains a private backup

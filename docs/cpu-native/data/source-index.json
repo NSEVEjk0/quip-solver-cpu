@@ -86,5 +86,19 @@
     "path": "README.md",
     "url": "https://raw.githubusercontent.com/QuipNetwork/isingmark/9c26c84a33f2457f4ec468c3703ed2aafebb3e54/README.md",
     "bytes": 8101
+  },
+  {
+    "repository": "quip-solver",
+    "revision": "b60c27117ae00219c4a03a1f77c2a591bd34292f",
+    "path": "crates/quip-coordinator/src/coordinator/events.rs",
+    "url": "https://raw.githubusercontent.com/QuipNetwork/quip-solver/b60c27117ae00219c4a03a1f77c2a591bd34292f/crates/quip-coordinator/src/coordinator/events.rs",
+    "bytes": 11669
+  },
+  {
+    "repository": "quip-solver",
+    "revision": "b60c27117ae00219c4a03a1f77c2a591bd34292f",
+    "path": "crates/quip-coordinator/src/coordinator/settle.rs",
+    "url": "https://raw.githubusercontent.com/QuipNetwork/quip-solver/b60c27117ae00219c4a03a1f77c2a591bd34292f/crates/quip-coordinator/src/coordinator/settle.rs",
+    "bytes": 21177
   }
 ]
