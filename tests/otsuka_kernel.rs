@@ -42,7 +42,7 @@ fn every_cpu_execution_combination_preserves_population_trajectories() {
             let reference =
                 anneal_population_configured(&graph, &schedule, 8, seed, options, || false)
                     .unwrap();
-            for mask in 1..16 {
+            for mask in 1..32 {
                 let native = anneal_population_configured(
                     &graph,
                     &schedule,
@@ -53,6 +53,7 @@ fn every_cpu_execution_combination_preserves_population_trajectories() {
                         copy_resampling: mask & 2 != 0,
                         inline_union: mask & 4 != 0,
                         fused_updates: mask & 8 != 0,
+                        selective_resampling: mask & 16 != 0,
                         cache_slots: 16,
                         ..options
                     },
@@ -69,6 +70,85 @@ fn every_cpu_execution_combination_preserves_population_trajectories() {
             }
         }
     }
+}
+
+#[test]
+fn identity_resampling_preserves_outputs_without_copying_parent_rows() {
+    use quip_solver_cpu::families::otsuka::{anneal_population_observed, PopulationOptions};
+    let graph = OtsukaGraph::new(
+        &Model {
+            h_milli: &[0; 4],
+            edges: &[],
+            j_milli: &[],
+        },
+        &Motifs {
+            tiles: &[],
+            gauges: &[],
+            pairs: &[],
+        },
+        Weights::FULL,
+    )
+    .unwrap();
+    let schedule = Schedule::new(&[3.0; 32], 1).unwrap();
+    let options = PopulationOptions {
+        resamples: 8,
+        copy_resampling: true,
+        ..PopulationOptions::default()
+    };
+    let reference =
+        anneal_population_observed(&graph, &schedule, 4, 881, options, || false, |_, _| {})
+            .unwrap();
+    let selective = anneal_population_observed(
+        &graph,
+        &schedule,
+        4,
+        881,
+        PopulationOptions {
+            selective_resampling: true,
+            ..options
+        },
+        || false,
+        |_, _| {},
+    )
+    .unwrap();
+    assert_eq!(reference.samples, selective.samples);
+    assert_eq!(reference.metrics.field_copies, 28);
+    assert_eq!(selective.metrics.field_copies, 0);
+    assert_eq!(selective.metrics.parent_snapshots, 0);
+    assert_eq!(selective.metrics.field_copies_skipped, 28);
+}
+
+#[test]
+fn high_degree_local_fields_keep_exact_flip_energies() {
+    // The center field fits i32, but flipping it changes energy by more
+    // than i32::MAX. This exercises the storage/delta width boundary.
+    let nodes = 1_100_001;
+    let h = vec![0; nodes];
+    let edges: Vec<_> = (1..nodes as u32).map(|v| (0, v)).collect();
+    let j = vec![999; edges.len()];
+    let graph = OtsukaGraph::new(
+        &Model {
+            h_milli: &h,
+            edges: &edges,
+            j_milli: &j,
+        },
+        &Motifs {
+            tiles: &[],
+            gauges: &[],
+            pairs: &[],
+        },
+        Weights::FULL,
+    )
+    .unwrap();
+    let mut chain = Chain::new(&graph, vec![1; nodes]).unwrap();
+    let mut rng = SmallRng::seed_from_u64(2149);
+    let before = graph.energy(chain.spins());
+    let delta = chain.single_sweep(12.0, &mut rng);
+    assert!(delta < i64::from(i32::MIN));
+    assert_eq!(graph.energy(chain.spins()) - before, delta);
+    let before = graph.energy(chain.spins());
+    let delta = chain.cluster_sweep(12.0, &mut rng);
+    assert_eq!(graph.energy(chain.spins()) - before, delta);
 }
 
 #[test]

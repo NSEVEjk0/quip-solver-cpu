@@ -85,6 +85,8 @@ pub struct FunnelConfig {
     pub cache_slots: usize,
     /// Copy parent local fields at population resampling checkpoints.
     pub copy_resampling: bool,
+    /// Skip identity children and snapshot only required parent rows.
+    pub selective_resampling: bool,
     /// Inline the monotone union-find path.
     pub inline_union: bool,
     /// Fuse full-field and residual-delta adjacency updates.
@@ -118,6 +120,7 @@ impl Default for FunnelConfig {
             shared_cache: false,
             cache_slots: 8192,
             copy_resampling: false,
+            selective_resampling: false,
             inline_union: false,
             fused_updates: false,
             archive: false,
@@ -146,6 +149,10 @@ impl FunnelConfig {
         for (key, value) in [
             ("funnel_shared_cache", &mut self.shared_cache),
             ("funnel_copy_resampling", &mut self.copy_resampling),
+            (
+                "funnel_selective_resampling",
+                &mut self.selective_resampling,
+            ),
             ("funnel_inline_union", &mut self.inline_union),
             ("funnel_fused_updates", &mut self.fused_updates),
             ("funnel_archive", &mut self.archive),
@@ -245,6 +252,7 @@ impl FunnelConfig {
             "shared_cache",
             "cache_slots",
             "copy_resampling",
+            "selective_resampling",
             "inline_union",
             "fused_updates",
             "archive",
@@ -256,10 +264,14 @@ impl FunnelConfig {
                 continue;
             };
             let value = match key {
-                "screen" | "shared_cache" | "copy_resampling" | "inline_union"
-                | "fused_updates" | "archive" | "motif_score" => {
-                    raw.parse::<bool>().ok().map(toml::Value::Boolean)
-                }
+                "screen"
+                | "shared_cache"
+                | "copy_resampling"
+                | "selective_resampling"
+                | "inline_union"
+                | "fused_updates"
+                | "archive"
+                | "motif_score" => raw.parse::<bool>().ok().map(toml::Value::Boolean),
                 "weak_scale" | "weak_beta_end" | "polish_beta" => {
                     raw.parse::<f64>().ok().map(toml::Value::Float)
                 }
@@ -553,6 +565,7 @@ pub fn tuned_reads(
             shared_cache: config.shared_cache,
             cache_slots: config.cache_slots,
             copy_resampling: config.copy_resampling,
+            selective_resampling: config.selective_resampling,
             inline_union: config.inline_union,
             fused_updates: config.fused_updates,
         },

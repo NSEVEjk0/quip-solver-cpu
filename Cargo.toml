@@ -185,6 +185,10 @@ required-features = ["experimental"]
 # compile unconditionally and only the [[bin]] targets are gated.
 [features]
 experimental = []
+# CPU working-set experiments. Both retain exact integer fields and scalar
+# probabilities; opt in when building the research comparison binaries.
+compact-local-fields = []
+compact-cache-stamps = []
 # Off by default. Adds per-spin-decision and per-flip spans INSIDE the hot loop.
 # These spans distort absolute timing (millions of enters per read), so they are
 # used only for the diagnostic cross-check pass, never for headline per-part JSON.

@@ -11,6 +11,47 @@ use std::fmt;
 
 use super::graph::{OtsukaGraph, Weights};
 
+// Unique, non-self edges, |J| <= 1000, zero fields, and at most 2^21 nodes
+// bound every local field by (2^21 - 1) * 1000 = 2,097,151,000. Partial sums
+// and fields after each flip satisfy the same bound. Energy deltas stay i64.
+#[cfg(feature = "compact-local-fields")]
+pub(super) type LocalField = i32;
+#[cfg(not(feature = "compact-local-fields"))]
+pub(super) type LocalField = i64;
+#[cfg(feature = "compact-local-fields")]
+const _: () = assert!(
+    (super::graph::MAX_NODES as i64 - 1) * super::graph::STRONG_MILLI as i64 <= i32::MAX as i64
+);
+
+#[inline(always)]
+fn field_coupling(value: i32) -> LocalField {
+    #[cfg(feature = "compact-local-fields")]
+    {
+        value
+    }
+    #[cfg(not(feature = "compact-local-fields"))]
+    {
+        i64::from(value)
+    }
+}
+
+#[inline(always)]
+fn field_energy(value: LocalField) -> i64 {
+    #[cfg(feature = "compact-local-fields")]
+    {
+        i64::from(value)
+    }
+    #[cfg(not(feature = "compact-local-fields"))]
+    {
+        value
+    }
+}
+
+#[cfg(feature = "compact-cache-stamps")]
+type CacheEpoch = u16;
+#[cfg(not(feature = "compact-cache-stamps"))]
+type CacheEpoch = u32;
+
 /// Bond probabilities at one inverse temperature.
 #[derive(Clone, Copy, Debug)]
 struct Breakup {
@@ -54,6 +95,8 @@ pub struct CacheStats {
     pub fallbacks: u64,
     /// Temperature or bond-weight changes that rebuilt the breakup values.
     pub temperatures: u64,
+    /// Stamp wraps that cleared the table before an epoch was reused.
+    pub epoch_wraps: u64,
 }
 
 /// One bounded probability table shared by the replicas at a temperature.
@@ -67,12 +110,12 @@ pub struct SweepCache {
     beta: f64,
     weights: Weights,
     breakup: Breakup,
-    epoch: u32,
+    epoch: CacheEpoch,
     slots: usize,
     heat: Vec<f64>,
-    heat_epoch: Vec<u32>,
+    heat_epoch: Vec<CacheEpoch>,
     metropolis: Vec<f64>,
-    metropolis_epoch: Vec<u32>,
+    metropolis_epoch: Vec<CacheEpoch>,
     stats: CacheStats,
 }
 
@@ -106,7 +149,7 @@ impl SweepCache {
     /// Bytes occupied by table payloads, excluding the small struct.
     #[must_use]
     pub fn table_bytes(&self) -> usize {
-        (self.heat.len() + self.metropolis.len()) * (size_of::<f64>() + size_of::<u32>())
+        (self.heat.len() + self.metropolis.len()) * (size_of::<f64>() + size_of::<CacheEpoch>())
     }
 
     fn prepare(&mut self, beta: f64, weights: Weights) {
@@ -121,6 +164,7 @@ impl SweepCache {
             self.heat_epoch.fill(0);
             self.metropolis_epoch.fill(0);
             self.epoch = 1;
+            self.stats.epoch_wraps += 1;
         }
         self.stats.temperatures += 1;
     }
@@ -182,7 +226,7 @@ struct Workspace {
     boltzmann: Boltzmann,
     /// The local field of each node over every coupling, `sum J s_v`,
     /// patched at each flip.
-    field: Vec<i64>,
+    field: Vec<LocalField>,
 }
 
 /// A direct-mapped cache of `exp(-beta * delta / 1000)` at one beta. The
@@ -240,7 +284,7 @@ impl Workspace {
                 .all
                 .row(u)
                 .iter()
-                .map(|&link| i64::from(link.j()) * i64::from(s[link.node()]))
+                .map(|&link| field_coupling(link.j()) * LocalField::from(s[link.node()]))
                 .sum();
         }
     }
@@ -249,12 +293,12 @@ impl Workspace {
     /// the model energy change in milli.
     #[inline]
     fn flip(&mut self, graph: &OtsukaGraph, s: &mut [i8], u: usize) -> i64 {
-        let twice = 2 * i64::from(s[u]);
+        let twice = 2 * LocalField::from(s[u]);
         for &link in graph.all.row(u) {
-            self.field[link.node()] -= twice * i64::from(link.j());
+            self.field[link.node()] -= twice * field_coupling(link.j());
         }
         s[u] = -s[u];
-        -twice * self.field[u]
+        -field_energy(twice) * field_energy(self.field[u])
     }
 
     fn find(&mut self, mut u: u32) -> u32 {
@@ -453,7 +497,7 @@ impl Workspace {
                 let su = i64::from(s[u]);
                 if let Some(rows) = fused {
                     let twice = 2 * su;
-                    change -= twice * self.field[u];
+                    change -= twice * field_energy(self.field[u]);
                     for &link in rows.row(u) {
                         let v = link.node();
                         let residual = link.residual();
@@ -461,7 +505,7 @@ impl Workspace {
                         if residual != 0 && lv != c {
                             self.delta[lv] += 4 * i64::from(residual) * su * i64::from(s[v]);
                         }
-                        self.field[v] -= twice * i64::from(link.full());
+                        self.field[v] -= 2 * LocalField::from(s[u]) * field_coupling(link.full());
                     }
                     s[u] = -s[u];
                 } else {
@@ -654,12 +698,12 @@ impl<'g> Chain<'g> {
         }
     }
 
-    pub(super) fn save_state(&self, spins: &mut [i8], fields: &mut [i64]) {
+    pub(super) fn save_state(&self, spins: &mut [i8], fields: &mut [LocalField]) {
         spins.copy_from_slice(&self.spins);
         fields.copy_from_slice(&self.work.field);
     }
 
-    pub(super) fn restore_state(&mut self, spins: &[i8], fields: &[i64]) {
+    pub(super) fn restore_state(&mut self, spins: &[i8], fields: &[LocalField]) {
         self.spins.copy_from_slice(spins);
         self.work.field.copy_from_slice(fields);
     }
@@ -678,7 +722,7 @@ impl<'g> Chain<'g> {
         let mut change = 0;
         work.boltzmann.clear();
         for u in 0..graph.n {
-            let delta = -2 * i64::from(s[u]) * work.field[u];
+            let delta = -2 * i64::from(s[u]) * field_energy(work.field[u]);
             if delta <= 0 || rng.gen::<f64>() < work.boltzmann.get(delta, beta) {
                 change += work.flip(graph, s, u);
             }
@@ -699,7 +743,7 @@ impl<'g> Chain<'g> {
         let (graph, s, work) = (self.graph, &mut self.spins, &mut self.work);
         let mut change = 0;
         for u in 0..graph.n {
-            let delta = -2 * i64::from(s[u]) * work.field[u];
+            let delta = -2 * i64::from(s[u]) * field_energy(work.field[u]);
             if delta <= 0 || rng.gen::<f64>() < cache.metropolis_probability(delta) {
                 change += work.flip(graph, s, u);
             }
@@ -711,6 +755,22 @@ impl<'g> Chain<'g> {
 #[cfg(test)]
 mod cache_tests {
     use super::*;
+
+    #[test]
+    fn epoch_wrap_clears_entries_before_reusing_the_first_stamp() {
+        let mut cache = SweepCache::new(16);
+        cache.prepare(1.0, Weights::FULL);
+        cache.heat_probability(1000);
+        cache.metropolis_probability(1000);
+        cache.heat_probability(4);
+        cache.metropolis_probability(4);
+        cache.epoch = CacheEpoch::MAX;
+        cache.prepare(2.0, Weights::FULL);
+        assert_eq!(cache.epoch, 1);
+        assert_eq!(cache.stats.epoch_wraps, 1);
+        assert_eq!(cache.heat_probability(4), heat_probability(0.008));
+        assert_eq!(cache.metropolis_probability(4), (-0.008_f64).exp());
+    }
 
     #[test]
     fn cached_probabilities_match_scalar_bits_and_epoch_changes() {
@@ -733,7 +793,7 @@ mod cache_tests {
                 }
             }
         }
-        cache.epoch = u32::MAX;
+        cache.epoch = CacheEpoch::MAX;
         cache.prepare(0.002, Weights::FULL);
         assert_eq!(cache.epoch, 1);
         assert_eq!(

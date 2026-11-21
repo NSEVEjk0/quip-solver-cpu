@@ -58,6 +58,8 @@ struct Args {
     disable_cache: bool,
     #[arg(long)]
     disable_motif_score: bool,
+    #[arg(long)]
+    selective_resampling: bool,
 }
 
 #[derive(Deserialize)]
@@ -86,6 +88,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let config = FunnelConfig {
         shared_cache: !args.disable_cache && (all || matches!(args.preset, Preset::Cache)),
         copy_resampling: all || matches!(args.preset, Preset::Copy),
+        selective_resampling: args.selective_resampling,
         inline_union: all || matches!(args.preset, Preset::Union),
         fused_updates: all || matches!(args.preset, Preset::Fusion),
         archive: matches!(args.preset, Preset::Archive),
@@ -145,6 +148,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     shared_cache: config.shared_cache,
                     cache_slots: config.cache_slots,
                     copy_resampling: config.copy_resampling,
+                    selective_resampling: config.selective_resampling,
                     inline_union: config.inline_union,
                     fused_updates: config.fused_updates,
                 },
@@ -170,10 +174,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 serde_json::json!({
                     "replica_sweeps":m.replica_sweeps,"resamples":m.resamples,
                     "field_rebuilds":m.field_rebuilds,"field_copies":m.field_copies,
+                    "field_copies_skipped":m.field_copies_skipped,"parent_snapshots":m.parent_snapshots,
+                    "local_field_bytes":m.local_field_bytes,"snapshot_bytes":m.snapshot_bytes,
                     "coefficient_visits_avoided":m.coefficient_visits_avoided,"cache_bytes":m.cache_bytes,
                     "heat_hits":c.heat_hits,"heat_misses":c.heat_misses,
                     "metropolis_hits":c.metropolis_hits,"metropolis_misses":c.metropolis_misses,
                     "fallbacks":c.fallbacks,"temperatures":c.temperatures,
+                    "epoch_wraps":c.epoch_wraps,
                 }),
             )
         }
@@ -205,7 +212,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         "seed":args.seed,"nonce":blake3::Hash::from(nonce).to_hex().to_string(),
         "reads":args.reads,"sweeps":args.sweeps,"beta_max":effective_beta_max,
         "weak_theta":args.weak_theta,"polish_beta":args.polish_beta,"cache_slots":args.cache_slots,
-        "cache_disabled":args.disable_cache,"motif_score_disabled":args.disable_motif_score,"seconds":seconds,"best_energy_milli":best,
+        "cache_disabled":args.disable_cache,"motif_score_disabled":args.disable_motif_score,
+        "selective_resampling":args.selective_resampling,
+        "compact_local_fields":cfg!(feature="compact-local-fields"),
+        "compact_cache_stamps":cfg!(feature="compact-cache-stamps"),
+        "seconds":seconds,"best_energy_milli":best,
         "energies_milli":energies,"trajectory_digest":fingerprint.finalize().to_hex().to_string(),"metrics":metrics});
     println!("{row}");
     Ok(())

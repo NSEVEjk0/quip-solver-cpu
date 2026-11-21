@@ -25,6 +25,7 @@ use rand::rngs::SmallRng;
 use rand::seq::SliceRandom;
 use rand::{Rng, SeedableRng};
 use std::fmt;
+use update::LocalField;
 
 pub use graph::{
     GraphError, Model, Motifs, OtsukaGraph, Weights, MAX_NODES, PAIR_MILLI, STRONG_MILLI,
@@ -167,6 +168,8 @@ pub struct PopulationOptions {
     pub cache_slots: usize,
     /// Transfer spins and their exact local fields during resampling.
     pub copy_resampling: bool,
+    /// Capture only needed parents and leave identity children in place.
+    pub selective_resampling: bool,
     /// Inline the monotone union-find path in the cluster draw.
     pub inline_union: bool,
     /// Patch residual deltas and full local fields in one neighbor pass.
@@ -181,6 +184,7 @@ impl Default for PopulationOptions {
             shared_cache: false,
             cache_slots: 8192,
             copy_resampling: false,
+            selective_resampling: false,
             inline_union: false,
             fused_updates: false,
         }
@@ -198,6 +202,14 @@ pub struct PopulationMetrics {
     pub field_rebuilds: usize,
     /// Replica fields restored from a captured parent state.
     pub field_copies: usize,
+    /// Identity children whose fields were already in place.
+    pub field_copies_skipped: usize,
+    /// Parent rows captured before restoring resampled children.
+    pub parent_snapshots: usize,
+    /// Field payload allocated across the live replicas.
+    pub local_field_bytes: usize,
+    /// Payload reserved for parent snapshots, excluding small vectors.
+    pub snapshot_bytes: usize,
     /// Adjacency entries not revisited because parent fields were copied.
     pub coefficient_visits_avoided: usize,
     /// Record-improvement states passed to the observer.
@@ -221,7 +233,8 @@ pub struct PopulationOutcome {
 struct PopulationSnapshot {
     nodes: usize,
     spins: Vec<i8>,
-    fields: Vec<i64>,
+    fields: Vec<LocalField>,
+    needed: Vec<bool>,
 }
 
 impl PopulationSnapshot {
@@ -230,6 +243,7 @@ impl PopulationSnapshot {
             nodes,
             spins: vec![0; replicas * nodes],
             fields: vec![0; replicas * nodes],
+            needed: vec![false; replicas],
         }
     }
 
@@ -243,6 +257,24 @@ impl PopulationSnapshot {
     fn restore(&self, chain: &mut Chain<'_>, parent: usize) {
         let row = parent * self.nodes..(parent + 1) * self.nodes;
         chain.restore_state(&self.spins[row.clone()], &self.fields[row]);
+    }
+
+    fn capture_needed(&mut self, chains: &[Chain<'_>], picks: &[usize]) -> usize {
+        self.needed.fill(false);
+        for (child, &parent) in picks.iter().enumerate() {
+            if child != parent {
+                self.needed[parent] = true;
+            }
+        }
+        let mut captured = 0;
+        for (i, chain) in chains.iter().enumerate() {
+            if self.needed[i] {
+                let row = i * self.nodes..(i + 1) * self.nodes;
+                chain.save_state(&mut self.spins[row.clone()], &mut self.fields[row]);
+                captured += 1;
+            }
+        }
+        captured
     }
 }
 
@@ -327,6 +359,12 @@ pub fn anneal_population_observed(
         .collect();
     let mut metrics = PopulationMetrics {
         field_rebuilds: replicas,
+        local_field_bytes: replicas * graph.n * size_of::<LocalField>(),
+        snapshot_bytes: if options.copy_resampling {
+            replicas * graph.n * (size_of::<i8>() + size_of::<LocalField>())
+        } else {
+            0
+        },
         ..PopulationMetrics::default()
     };
     for (chain, &e) in chains.iter().zip(&energy) {
@@ -356,11 +394,24 @@ pub fn anneal_population_observed(
         if sweep > 0 && sweep % every == 0 && replicas > 1 {
             let picks = resample(&energy, beta - last_beta, &mut rng);
             if let Some(snapshot) = &mut snapshot {
-                snapshot.capture(&chains);
-                for (chain, &parent) in chains.iter_mut().zip(&picks) {
-                    snapshot.restore(chain, parent);
+                if options.selective_resampling {
+                    metrics.parent_snapshots += snapshot.capture_needed(&chains, &picks);
+                    for (child, (chain, &parent)) in chains.iter_mut().zip(&picks).enumerate() {
+                        if child == parent {
+                            metrics.field_copies_skipped += 1;
+                        } else {
+                            snapshot.restore(chain, parent);
+                            metrics.field_copies += 1;
+                        }
+                    }
+                } else {
+                    snapshot.capture(&chains);
+                    metrics.parent_snapshots += replicas;
+                    for (chain, &parent) in chains.iter_mut().zip(&picks) {
+                        snapshot.restore(chain, parent);
+                    }
+                    metrics.field_copies += replicas;
                 }
-                metrics.field_copies += replicas;
                 metrics.coefficient_visits_avoided += replicas * graph.all.link_count();
             } else {
                 let states: Vec<Vec<i8>> =
@@ -536,4 +587,52 @@ fn resample(energy: &[i64], step: f64, rng: &mut SmallRng) -> Vec<usize> {
     // Rounding can leave the last slot short; it takes the last replica.
     picks.resize(energy.len(), energy.len() - 1);
     picks
+}
+
+#[cfg(test)]
+mod snapshot_tests {
+    use super::*;
+
+    #[test]
+    fn selective_snapshots_preserve_cycles_repeated_parents_and_fields() {
+        let graph = OtsukaGraph::new(
+            &Model {
+                h_milli: &[0; 3],
+                edges: &[(0, 1), (1, 2), (0, 2)],
+                j_milli: &[120, -210, 330],
+            },
+            &Motifs {
+                tiles: &[],
+                gauges: &[],
+                pairs: &[],
+            },
+            Weights::FULL,
+        )
+        .unwrap();
+        let states = [vec![1, 1, -1], vec![-1, 1, 1], vec![1, -1, 1]];
+        let mut snapshot = PopulationSnapshot::new(3, 3);
+        for (picks, count) in [
+            ([1, 0, 2], 2),
+            ([1, 1, 1], 1),
+            ([2, 0, 1], 3),
+            ([0, 1, 2], 0),
+        ] {
+            let mut chains: Vec<_> = states
+                .iter()
+                .map(|s| Chain::new(&graph, s.clone()).unwrap())
+                .collect();
+            assert_eq!(snapshot.capture_needed(&chains, &picks), count);
+            for (child, (chain, &parent)) in chains.iter_mut().zip(&picks).enumerate() {
+                if child != parent {
+                    snapshot.restore(chain, parent);
+                }
+            }
+            for (child, chain) in chains.iter_mut().enumerate() {
+                assert_eq!(chain.spins(), states[picks[child]]);
+                let before = graph.energy(chain.spins());
+                let delta = chain.single_sweep(0.9, &mut SmallRng::seed_from_u64(child as u64));
+                assert_eq!(graph.energy(chain.spins()) - before, delta);
+            }
+        }
+    }
 }
