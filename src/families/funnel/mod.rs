@@ -736,6 +736,12 @@ pub fn tuned_reads(
         if config.tree_polish && !polish_trees(&truth, &mut reads, params.seed, &stopped) {
             return Ok(None);
         }
+        #[cfg(feature = "pair-worm-polish")]
+        if config.pair_worm_polish
+            && !polish_pair_worm(instance, &mut reads, params.seed, &stopped)?
+        {
+            return Ok(None);
+        }
         return Ok(Some(reads));
     }
     for read in &mut reads {
