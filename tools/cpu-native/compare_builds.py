@@ -80,6 +80,11 @@ def main():
         help="run both builds on the same CPU in balanced sequential order",
     )
     parser.add_argument(
+        "--bracket",
+        action="store_true",
+        help="time each build twice per instance in balanced ABBA order on the same CPU",
+    )
+    parser.add_argument(
         "--perf",
         action="store_true",
         help="record Linux perf counters for each process",
@@ -93,6 +98,8 @@ def main():
         parser.error("candidate polish sweeps must be nonnegative")
     if args.compare_energy and args.mode != "pipeline":
         parser.error("--compare-energy requires the pipeline's original-energy verification")
+    if args.bracket and not args.serial:
+        parser.error("--bracket requires --serial")
     if args.candidate_single_every is not None and args.candidate_single_every < 0:
         parser.error("Metropolis cadence must be nonnegative")
     if not args.compare_energy and any(
@@ -157,6 +164,8 @@ def main():
             candidate_polish_sweeps=args.candidate_polish_sweeps,
             candidate_single_every=args.candidate_single_every,
         )
+    if args.bracket:
+        metadata["repeats_per_build"] = 2
     if args.perf:
         metadata["perf_events"] = PERF_EVENTS
         metadata["perf_task_clock_unit"] = "ms"
@@ -164,7 +173,7 @@ def main():
     rows, ratios, improvements = [], [], []
     exact_pairs = 0
 
-    def run(role, seed, cpu):
+    def run(role, seed, cpu, repetition=None):
         slots = args.reference_cache_slots if role == "reference" else args.cache_slots
         sweeps = (args.reference_sweeps or args.sweeps) if role == "reference" else args.sweeps
         command = [
@@ -188,8 +197,9 @@ def main():
             command.extend(("--polish-sweeps", str(args.candidate_polish_sweeps)))
         if role == "candidate" and args.candidate_single_every is not None:
             command.extend(("--single-every", str(args.candidate_single_every)))
+        stem = f"{seed}-{role}" if repetition is None else f"{seed}-{role}-{repetition}"
         if args.perf:
-            perf_path = output / f"{seed}-{role}.perf.csv"
+            perf_path = output / f"{stem}.perf.csv"
             command = [
                 "perf",
                 "stat",
@@ -216,7 +226,7 @@ def main():
         if args.perf:
             row["perf"] = read_perf(perf_path)
         if result.stderr:
-            (output / f"{seed}-{role}.log").write_text(result.stderr)
+            (output / f"{stem}.log").write_text(result.stderr)
         return row
 
     with concurrent.futures.ThreadPoolExecutor(max_workers=2) as pool:
@@ -226,13 +236,32 @@ def main():
             left, right = args.cpus if number % 2 == 0 else reversed(args.cpus)
             if args.serial:
                 roles = ("reference", "candidate")
-                order = roles if number % 4 < 2 else reversed(roles)
-                by_role = {}
+                order = roles if number % 4 < 2 else tuple(reversed(roles))
+                if args.bracket:
+                    order = (*order, *reversed(order))
+                by_role = {role: [] for role in roles}
                 for position, role in enumerate(order, start=1):
-                    row = run(role, seed, left)
+                    repeat = position if args.bracket else None
+                    row = run(role, seed, left, repeat)
                     row["serial_order"] = position
-                    by_role[role] = row
-                pair = [by_role[role] for role in roles]
+                    by_role[role].append(row)
+                pair = []
+                for role in roles:
+                    first = by_role[role][0]
+                    if not args.bracket:
+                        pair.append(first)
+                        continue
+                    second = by_role[role][1]
+                    if first["trajectory_digest"] != second["trajectory_digest"]:
+                        raise RuntimeError(f"repeat outputs differ for {role} at seed {seed}")
+                    first = {**first, "runs": [first, second]}
+                    first["seconds"] = statistics.mean(row["seconds"] for row in first["runs"])
+                    if args.perf:
+                        first["perf"] = {
+                            event: statistics.mean(row["perf"][event] for row in first["runs"])
+                            for event in PERF_EVENTS
+                        }
+                    pair.append(first)
             else:
                 futures = [
                     pool.submit(run, "reference", seed, left),
