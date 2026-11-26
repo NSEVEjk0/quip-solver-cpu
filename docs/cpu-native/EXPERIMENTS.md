@@ -293,6 +293,34 @@ pair. The measurements cover the specified recipe and one EPYC 7663 VPS. The
 masked path is an opt-in build. [Counter summary](data/residual-edge-scan/confirm-masked/summary.json),
 [build and hashes](data/residual-edge-scan/masked-build.json).
 
+## Table-driven tile bond sampling
+
+In a profile of the C38 archive pipeline at 16 × 4,096, `Workspace::partition`
+accounted for 41.2% of sampled user-space cycles. The function draws tile
+and pair bonds and builds the component lists. [Profile settings](data/tile-bonds/build.json).
+
+A four-bit mask records which spin signs match their tile gauges. A 16-entry
+table gives the number of up spins and the ordered up and down positions.
+Retaining the order preserves the partners selected by the low random bits
+on ice tiles and by the two range draws on defect tiles. The sampler uses the
+same probability thresholds and consumes random draws in the same order.
+
+Both builds use Rust 1.97.1 and the same source revision with C38's masked
+residual scan enabled. The candidate also enables `table-tile-bonds`. Each pair
+runs on CPUs 3 and 4 of one AMD EPYC 7663 VPS, alternating CPU placement.
+[Build flags and binary hashes](data/tile-bonds/build.json).
+
+| Comparison | Seeds | Replicas × sweeps | Median speed ratio | Paired bootstrap 95% median interval | Faster pairs | Exact matches |
+|---|---:|---:|---:|---:|---:|---:|
+| [Kernel](data/tile-bonds/kernel/results.json) | 1129–1136 | 16 × 2,048 | 1.062× | 1.024–1.206× | 8/8 | 8/8 |
+| [Archive pipeline](data/tile-bonds/pipeline/results.json) | 1141–1148 | 16 × 8,192 | **1.129×** | 1.041–1.165× | 8/8 | 8/8 |
+
+In the full pipeline, mean solver time fell from 36.719 s to 32.900 s.
+Whole-process median ratios correspond to 17.5% fewer branch misses, 5.9%
+fewer cycles, and 0.4% more retired instructions. Branch misses and cycles
+fell in every pair in both comparisons. [Pipeline summary](data/tile-bonds/pipeline/summary.json),
+[kernel summary](data/tile-bonds/kernel/summary.json).
+
 ## Correctness and protocol checks
 
 The release validation checks the actual native binary and its family adapter:
@@ -318,6 +346,9 @@ For the masked build, 23 kernel tests and one native session conformance test
 passed. With the storage, cluster, and residual-scan features selected together,
 32 family-library tests, Clippy with warnings denied, and formatting passed.
 See the [validation record](data/residual-edge-scan/masked-validation.json).
+The tile-table build verifies position order for all 16 patterns and runs the
+family library, kernel, and native protocol checks.
+[Tile-table validation record](data/tile-bonds/validation.json).
 Native deployment observations are recorded separately in
 [live operation](LIVE_OPERATION.md); coordinator candidate validation is a
 different event from inclusion of a winning proof in a block.
@@ -385,6 +416,18 @@ budget and the standard native build at the operational budget.
 ```sh
 python3 tools/cpu-native/compare_builds.py --reference-binary "$study/rows" --candidate-binary "$study/masked" --label masked-residual-deltas --cpus 3 4 --output "$study/masked-kernel" --seed-start 1101 --sweeps 2048 --mode kernel --preset core --perf
 python3 tools/cpu-native/compare_builds.py --reference-binary "$study/wide" --candidate-binary "$study/masked" --label masked-residual-deltas-pipeline --cpus 3 4 --output "$study/masked-pipeline" --seed-start 1111 --sweeps 8192 --mode pipeline --preset archive --perf
+```
+
+Build both tile-table comparisons from the same checkout. Use the masked
+scan in both builds and add `table-tile-bonds` to the candidate.
+
+```sh
+cargo +1.97.1 build --release --locked --features experimental,masked-residual-deltas --example cpu_native_bench -j 1
+cp target/release/examples/cpu_native_bench "$study/tile-reference"
+cargo +1.97.1 build --release --locked --features experimental,masked-residual-deltas,table-tile-bonds --example cpu_native_bench -j 1
+cp target/release/examples/cpu_native_bench "$study/tile-table"
+python3 tools/cpu-native/compare_builds.py --reference-binary "$study/tile-reference" --candidate-binary "$study/tile-table" --label table-tile-bonds-kernel --cpus 3 4 --output "$study/tile-kernel" --seed-start 1129 --reads 16 --sweeps 2048 --mode kernel --preset core --perf
+python3 tools/cpu-native/compare_builds.py --reference-binary "$study/tile-reference" --candidate-binary "$study/tile-table" --label table-tile-bonds-pipeline --cpus 3 4 --output "$study/tile-pipeline" --seed-start 1141 --reads 16 --sweeps 8192 --mode pipeline --preset archive --perf
 ```
 
 The evidence covers the specified Quip family, recipe, toolchain, and VPS.

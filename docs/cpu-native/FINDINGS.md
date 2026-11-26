@@ -54,6 +54,7 @@ with block eligibility checked separately by the coordinator and runtime.
 | [C36](#c36) | Packed component labels and spin signs | Exact outputs; 4.9% more instructions on fresh seeds |
 | [C37](#c37) | Group residual edges by endpoint | 10.6% fewer instructions; full-pipeline time near parity |
 | [C38](#c38) | Mask interior edges in the residual scan | 1.028× median full-pipeline speedup; eight exact output matches |
+| [C39](#c39) | Table-driven tile bond sampling | 1.129× median full-pipeline speedup over C38 with eight exact output matches |
 
 <a id="c01"></a>
 ## C01. Packed adjacency fusion
@@ -491,3 +492,16 @@ at the median** than the standard native build and returned identical candidate
 spins and energies in every pair. The whole process recorded 28.8% fewer
 branch misses and 5.1% fewer cycles at the median. The build is opt-in and has
 been measured on one EPYC VPS. [Results and reproduction](EXPERIMENTS.md#mask-the-interior-edge-term).
+
+<a id="c39"></a>
+## C39. Table-driven tile bond sampling
+
+The four gauged spin signs index a 16-entry table of up and down positions.
+The table preserves tile order within each list, so the same draws still
+select the same partners and bonds. The build flag is `table-tile-bonds`.
+
+At 16 × 8,192, the archive pipeline reached a **1.129× median speedup** over
+the C38 configuration on one EPYC 7663 VPS. All eight held-out pairs ran
+faster and returned identical candidate spins and energies. Median branch
+misses fell 17.5% and cycles fell 5.9%.
+[Results and reproduction](EXPERIMENTS.md#table-driven-tile-bond-sampling).

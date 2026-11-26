@@ -1,0 +1,21 @@
+{
+  "label": "table-tile-bonds-pipeline",
+  "pairs": 8,
+  "median_speedup": 1.1293267018991542,
+  "bootstrap95_median": [
+    1.0405747763590052,
+    1.165020701364178
+  ],
+  "mean_reference_seconds": 36.718553388375,
+  "mean_candidate_seconds": 32.900493847625,
+  "exact_output_pairs": 8,
+  "mean_best_original_energy": -5048.405,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.121903103337261,
+    "cycles": 1.0622413565327888,
+    "instructions": 0.996238905960481,
+    "branches": 0.9982760868096672,
+    "branch-misses": 1.2124527232311182,
+    "cache-misses": 1.020750519608666
+  }
+}

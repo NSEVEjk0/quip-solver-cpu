@@ -45,6 +45,10 @@ component-membership branch in the scan. In eight held-out full-pipeline
 pairs it achieved **1.028× median speedup** over the native path with identical
 candidate outputs. [Finding C38 and paired measurements](docs/cpu-native/FINDINGS.md#c38).
 
+An opt-in lookup table for the four-spin tile patterns reached a **1.129× median
+full-pipeline speedup** over that masked build. All eight paired runs returned
+identical candidate spins and energies. [Finding C39](docs/cpu-native/FINDINGS.md#c39).
+
 ![CPU execution ablation](docs/cpu-native/figures/kernel-ablation.svg)
 
 The [experiment report](docs/cpu-native/EXPERIMENTS.md) contains the complete

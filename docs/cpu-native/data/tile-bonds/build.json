@@ -1,0 +1,46 @@
+{
+  "build_source_commit": "c308965df077fe2a240005609b3d99ba5bd2d73a",
+  "build_command": [
+    "cargo",
+    "+1.97.1",
+    "build",
+    "--release",
+    "--locked",
+    "--features",
+    "<features>",
+    "--example",
+    "cpu_native_bench",
+    "-j",
+    "1"
+  ],
+  "binaries": {
+    "reference": {
+      "features": [
+        "experimental",
+        "masked-residual-deltas"
+      ],
+      "sha256": "8225e88e6f1e64807ee016b3491005ca8f63cb59b1e1d4bd4b78881b3b76a6ee"
+    },
+    "candidate": {
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds"
+      ],
+      "sha256": "201f528151ea05eb5c2817a7bc37b71d8dbcd7fca717b7ad596dcc7d975a4a89"
+    }
+  },
+  "host_cpu": "AMD EPYC 7663",
+  "profile": {
+    "reference": "C38 masked build",
+    "sha256": "3c4602bacf1717b152d3564ad3a8e373359742f02569102acef2943173cbafac",
+    "event": "cycles:u",
+    "sample_period": 800001,
+    "seed": 1121,
+    "reads": 16,
+    "sweeps": 4096,
+    "mode": "pipeline",
+    "preset": "archive",
+    "partition_sample_percent": 41.19
+  }
+}
