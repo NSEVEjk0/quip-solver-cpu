@@ -222,6 +222,15 @@ def main():
             check=True,
         )
         row = json.loads(result.stdout)
+        if row["seed"] != seed or row["sweeps"] != sweeps or row["reads"] != args.reads:
+            raise RuntimeError(f"reported solve budget differs for {role} at seed {seed}")
+        if row["mode"].lower() != args.mode or row["preset"].lower() != args.preset:
+            raise RuntimeError(f"reported solve preset differs for {role} at seed {seed}")
+        if role == "candidate":
+            if args.candidate_polish_sweeps is not None and row.get("polish_sweeps") != args.candidate_polish_sweeps:
+                raise RuntimeError(f"reported candidate polishing budget differs at seed {seed}")
+            if args.candidate_single_every is not None and row.get("single_every") != args.candidate_single_every:
+                raise RuntimeError(f"reported candidate Metropolis cadence differs at seed {seed}")
         row.update(role=role, label=args.label, cpu=cpu, command=command)
         if args.perf:
             row["perf"] = read_perf(perf_path)
@@ -274,6 +283,8 @@ def main():
                 raise RuntimeError(f"different canonical instances at seed {seed}")
             if any(len(row["energies_milli"]) != args.reads for row in pair):
                 raise RuntimeError(f"candidate count differs from the requested reads at seed {seed}")
+            if any(row["best_energy_milli"] != min(row["energies_milli"]) for row in pair):
+                raise RuntimeError(f"best energy does not match the candidate list at seed {seed}")
             energy_change = {}
             if args.compare_energy:
                 ref, candidate = [sorted(row["energies_milli"]) for row in pair]
