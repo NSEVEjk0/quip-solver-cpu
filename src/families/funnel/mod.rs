@@ -18,6 +18,8 @@ mod stage0;
 )]
 mod stage0v2;
 
+#[cfg(feature = "tree-polish")]
+use super::otsuka::TreePolish;
 use super::otsuka::{
     anneal_population_observed, AnnealError, Chain, Model, Motifs, OtsukaGraph, PopulationOptions,
     Schedule, SweepCache, Weights,
@@ -700,6 +702,14 @@ pub fn tuned_reads(
             record.energy_milli = truth.energy(&record.spins);
         }
         retain_record(&mut reads, record, params.num_reads);
+    }
+    #[cfg(feature = "tree-polish")]
+    if let Some(mut polish) = TreePolish::new(&truth, params.seed, &stopped) {
+        if polish.improve(&mut reads, &stopped).is_none() {
+            return Ok(None);
+        }
+    } else {
+        return Ok(None);
     }
     Ok(Some(reads))
 }

@@ -52,6 +52,8 @@ struct Args {
     weak_theta: Option<f64>,
     #[arg(long, default_value_t = 20.0)]
     polish_beta: f64,
+    #[arg(long, default_value_t = 256)]
+    polish_sweeps: usize,
     #[arg(long, default_value_t = 8192)]
     cache_slots: usize,
     #[arg(long)]
@@ -94,6 +96,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         archive: matches!(args.preset, Preset::Archive),
         weak_beta_end: args.weak_theta,
         polish_beta: args.polish_beta,
+        polish_sweeps: args.polish_sweeps,
         cache_slots: args.cache_slots,
         motif_score: !args.disable_motif_score,
         ..FunnelConfig::default()
@@ -227,6 +230,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         "shallow_union_roots":cfg!(feature="shallow-union-roots"),
         "linked_component_lists":cfg!(feature="linked-component-lists"),
         "packed_residual_fields":cfg!(feature="packed-residual-fields"),
+        "tree_polish":cfg!(feature="tree-polish"),
+        "polish_sweeps":args.polish_sweeps,
         "seconds":seconds,"best_energy_milli":best,
         "energies_milli":energies,"trajectory_digest":fingerprint.finalize().to_hex().to_string(),"metrics":metrics});
     println!("{row}");

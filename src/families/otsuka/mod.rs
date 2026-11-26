@@ -18,6 +18,8 @@
 //! with the declared parameters, before preparation.
 
 mod graph;
+#[cfg(feature = "tree-polish")]
+mod tree;
 mod update;
 
 use quip_solver_core::CancelToken;
@@ -30,6 +32,8 @@ use update::LocalField;
 pub use graph::{
     GraphError, Model, Motifs, OtsukaGraph, Weights, MAX_NODES, PAIR_MILLI, STRONG_MILLI,
 };
+#[cfg(feature = "tree-polish")]
+pub(crate) use tree::TreePolish;
 pub use update::{CacheStats, Chain, SpinError, SweepCache};
 
 /// Why a schedule cannot drive an anneal.
