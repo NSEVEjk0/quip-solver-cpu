@@ -847,6 +847,8 @@ impl Workspace {
         self.partition::<INLINE>(graph, s, p, rng);
         let rows = graph.fused();
         let forward = graph.weak_forward();
+        let tile_energy = i64::from(graph.weights.tile_milli - super::graph::STRONG_MILLI);
+        let pair_energy = i64::from(graph.weights.pair_milli - super::graph::STRONG_MILLI);
         let mut change = 0;
         for c in 0..self.delta.len() {
             let (start, end) = self.component_range(c);
@@ -859,25 +861,39 @@ impl Workspace {
                 }
                 continue;
             }
+            let second = self.next_member(&mut at);
+            if at == end {
+                // Exactly one sampled bond connected these two nodes. A
+                // dimer joins equal spins and a tile joins opposite gauged
+                // spins, so either bond's residual energy is fixed.
+                let bond_energy = if graph.pair_partner[first] == second as u32 {
+                    pair_energy
+                } else {
+                    tile_energy
+                };
+                let field_sum = i64::from(s[first]) * residual_field(self.field[first])
+                    + i64::from(s[second]) * residual_field(self.field[second]);
+                if draw(4 * bond_energy - 2 * field_sum, rng) {
+                    change += Self::flip_packed(rows, &mut self.field, s, first);
+                    change += Self::flip_packed(rows, &mut self.field, s, second);
+                }
+                continue;
+            }
 
             // Summed residual fields count each interior edge twice. Restore
             // that contribution once per interior edge using the forward rows.
             let mut delta = 0;
-            let mut u = first;
-            loop {
+            let mut at = start;
+            while at != end {
+                let u = self.next_member(&mut at);
                 let mut interior = 0_i32;
                 for &link in forward.row(u) {
                     let v = link.node();
-                    if self.label[v] as usize == c {
-                        interior += link.j() * i32::from(s[v]);
-                    }
+                    let inside = -i32::from(self.label[v] as usize == c);
+                    interior += (link.j() * i32::from(s[v])) & inside;
                 }
                 delta +=
                     i64::from(s[u]) * (4 * i64::from(interior) - 2 * residual_field(self.field[u]));
-                if at == end {
-                    break;
-                }
-                u = self.next_member(&mut at);
             }
             if draw(delta, rng) {
                 let mut at = start;

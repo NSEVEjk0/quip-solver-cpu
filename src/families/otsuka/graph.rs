@@ -308,6 +308,8 @@ pub struct OtsukaGraph {
     pub(crate) n: usize,
     pub(crate) tiles: Vec<Tile>,
     pub(crate) pairs: Vec<(u32, u32)>,
+    #[cfg(feature = "packed-residual-fields")]
+    pub(crate) pair_partner: Vec<u32>,
     pub(crate) weights: Weights,
     /// Every coupling of the model.
     edges: Vec<Edge>,
@@ -458,6 +460,15 @@ impl OtsukaGraph {
         let mut strong = vec![false; edges.len()];
         let tiles = check_tiles(motifs, n, &edges, &index, &mut strong)?;
         let pairs = check_pairs(motifs, n, &edges, &index, &mut strong)?;
+        #[cfg(feature = "packed-residual-fields")]
+        let pair_partner = {
+            let mut partners = vec![u32::MAX; n];
+            for &(u, v) in &pairs {
+                partners[u as usize] = v;
+                partners[v as usize] = u;
+            }
+            partners
+        };
         let mut weak_edges = Vec::new();
         for (at, (&edge, &is_strong)) in edges.iter().zip(&strong).enumerate() {
             if is_strong {
@@ -487,6 +498,8 @@ impl OtsukaGraph {
             n,
             tiles,
             pairs,
+            #[cfg(feature = "packed-residual-fields")]
+            pair_partner,
             weights,
             weak: Csr::build(n, &weak_edges),
             #[cfg(feature = "row-grouped-residual-deltas")]
