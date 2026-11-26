@@ -86,6 +86,8 @@ pub struct FunnelConfig {
     pub houdayer_every: usize,
     /// Keep independent replica histories while retaining Houdayer exchanges.
     pub independent_ancestry: bool,
+    /// Propose Houdayer exchanges on strong edges and accept against full energy.
+    pub strong_exchanges: bool,
     /// Keep one original-objective record per replica slot through resampling.
     pub slot_archive: bool,
     /// Cold cluster continuation sweeps on the four best reads.
@@ -138,6 +140,7 @@ impl Default for FunnelConfig {
             resamples: 512,
             houdayer_every: 0,
             independent_ancestry: false,
+            strong_exchanges: false,
             slot_archive: false,
             polish_sweeps: 256,
             single_every: 1,
@@ -191,6 +194,7 @@ impl FunnelConfig {
                 &mut self.independent_ancestry,
             ),
             ("funnel_slot_archive", &mut self.slot_archive),
+            ("funnel_strong_exchanges", &mut self.strong_exchanges),
         ] {
             if let Some(v) = table.get(key) {
                 *value = v
@@ -307,6 +311,7 @@ impl FunnelConfig {
             "resamples",
             "houdayer_every",
             "independent_ancestry",
+            "strong_exchanges",
             "slot_archive",
             "polish_sweeps",
             "single_every",
@@ -342,6 +347,7 @@ impl FunnelConfig {
                 | "fused_updates"
                 | "archive"
                 | "independent_ancestry"
+                | "strong_exchanges"
                 | "slot_archive"
                 | "motif_score" => raw.parse::<bool>().ok().map(toml::Value::Boolean),
                 "weak_scale" | "weak_beta_end" | "polish_beta" | "beta_hold" => {
@@ -658,6 +664,7 @@ pub fn tuned_reads(
             resamples: config.resamples,
             houdayer_every: config.houdayer_every,
             independent_ancestry: config.independent_ancestry,
+            strong_exchanges: config.strong_exchanges,
             shared_cache: config.shared_cache,
             cache_slots: config.cache_slots,
             copy_resampling: config.copy_resampling,

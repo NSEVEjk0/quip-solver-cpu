@@ -71,6 +71,8 @@ struct Args {
     #[arg(long)]
     independent_ancestry: bool,
     #[arg(long)]
+    strong_exchanges: bool,
+    #[arg(long)]
     slot_archive: bool,
     #[arg(long, default_value_t = 8192)]
     cache_slots: usize,
@@ -129,6 +131,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         resamples: args.resamples,
         houdayer_every: args.houdayer_every,
         independent_ancestry: args.independent_ancestry,
+        strong_exchanges: args.strong_exchanges,
         slot_archive: args.slot_archive,
         #[cfg(feature = "tree-polish")]
         tree_polish: true,
@@ -186,6 +189,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     resamples: config.resamples,
                     houdayer_every: config.houdayer_every,
                     independent_ancestry: args.independent_ancestry,
+                    strong_exchanges: args.strong_exchanges,
                     shared_cache: config.shared_cache,
                     cache_slots: config.cache_slots,
                     copy_resampling: config.copy_resampling,
@@ -225,6 +229,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                     "metropolis_hits":c.metropolis_hits,"metropolis_misses":c.metropolis_misses,
                     "fallbacks":c.fallbacks,"temperatures":c.temperatures,
                     "epoch_wraps":c.epoch_wraps,
+                    "exchange_proposals": m.exchange_proposals,
+                    "exchange_partial": m.exchange_partial,
+                    "exchange_rejected": m.exchange_rejected,
                 }),
             )
         }
@@ -283,6 +290,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "tile_milli":args.tile_milli,"pair_milli":args.pair_milli,"resamples":args.resamples,
         "houdayer_every":args.houdayer_every,"independent_ancestry":args.independent_ancestry,
         "slot_archive":args.slot_archive,
+        "strong_exchanges":args.strong_exchanges,
     });
     let row_fields = row
         .as_object_mut()

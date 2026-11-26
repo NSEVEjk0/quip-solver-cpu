@@ -168,6 +168,8 @@ pub struct PopulationOptions {
     pub houdayer_every: usize,
     /// Advance each replica's own chain while retaining the configured swap cadence.
     pub independent_ancestry: bool,
+    /// Propose exchanges on the strong graph, with full-energy Metropolis acceptance.
+    pub strong_exchanges: bool,
     /// Share temperature-local transition probabilities across replicas.
     pub shared_cache: bool,
     /// Positive half-delta slots in the bounded probability table.
@@ -188,6 +190,7 @@ impl Default for PopulationOptions {
             resamples: RESAMPLES,
             houdayer_every: 1,
             independent_ancestry: false,
+            strong_exchanges: false,
             shared_cache: false,
             cache_slots: 8192,
             copy_resampling: false,
@@ -229,6 +232,12 @@ pub struct PopulationMetrics {
     pub observer_records: usize,
     /// Probability table size in bytes.
     pub cache_bytes: usize,
+    /// Nonempty disagreement components proposed for exchange.
+    pub exchange_proposals: usize,
+    /// Accepted exchanges involving a strict subset of the disagreement set.
+    pub exchange_partial: usize,
+    /// Exchanges rejected by the full-energy acceptance test.
+    pub exchange_rejected: usize,
     /// Temperature-local probability counters.
     pub cache: CacheStats,
 }
@@ -506,7 +515,15 @@ pub(crate) fn anneal_population_with_slots(
                 let (a, b) = (pair[0].min(pair[1]), pair[0].max(pair[1]));
                 let (left, right) = chains.split_at_mut(b);
                 let (ca, cb) = (&mut left[a], &mut right[0]);
-                if let Some((da, db)) = houdayer(graph, ca, cb, &mut scratch, &mut rng) {
+                if let Some((da, db)) = houdayer(
+                    graph,
+                    ca,
+                    cb,
+                    &mut scratch,
+                    &mut rng,
+                    options.strong_exchanges.then_some(beta),
+                    &mut metrics,
+                ) {
                     energy[a] += da;
                     energy[b] += db;
                     for i in [a, b] {
@@ -572,6 +589,8 @@ fn houdayer(
     b: &mut Chain<'_>,
     scratch: &mut Houdayer,
     rng: &mut SmallRng,
+    strong_beta: Option<f64>,
+    metrics: &mut PopulationMetrics,
 ) -> Option<(i64, i64)> {
     let (sa, sb) = (a.spins(), b.spins());
     scratch.differ.clear();
@@ -581,6 +600,7 @@ fn houdayer(
     if scratch.differ.is_empty() {
         return None;
     }
+    metrics.exchange_proposals += 1;
     let root = scratch.differ[rng.gen_range(0..scratch.differ.len())];
     scratch.cluster.clear();
     scratch.cluster.push(root);
@@ -591,21 +611,60 @@ fn houdayer(
         at += 1;
         for link in graph.all.row(u) {
             let v = link.node();
-            if !scratch.seen[v] && sa[v] != sb[v] {
+            if !scratch.seen[v]
+                && sa[v] != sb[v]
+                && (strong_beta.is_none() || link.j().abs() == STRONG_MILLI)
+            {
                 scratch.seen[v] = true;
                 scratch.cluster.push(v as u32);
             }
         }
     }
+    let summed_delta = if strong_beta.is_some() && scratch.cluster.len() != scratch.differ.len() {
+        exchange_boundary_delta(graph, &scratch.cluster, &scratch.seen, sa, sb)
+    } else {
+        0
+    };
     for &u in &scratch.cluster {
         scratch.seen[u as usize] = false;
     }
+    if summed_delta > 0
+        && strong_beta
+            .is_some_and(|beta| rng.gen::<f64>() >= (-beta * summed_delta as f64 / 1000.0).exp())
+    {
+        metrics.exchange_rejected += 1;
+        return None;
+    }
+    metrics.exchange_partial += usize::from(scratch.cluster.len() < scratch.differ.len());
     let change = (
         a.flip_nodes(&scratch.cluster),
         b.flip_nodes(&scratch.cluster),
     );
-    debug_assert_eq!(change.0 + change.1, 0, "a swap keeps the summed energy");
+    debug_assert_eq!(change.0 + change.1, summed_delta);
     Some(change)
+}
+
+// On a boundary edge with one disagreeing endpoint, the two energy changes
+// cancel if the other endpoint agrees. With two disagreeing endpoints they
+// are equal. Every internal edge preserves its spin product in both replicas.
+fn exchange_boundary_delta(
+    graph: &OtsukaGraph,
+    nodes: &[u32],
+    inside: &[bool],
+    a: &[i8],
+    b: &[i8],
+) -> i64 {
+    let mut delta = 0;
+    for &node in nodes {
+        let u = node as usize;
+        for &link in graph.all.row(u) {
+            let v = link.node();
+            if !inside[v] && a[v] != b[v] {
+                delta -= 4 * i64::from(link.j()) * i64::from(a[u] * a[v]);
+            }
+        }
+    }
+    delta
 }
 
 /// Systematic resampling: the replica each slot copies, drawn in proportion
