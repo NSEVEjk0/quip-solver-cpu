@@ -177,6 +177,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                     "field_copies_skipped":m.field_copies_skipped,"parent_snapshots":m.parent_snapshots,
                     "local_field_bytes":m.local_field_bytes,"snapshot_bytes":m.snapshot_bytes,
                     "coefficient_visits_avoided":m.coefficient_visits_avoided,"cache_bytes":m.cache_bytes,
+                    "boundary_updated_nodes":m.boundary_updated_nodes,
+                    "boundary_field_updates":m.boundary_field_updates,
+                    "interior_field_updates_avoided":m.interior_field_updates_avoided,
                     "heat_hits":c.heat_hits,"heat_misses":c.heat_misses,
                     "metropolis_hits":c.metropolis_hits,"metropolis_misses":c.metropolis_misses,
                     "fallbacks":c.fallbacks,"temperatures":c.temperatures,
@@ -216,6 +219,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "selective_resampling":args.selective_resampling,
         "compact_local_fields":cfg!(feature="compact-local-fields"),
         "compact_cache_stamps":cfg!(feature="compact-cache-stamps"),
+        "cluster_boundary_updates":cfg!(feature="cluster-boundary-updates"),
         "seconds":seconds,"best_energy_milli":best,
         "energies_milli":energies,"trajectory_digest":fingerprint.finalize().to_hex().to_string(),"metrics":metrics});
     println!("{row}");

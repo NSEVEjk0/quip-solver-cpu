@@ -212,6 +212,12 @@ pub struct PopulationMetrics {
     pub snapshot_bytes: usize,
     /// Adjacency entries not revisited because parent fields were copied.
     pub coefficient_visits_avoided: usize,
+    /// Accepted nodes updated by the component-boundary transformation.
+    pub boundary_updated_nodes: usize,
+    /// Outside-neighbor field updates in that transformation.
+    pub boundary_field_updates: usize,
+    /// Interior-neighbor field writes replaced by node-field transformations.
+    pub interior_field_updates_avoided: usize,
     /// Record-improvement states passed to the observer.
     pub observer_records: usize,
     /// Probability table size in bytes.
@@ -486,6 +492,12 @@ pub fn anneal_population_observed(
     if let Some(cache) = cache {
         metrics.cache = cache.stats();
         metrics.cache_bytes = cache.table_bytes();
+    }
+    for chain in &chains {
+        let [nodes, boundary, interior] = chain.boundary_work();
+        metrics.boundary_updated_nodes += nodes;
+        metrics.boundary_field_updates += boundary;
+        metrics.interior_field_updates_avoided += interior;
     }
     Ok(PopulationOutcome {
         samples: best

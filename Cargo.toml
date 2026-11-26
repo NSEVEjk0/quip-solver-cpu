@@ -189,6 +189,9 @@ experimental = []
 # probabilities; opt in when building the research comparison binaries.
 compact-local-fields = []
 compact-cache-stamps = []
+# Exact cluster-field transformation using only contributions across the
+# component boundary. Research build; the default update remains available.
+cluster-boundary-updates = []
 # Off by default. Adds per-spin-decision and per-flip spans INSIDE the hot loop.
 # These spans distort absolute timing (millions of enters per read), so they are
 # used only for the diagnostic cross-check pass, never for headline per-part JSON.

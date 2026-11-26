@@ -47,6 +47,18 @@ fn field_energy(value: LocalField) -> i64 {
     }
 }
 
+#[inline(always)]
+fn stored_field(value: i64) -> LocalField {
+    #[cfg(feature = "compact-local-fields")]
+    {
+        value as i32
+    }
+    #[cfg(not(feature = "compact-local-fields"))]
+    {
+        value
+    }
+}
+
 #[cfg(feature = "compact-cache-stamps")]
 type CacheEpoch = u16;
 #[cfg(not(feature = "compact-cache-stamps"))]
@@ -227,6 +239,8 @@ struct Workspace {
     /// The local field of each node over every coupling, `sum J s_v`,
     /// patched at each flip.
     field: Vec<LocalField>,
+    /// Accepted nodes, boundary neighbor updates, and interior updates avoided.
+    boundary_work: [usize; 3],
 }
 
 /// A direct-mapped cache of `exp(-beta * delta / 1000)` at one beta. The
@@ -274,6 +288,7 @@ impl Workspace {
             delta: Vec::with_capacity(n),
             boltzmann: Boltzmann::new(),
             field: vec![0; n],
+            boundary_work: [0; 3],
         }
     }
 
@@ -496,6 +511,41 @@ impl Workspace {
                 let u = self.members[at] as usize;
                 let su = i64::from(s[u]);
                 if let Some(rows) = fused {
+                    if cfg!(feature = "cluster-boundary-updates") {
+                        // A simultaneous component flip leaves all interior
+                        // spin products unchanged. Its full energy change
+                        // therefore comes entirely from boundary edges.
+                        // For an inside node f' = -f + 2*f_external; outside
+                        // fields receive the ordinary boundary patch. No
+                        // interior node is patched by another member here.
+                        let mut external = 0_i64;
+                        let mut boundary = 0;
+                        for &link in rows.row(u) {
+                            let v = link.node();
+                            let lv = self.label[v] as usize;
+                            if lv == c {
+                                continue;
+                            }
+                            let full = link.full();
+                            external += i64::from(full) * i64::from(s[v]);
+                            self.field[v] -= 2 * LocalField::from(s[u]) * field_coupling(full);
+                            let residual = link.residual();
+                            if residual != 0 {
+                                self.delta[lv] += 4 * i64::from(residual) * su * i64::from(s[v]);
+                            }
+                            boundary += 1;
+                        }
+                        change -= 2 * su * external;
+                        // The i64 intermediate is necessary even for compact
+                        // fields: 2*f_external can exceed i32. The completed
+                        // field satisfies the admitted-graph bound above.
+                        self.field[u] = stored_field(-field_energy(self.field[u]) + 2 * external);
+                        s[u] = -s[u];
+                        self.boundary_work[0] += 1;
+                        self.boundary_work[1] += boundary;
+                        self.boundary_work[2] += rows.row(u).len() - boundary;
+                        continue;
+                    }
                     let twice = 2 * su;
                     change -= twice * field_energy(self.field[u]);
                     for &link in rows.row(u) {
@@ -706,6 +756,10 @@ impl<'g> Chain<'g> {
     pub(super) fn restore_state(&mut self, spins: &[i8], fields: &[LocalField]) {
         self.spins.copy_from_slice(spins);
         self.work.field.copy_from_slice(fields);
+    }
+
+    pub(super) fn boundary_work(&self) -> [usize; 3] {
+        self.work.boundary_work
     }
 
     /// Flip every node of `nodes` once. Returns the model energy change in

@@ -11,7 +11,7 @@ use quip_solver_cpu::families::otsuka::{
     Schedule, ScheduleError, SpinError, Weights,
 };
 use rand::rngs::SmallRng;
-use rand::SeedableRng;
+use rand::{RngCore, SeedableRng};
 
 #[test]
 fn every_cpu_execution_combination_preserves_population_trajectories() {
@@ -149,6 +149,12 @@ fn high_degree_local_fields_keep_exact_flip_energies() {
     let before = graph.energy(chain.spins());
     let delta = chain.cluster_sweep(12.0, &mut rng);
     assert_eq!(graph.energy(chain.spins()) - before, delta);
+    let before = graph.energy(chain.spins());
+    let delta = chain.cluster_sweep_optimized(12.0, None, true, true, &mut rng);
+    assert_eq!(graph.energy(chain.spins()) - before, delta);
+    let before = graph.energy(chain.spins());
+    let delta = chain.single_sweep(12.0, &mut rng);
+    assert_eq!(graph.energy(chain.spins()) - before, delta);
 }
 
 #[test]
@@ -188,6 +194,7 @@ fn fused_cluster_and_cached_metropolis_preserve_each_move() {
                 assert_eq!(a, b);
                 assert_eq!(scalar.spins(), native.spins());
             }
+            assert_eq!(left.next_u64(), right.next_u64(), "RNG position differs");
         }
     }
 }
