@@ -81,6 +81,8 @@ pub struct FunnelConfig {
     pub houdayer_every: usize,
     /// Cold cluster continuation sweeps on the four best reads.
     pub polish_sweeps: usize,
+    /// Metropolis cadence during the population phase. Zero uses clusters alone.
+    pub single_every: usize,
     /// Share temperature-local probabilities across replicas.
     pub shared_cache: bool,
     /// Positive half-delta capacity of the shared probability table.
@@ -119,6 +121,7 @@ impl Default for FunnelConfig {
             resamples: 512,
             houdayer_every: 0,
             polish_sweeps: 256,
+            single_every: 1,
             shared_cache: false,
             cache_slots: 8192,
             copy_resampling: false,
@@ -549,7 +552,7 @@ pub fn tuned_reads(
         .into_iter()
         .flat_map(|beta| std::iter::repeat_n(beta, per_beta))
         .collect();
-    let schedule = Schedule::new(&betas, 1).map_err(|_| SampleError::Capacity)?;
+    let schedule = Schedule::new(&betas, config.single_every).map_err(|_| SampleError::Capacity)?;
     let weak_levels = config
         .motif_score
         .then(|| uniform_weak_levels(instance, config))
