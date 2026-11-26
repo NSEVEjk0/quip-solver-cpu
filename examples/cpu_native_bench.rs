@@ -252,12 +252,15 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
     };
     let best = energies.iter().min().copied().ok_or("no reads")?;
-    let row = serde_json::json!({"mode":format!("{:?}",args.mode),"preset":format!("{:?}",args.preset),
+    let mut row = serde_json::json!({"mode":format!("{:?}",args.mode),"preset":format!("{:?}",args.preset),
         "seed":args.seed,"nonce":blake3::Hash::from(nonce).to_hex().to_string(),
         "reads":args.reads,"sweeps":args.sweeps,"beta_max":effective_beta_max,
         "weak_theta":args.weak_theta,"polish_beta":args.polish_beta,"cache_slots":args.cache_slots,
         "cache_disabled":args.disable_cache,"motif_score_disabled":args.disable_motif_score,
         "selective_resampling":args.selective_resampling,
+        "seconds":seconds,"best_energy_milli":best,
+        "energies_milli":energies,"trajectory_digest":fingerprint.finalize().to_hex().to_string(),"metrics":metrics});
+    let build = serde_json::json!({
         "compact_local_fields":cfg!(feature="compact-local-fields"),
         "compact_cache_stamps":cfg!(feature="compact-cache-stamps"),
         "cluster_boundary_updates":cfg!(feature="cluster-boundary-updates"),
@@ -272,14 +275,23 @@ fn main() -> Result<(), Box<dyn Error>> {
         "cyclic_polish":cfg!(feature="cyclic-polish"),
         "pair_worm_polish":cfg!(feature="pair-worm-polish"),
         "interleaved_probability_cache":cfg!(feature="interleaved-probability-cache"),
+    });
+    let schedule = serde_json::json!({
         "polish_sweeps":args.polish_sweeps,
         "single_every":args.single_every,
         "beta_hold":args.beta_hold,"weak_scale":args.weak_scale,
         "tile_milli":args.tile_milli,"pair_milli":args.pair_milli,"resamples":args.resamples,
         "houdayer_every":args.houdayer_every,"independent_ancestry":args.independent_ancestry,
         "slot_archive":args.slot_archive,
-        "seconds":seconds,"best_energy_milli":best,
-        "energies_milli":energies,"trajectory_digest":fingerprint.finalize().to_hex().to_string(),"metrics":metrics});
+    });
+    let row_fields = row
+        .as_object_mut()
+        .ok_or("benchmark output must be an object")?;
+    for fields in [build, schedule] {
+        if let serde_json::Value::Object(fields) = fields {
+            row_fields.extend(fields);
+        }
+    }
     println!("{row}");
     Ok(())
 }
