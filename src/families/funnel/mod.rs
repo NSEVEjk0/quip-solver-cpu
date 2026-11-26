@@ -21,8 +21,8 @@ mod stage0v2;
 #[cfg(feature = "tree-polish")]
 use super::otsuka::TreePolish;
 use super::otsuka::{
-    anneal_population_observed, AnnealError, Chain, Model, Motifs, OtsukaGraph, PopulationOptions,
-    Schedule, SweepCache, Weights,
+    anneal_population_with_slots, AnnealError, Chain, Model, Motifs, OtsukaGraph,
+    PopulationOptions, Schedule, SweepCache, Weights,
 };
 use super::otsuka_sampler::{parse_pairs, section, PAIRS_SECTION};
 use crate::sampler_core::{
@@ -79,6 +79,10 @@ pub struct FunnelConfig {
     pub resamples: usize,
     /// Houdayer cadence; zero means checkpoints only.
     pub houdayer_every: usize,
+    /// Keep independent replica histories while retaining Houdayer exchanges.
+    pub independent_ancestry: bool,
+    /// Keep one original-objective record per replica slot through resampling.
+    pub slot_archive: bool,
     /// Cold cluster continuation sweeps on the four best reads.
     pub polish_sweeps: usize,
     /// Metropolis cadence during the population phase. Zero uses clusters alone.
@@ -125,6 +129,8 @@ impl Default for FunnelConfig {
             weak_scale: 1.5,
             resamples: 512,
             houdayer_every: 0,
+            independent_ancestry: false,
+            slot_archive: false,
             polish_sweeps: 256,
             single_every: 1,
             beta_hold: 0.0,
@@ -170,6 +176,11 @@ impl FunnelConfig {
             ("funnel_fused_updates", &mut self.fused_updates),
             ("funnel_archive", &mut self.archive),
             ("funnel_motif_score", &mut self.motif_score),
+            (
+                "funnel_independent_ancestry",
+                &mut self.independent_ancestry,
+            ),
+            ("funnel_slot_archive", &mut self.slot_archive),
         ] {
             if let Some(v) = table.get(key) {
                 *value = v
@@ -279,6 +290,8 @@ impl FunnelConfig {
             "weak_scale",
             "resamples",
             "houdayer_every",
+            "independent_ancestry",
+            "slot_archive",
             "polish_sweeps",
             "single_every",
             "beta_hold",
@@ -308,6 +321,8 @@ impl FunnelConfig {
                 | "inline_union"
                 | "fused_updates"
                 | "archive"
+                | "independent_ancestry"
+                | "slot_archive"
                 | "motif_score" => raw.parse::<bool>().ok().map(toml::Value::Boolean),
                 "weak_scale" | "weak_beta_end" | "polish_beta" | "beta_hold" => {
                     raw.parse::<f64>().ok().map(toml::Value::Float)
@@ -613,7 +628,8 @@ pub fn tuned_reads(
         .flatten();
     let mut archive: Option<SamplerResult> = None;
     let mut last_scored: Option<SamplerResult> = None;
-    let outcome = match anneal_population_observed(
+    let mut slot_archive = config.slot_archive.then(|| vec![None; params.num_reads]);
+    let outcome = match anneal_population_with_slots(
         &biased,
         &schedule,
         params.num_reads,
@@ -621,6 +637,7 @@ pub fn tuned_reads(
         PopulationOptions {
             resamples: config.resamples,
             houdayer_every: config.houdayer_every,
+            independent_ancestry: config.independent_ancestry,
             shared_cache: config.shared_cache,
             cache_slots: config.cache_slots,
             copy_resampling: config.copy_resampling,
@@ -629,8 +646,8 @@ pub fn tuned_reads(
             fused_updates: config.fused_updates,
         },
         &stopped,
-        |biased_energy, spins| {
-            if !config.archive {
+        |slot, biased_energy, spins| {
+            if !config.archive && slot_archive.is_none() {
                 return;
             }
             let energy_milli = if let Some(previous) = &last_scored {
@@ -648,9 +665,21 @@ pub fn tuned_reads(
                     energy_milli,
                 });
             }
-            if archive
-                .as_ref()
-                .is_none_or(|r| energy_milli < r.energy_milli)
+            if let Some(records) = &mut slot_archive {
+                if records[slot]
+                    .as_ref()
+                    .is_none_or(|r: &SamplerResult| energy_milli < r.energy_milli)
+                {
+                    records[slot] = Some(SamplerResult {
+                        spins: spins.to_vec(),
+                        energy_milli,
+                    });
+                }
+            }
+            if config.archive
+                && archive
+                    .as_ref()
+                    .is_none_or(|r| energy_milli < r.energy_milli)
             {
                 archive = Some(SamplerResult {
                     spins: spins.to_vec(),
@@ -674,6 +703,11 @@ pub fn tuned_reads(
             }
         })
         .collect();
+    if let Some(records) = slot_archive {
+        for record in records.into_iter().flatten() {
+            retain_record(&mut reads, record, params.num_reads);
+        }
+    }
     if config.polish_sweeps == 0 {
         if let Some(record) = archive {
             retain_record(&mut reads, record, params.num_reads);

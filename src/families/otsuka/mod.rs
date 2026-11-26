@@ -166,6 +166,8 @@ pub struct PopulationOptions {
     pub resamples: usize,
     /// Sweeps between Houdayer moves; zero uses the resampling cadence.
     pub houdayer_every: usize,
+    /// Advance each replica's own chain while retaining the configured swap cadence.
+    pub independent_ancestry: bool,
     /// Share temperature-local transition probabilities across replicas.
     pub shared_cache: bool,
     /// Positive half-delta slots in the bounded probability table.
@@ -185,6 +187,7 @@ impl Default for PopulationOptions {
         Self {
             resamples: RESAMPLES,
             houdayer_every: 1,
+            independent_ancestry: false,
             shared_cache: false,
             cache_slots: 8192,
             copy_resampling: false,
@@ -357,6 +360,27 @@ pub fn anneal_population_observed(
     stopped: impl Fn() -> bool,
     mut observe: impl FnMut(i64, &[i8]),
 ) -> Result<PopulationOutcome, AnnealError> {
+    anneal_population_with_slots(
+        graph,
+        schedule,
+        replicas,
+        seed,
+        options,
+        stopped,
+        |_, energy, spins| observe(energy, spins),
+    )
+}
+
+/// As above, with the current replica slot for each record.
+pub(crate) fn anneal_population_with_slots(
+    graph: &OtsukaGraph,
+    schedule: &Schedule<'_>,
+    replicas: usize,
+    seed: u64,
+    options: PopulationOptions,
+    stopped: impl Fn() -> bool,
+    mut observe: impl FnMut(usize, i64, &[i8]),
+) -> Result<PopulationOutcome, AnnealError> {
     let mut rng = SmallRng::seed_from_u64(seed);
     let mut chains: Vec<Chain<'_>> = (0..replicas)
         .map(|_| Chain::random(graph, &mut rng))
@@ -370,22 +394,21 @@ pub fn anneal_population_observed(
     let mut metrics = PopulationMetrics {
         field_rebuilds: replicas,
         local_field_bytes: replicas * graph.n * size_of::<LocalField>(),
-        snapshot_bytes: if options.copy_resampling {
+        snapshot_bytes: if options.copy_resampling && !options.independent_ancestry {
             replicas * graph.n * (size_of::<i8>() + size_of::<LocalField>())
         } else {
             0
         },
         ..PopulationMetrics::default()
     };
-    for (chain, &e) in chains.iter().zip(&energy) {
-        observe(e, chain.spins());
+    for (slot, (chain, &e)) in chains.iter().zip(&energy).enumerate() {
+        observe(slot, e, chain.spins());
         metrics.observer_records += 1;
     }
     let mut cache = options
         .shared_cache
         .then(|| SweepCache::new(options.cache_slots));
-    let mut snapshot = options
-        .copy_resampling
+    let mut snapshot = (options.copy_resampling && !options.independent_ancestry)
         .then(|| PopulationSnapshot::new(replicas, graph.n));
     let every = schedule
         .betas
@@ -401,7 +424,7 @@ pub fn anneal_population_observed(
     let mut scratch = Houdayer::new(graph.n);
     let mut last_beta = schedule.betas[0];
     for (sweep, &beta) in schedule.betas.iter().enumerate() {
-        if sweep > 0 && sweep % every == 0 && replicas > 1 {
+        if !options.independent_ancestry && sweep > 0 && sweep % every == 0 && replicas > 1 {
             let picks = resample(&energy, beta - last_beta, &mut rng);
             if let Some(snapshot) = &mut snapshot {
                 if options.selective_resampling {
@@ -436,7 +459,12 @@ pub fn anneal_population_observed(
             best = picks.iter().map(|&i| best[i].clone()).collect();
             last_beta = beta;
         }
-        for ((chain, e), lowest) in chains.iter_mut().zip(&mut energy).zip(&mut best) {
+        for (slot, ((chain, e), lowest)) in chains
+            .iter_mut()
+            .zip(&mut energy)
+            .zip(&mut best)
+            .enumerate()
+        {
             if stopped() {
                 return Err(AnnealError::Cancelled);
             }
@@ -453,7 +481,7 @@ pub fn anneal_population_observed(
                 *e += chain.cluster_sweep(beta, &mut rng);
             }
             if *e < lowest.1 {
-                observe(*e, chain.spins());
+                observe(slot, *e, chain.spins());
                 metrics.observer_records += 1;
             }
             if schedule.single_every > 0 && (sweep + 1).is_multiple_of(schedule.single_every) {
@@ -463,7 +491,7 @@ pub fn anneal_population_observed(
                     chain.single_sweep(beta, &mut rng)
                 };
                 if *e < lowest.1 {
-                    observe(*e, chain.spins());
+                    observe(slot, *e, chain.spins());
                     metrics.observer_records += 1;
                 }
             }
@@ -483,7 +511,7 @@ pub fn anneal_population_observed(
                     energy[b] += db;
                     for i in [a, b] {
                         if energy[i] < best[i].1 {
-                            observe(energy[i], chains[i].spins());
+                            observe(i, energy[i], chains[i].spins());
                             metrics.observer_records += 1;
                             best[i].0.copy_from_slice(chains[i].spins());
                             best[i].1 = energy[i];

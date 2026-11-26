@@ -66,6 +66,12 @@ struct Args {
     weak_scale: f64,
     #[arg(long, default_value_t = 512)]
     resamples: usize,
+    #[arg(long, default_value_t = 0)]
+    houdayer_every: usize,
+    #[arg(long)]
+    independent_ancestry: bool,
+    #[arg(long)]
+    slot_archive: bool,
     #[arg(long, default_value_t = 8192)]
     cache_slots: usize,
     #[arg(long)]
@@ -121,6 +127,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         pair_milli: args.pair_milli,
         weak_scale: args.weak_scale,
         resamples: args.resamples,
+        houdayer_every: args.houdayer_every,
+        independent_ancestry: args.independent_ancestry,
+        slot_archive: args.slot_archive,
         #[cfg(feature = "tree-polish")]
         tree_polish: true,
         cache_slots: args.cache_slots,
@@ -174,6 +183,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                 PopulationOptions {
                     resamples: config.resamples,
                     houdayer_every: config.houdayer_every,
+                    independent_ancestry: args.independent_ancestry,
                     shared_cache: config.shared_cache,
                     cache_slots: config.cache_slots,
                     copy_resampling: config.copy_resampling,
@@ -262,6 +272,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         "single_every":args.single_every,
         "beta_hold":args.beta_hold,"weak_scale":args.weak_scale,
         "tile_milli":args.tile_milli,"pair_milli":args.pair_milli,"resamples":args.resamples,
+        "houdayer_every":args.houdayer_every,"independent_ancestry":args.independent_ancestry,
+        "slot_archive":args.slot_archive,
         "seconds":seconds,"best_energy_milli":best,
         "energies_milli":energies,"trajectory_digest":fingerprint.finalize().to_hex().to_string(),"metrics":metrics});
     println!("{row}");
