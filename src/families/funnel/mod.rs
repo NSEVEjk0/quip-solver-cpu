@@ -83,6 +83,9 @@ pub struct FunnelConfig {
     pub polish_sweeps: usize,
     /// Metropolis cadence during the population phase. Zero uses clusters alone.
     pub single_every: usize,
+    /// Enable conditional tree descent on the completed candidate batch.
+    #[cfg(feature = "tree-polish")]
+    pub tree_polish: bool,
     /// Share temperature-local probabilities across replicas.
     pub shared_cache: bool,
     /// Positive half-delta capacity of the shared probability table.
@@ -122,6 +125,8 @@ impl Default for FunnelConfig {
             houdayer_every: 0,
             polish_sweeps: 256,
             single_every: 1,
+            #[cfg(feature = "tree-polish")]
+            tree_polish: false,
             shared_cache: false,
             cache_slots: 8192,
             copy_resampling: false,
@@ -224,6 +229,17 @@ impl FunnelConfig {
                 .filter(|n| *n <= 8192)
                 .ok_or("invalid funnel_polish_sweeps")?;
         }
+        if let Some(v) = table.get("funnel_single_every") {
+            self.single_every = v
+                .as_integer()
+                .and_then(|n| usize::try_from(n).ok())
+                .filter(|n| *n <= 262_144)
+                .ok_or("invalid funnel_single_every")?;
+        }
+        #[cfg(feature = "tree-polish")]
+        if let Some(v) = table.get("funnel_tree_polish") {
+            self.tree_polish = v.as_bool().ok_or("funnel_tree_polish must be a boolean")?;
+        }
         if let Some(v) = table.get("funnel_weak_scale") {
             self.weak_scale = v
                 .as_float()
@@ -254,6 +270,9 @@ impl FunnelConfig {
             "resamples",
             "houdayer_every",
             "polish_sweeps",
+            "single_every",
+            #[cfg(feature = "tree-polish")]
+            "tree_polish",
             "shared_cache",
             "cache_slots",
             "copy_resampling",
@@ -624,6 +643,10 @@ pub fn tuned_reads(
         if let Some(record) = archive {
             retain_record(&mut reads, record, params.num_reads);
         }
+        #[cfg(feature = "tree-polish")]
+        if config.tree_polish && !polish_trees(&truth, &mut reads, params.seed, &stopped) {
+            return Ok(None);
+        }
         return Ok(Some(reads));
     }
     for read in &mut reads {
@@ -707,14 +730,22 @@ pub fn tuned_reads(
         retain_record(&mut reads, record, params.num_reads);
     }
     #[cfg(feature = "tree-polish")]
-    if let Some(mut polish) = TreePolish::new(&truth, params.seed, &stopped) {
-        if polish.improve(&mut reads, &stopped).is_none() {
-            return Ok(None);
-        }
-    } else {
+    if config.tree_polish && !polish_trees(&truth, &mut reads, params.seed, &stopped) {
         return Ok(None);
     }
     Ok(Some(reads))
+}
+
+#[cfg(feature = "tree-polish")]
+fn polish_trees(
+    graph: &OtsukaGraph,
+    reads: &mut [SamplerResult],
+    seed: u64,
+    stopped: &impl Fn() -> bool,
+) -> bool {
+    TreePolish::new(graph, seed, stopped)
+        .and_then(|mut polish| polish.improve(reads, stopped))
+        .is_some()
 }
 
 fn retain_record(reads: &mut Vec<SamplerResult>, record: SamplerResult, limit: usize) {

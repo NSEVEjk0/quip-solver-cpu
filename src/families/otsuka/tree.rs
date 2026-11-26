@@ -397,7 +397,9 @@ impl<'a> TreePolish<'a> {
             self.combine(&mut candidate, &reads[donor].spins, stopped)?;
             self.descend(&mut candidate, stopped)?;
             let energy_milli = self.graph.energy(&candidate);
-            if energy_milli < reads[best].energy_milli {
+            if energy_milli < reads[best].energy_milli
+                && !reads.iter().any(|read| read.spins == candidate)
+            {
                 reads[best] = quip_solver_core::SamplerResult {
                     spins: candidate,
                     energy_milli,
