@@ -1,0 +1,21 @@
+{
+  "label": "dictionary-field-links",
+  "pairs": 4,
+  "median_speedup": 1.203653779790055,
+  "bootstrap95_median": [
+    0.5015048205523855,
+    2.2960170440742593
+  ],
+  "mean_reference_seconds": 10.945366005,
+  "mean_candidate_seconds": 10.76491039525,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -5028.895,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.006029701232608,
+    "cycles": 1.003311475114362,
+    "instructions": 0.9972027752816202,
+    "branches": 0.9804886350922961,
+    "branch-misses": 1.0002022182403731,
+    "cache-misses": 1.5368313239301634
+  }
+}

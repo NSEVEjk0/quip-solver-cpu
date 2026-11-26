@@ -1,0 +1,56 @@
+{
+  "label": "tree-cadence-2",
+  "pairs": 4,
+  "median_speedup": 1.054151227754089,
+  "bootstrap95_median": [
+    0.9312568308471695,
+    1.1123672865769763
+  ],
+  "mean_reference_seconds": 12.7612893555,
+  "mean_candidate_seconds": 12.31292475575,
+  "exact_output_pairs": 0,
+  "mean_best_original_energy": -5035.355,
+  "energy": {
+    "best_gain_milli": {
+      "median": -4390.0,
+      "mean": -2990,
+      "range": [
+        -7880,
+        4700
+      ],
+      "improved": 1,
+      "tied": 0,
+      "regressed": 3
+    },
+    "median_gain_milli": {
+      "median": -4477.5,
+      "mean": -3171.25,
+      "range": [
+        -8530.0,
+        4800.0
+      ],
+      "improved": 1,
+      "tied": 0,
+      "regressed": 3
+    },
+    "worst_gain_milli": {
+      "median": -4635.0,
+      "mean": -3460,
+      "range": [
+        -9090,
+        4520
+      ],
+      "improved": 1,
+      "tied": 0,
+      "regressed": 3
+    }
+  },
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.0524047436897466,
+    "cycles": 1.052924648714637,
+    "instructions": 1.099028526912393,
+    "branches": 1.0735930316151685,
+    "branch-misses": 1.0329989384904703,
+    "cache-misses": 1.1170767424806165
+  }
+}

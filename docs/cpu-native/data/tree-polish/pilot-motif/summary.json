@@ -1,0 +1,21 @@
+{
+  "label": "motif-residual-correction",
+  "pairs": 4,
+  "median_speedup": 0.8026181066841479,
+  "bootstrap95_median": [
+    0.7604135324626116,
+    0.9505605586580088
+  ],
+  "mean_reference_seconds": 6.8113531355,
+  "mean_candidate_seconds": 8.23850543925,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -5032.625,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.8153064313170585,
+    "cycles": 0.8444760763191643,
+    "instructions": 0.9343531088194936,
+    "branches": 0.8740504021469443,
+    "branch-misses": 0.7269568486883453,
+    "cache-misses": 0.7726889198207068
+  }
+}

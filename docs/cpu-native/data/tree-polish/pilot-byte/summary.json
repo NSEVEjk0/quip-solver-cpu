@@ -1,0 +1,21 @@
+{
+  "label": "byte-membership-pilot",
+  "pairs": 4,
+  "median_speedup": 1.0083874379417592,
+  "bootstrap95_median": [
+    0.813237970334641,
+    1.046218878713763
+  ],
+  "mean_reference_seconds": 16.433819681,
+  "mean_candidate_seconds": 17.480096882,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -5030.965,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.9595874582265036,
+    "cycles": 0.896448764048265,
+    "instructions": 0.9670517436947161,
+    "branches": 0.930331330898303,
+    "branch-misses": 0.9471411653892479,
+    "cache-misses": 0.9650767924991568
+  }
+}

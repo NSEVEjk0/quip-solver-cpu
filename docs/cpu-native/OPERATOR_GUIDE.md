@@ -63,6 +63,14 @@ overrides can be omitted to use the job budget. The four execution options
 are independently switchable for ablations; candidate preservation and
 temperature settings are evaluated separately.
 
+### Optional tree polishing
+
+Build the native solver with `tree-polish` in addition to the selected
+execution features. Enable it with `native_tree_polish = true` in backend
+TOML or set `QUIP_CPU_NATIVE_TREE_POLISH=true`. The default is off. The
+cyclic-block variant uses the `cyclic-polish` build feature and the same
+runtime setting. [Candidate quality measurements](EXPERIMENTS.md#full-budget-candidate-quality).
+
 ## Reproduce the kernel and pipeline studies
 
 Run experiments on available CPUs, with the complete recorded inputs:

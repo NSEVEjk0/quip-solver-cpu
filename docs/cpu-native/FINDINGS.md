@@ -58,6 +58,10 @@ with block eligibility checked separately by the coordinator and runtime.
 | [C40](#c40) | Component construction during labeling | 1.218× over C39 at full budget with 8/8 exact outputs |
 | [C41](#c41) | Packed full and residual local fields | 1.341× over C39 in the same-CPU repeat with 8/8 exact outputs |
 | [C42](#c42) | Integer cutoffs for transition draws | 0.948× archive pilot wall ratio and 4/4 exact outputs |
+| [C43](#c43) | Exact conditional tree polishing and candidate recombination | Best energy lower on 15 of 20 full-budget instances, five ties |
+| [C44](#c44) | Exact cyclic blocks | Lower best energy on four of eight full-budget instances, four ties |
+| [C45](#c45) | Anneal and polish budget reduction | Shorter anneals and sparser Metropolis updates lost quality in the pilots |
+| [C46](#c46) | Residual scan and compiler trials | Exact outputs throughout the listed pilots, timing gains unconfirmed at full budget |
 
 <a id="c01"></a>
 ## C01. Packed adjacency fusion
@@ -539,3 +543,37 @@ Comparing the 53 random bits with an integer cutoff preserved the sampled
 choices. All four archive pilot pairs returned identical outputs. The median
 elapsed ratio was 0.948× and the experiment was retired.
 [Study](EXPERIMENTS.md#integer-cutoffs-for-transition-draws).
+
+<a id="c43"></a>
+## C43. Exact conditional tree polishing and candidate recombination
+
+The solver optimizes induced trees with their surrounding spins fixed and
+uses downhill disagreement components to combine candidate reads. At 16 ×
+8,192, best original energy was lower on 15 of 20 instances and tied on
+five. The median gain was 90 milli units and the largest was 360. Both
+full-budget timing intervals span parity. [Methods and raw pairs](EXPERIMENTS.md#full-budget-candidate-quality).
+
+<a id="c44"></a>
+## C44. Exact cyclic blocks
+
+The cyclic variant enumerates up to 256 assignments in each tile- or
+dimer-centered block and applies the minimum if it lowers the full energy.
+With tree descent and recombination, it lowered the best energy on four of
+eight full-budget pairs versus C41 and tied on four. Median gain was 45
+milli units. [Full-budget pairs](data/tree-polish/full-cyclic/results.json).
+
+<a id="c45"></a>
+## C45. Anneal and polish budget reduction
+
+Tree polish with half or a quarter of the anneal sweeps lost best-energy
+quality on all four tested instances. Sparser Metropolis passes also regressed
+on several instances at full pilot sweeps. The smaller search budgets remain
+experimental. [Results](EXPERIMENTS.md#smaller-search-budgets-and-restarts).
+
+<a id="c46"></a>
+## C46. Residual scan and compiler trials
+
+Eight variants matched every candidate output in short-budget tests. The
+16-bit link dictionary reduced cache misses, and an AVX2 gather loop reduced
+cycles modestly. The packed scalar C41 kernel remains the reference for
+these tests. [Pilot matrix](EXPERIMENTS.md#residual-scan-and-compiler-trials-after-c41).

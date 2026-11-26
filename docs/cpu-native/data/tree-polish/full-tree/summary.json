@@ -1,0 +1,56 @@
+{
+  "label": "tree-polish-full-same-cpu",
+  "pairs": 12,
+  "median_speedup": 0.9578768849673723,
+  "bootstrap95_median": [
+    0.9201862413604329,
+    1.042457347944149
+  ],
+  "mean_reference_seconds": 27.417967924333333,
+  "mean_candidate_seconds": 27.845242345916667,
+  "exact_output_pairs": 1,
+  "mean_best_original_energy": -5045.7875,
+  "energy": {
+    "best_gain_milli": {
+      "median": 90.0,
+      "mean": 127.5,
+      "range": [
+        0,
+        360
+      ],
+      "improved": 10,
+      "tied": 2,
+      "regressed": 0
+    },
+    "median_gain_milli": {
+      "median": 0.0,
+      "mean": 26.25,
+      "range": [
+        0.0,
+        90.0
+      ],
+      "improved": 5,
+      "tied": 7,
+      "regressed": 0
+    },
+    "worst_gain_milli": {
+      "median": 0.0,
+      "mean": 0,
+      "range": [
+        0,
+        0
+      ],
+      "improved": 0,
+      "tied": 12,
+      "regressed": 0
+    }
+  },
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.9557256264262901,
+    "cycles": 0.9843234628797009,
+    "instructions": 1.0067736924410373,
+    "branches": 0.9979703195437555,
+    "branch-misses": 0.9997805968014667,
+    "cache-misses": 0.9541424992144286
+  }
+}

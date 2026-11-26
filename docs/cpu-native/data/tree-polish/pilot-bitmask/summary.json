@@ -1,0 +1,21 @@
+{
+  "label": "signed-popcount-pilot",
+  "pairs": 6,
+  "median_speedup": 0.7724947728513296,
+  "bootstrap95_median": [
+    0.6814079775022661,
+    0.8357798313797608
+  ],
+  "mean_reference_seconds": 6.896035793166667,
+  "mean_candidate_seconds": 9.0515542915,
+  "exact_output_pairs": 6,
+  "mean_best_original_energy": -5030.368333333334,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.7643743905206486,
+    "cycles": 0.749808934891031,
+    "instructions": 0.858624469471289,
+    "branches": 1.0421974436005619,
+    "branch-misses": 0.7679262721743617,
+    "cache-misses": 0.5764798943852378
+  }
+}

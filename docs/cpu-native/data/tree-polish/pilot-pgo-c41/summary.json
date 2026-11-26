@@ -1,0 +1,21 @@
+{
+  "label": "pgo-c41-pilot",
+  "pairs": 4,
+  "median_speedup": 1.0549953986856275,
+  "bootstrap95_median": [
+    0.894822846703849,
+    1.1271115603285145
+  ],
+  "mean_reference_seconds": 7.401825037375,
+  "mean_candidate_seconds": 7.155537059,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -5027.474999999999,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.0655094276349053,
+    "cycles": 1.017511928403375,
+    "instructions": 1.0803425011345884,
+    "branches": 1.1561209190277373,
+    "branch-misses": 0.9932642175692865,
+    "cache-misses": 0.9403965697690548
+  }
+}

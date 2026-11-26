@@ -1,0 +1,63 @@
+{
+  "source_commit": "9ece0c7e08ed213456d74c878b985c3548c6a342",
+  "native_binary_sha256": "990cbb9b82a181c3bae254a0a6f28afc9b3737c5a0f198545f89e8a42bae0162",
+  "features": [
+    "experimental",
+    "masked-residual-deltas",
+    "table-tile-bonds",
+    "linked-component-lists",
+    "shallow-union-roots",
+    "packed-residual-fields",
+    "tree-polish"
+  ],
+  "integration_method": "Built the native binary with Cargo, then compiled and ran the integration test targets against the release dependencies.",
+  "checks": [
+    {
+      "check": "release-build",
+      "exit_code": 0,
+      "summary": []
+    },
+    {
+      "check": "family-library",
+      "exit_code": 0,
+      "summary": [
+        "test result: ok. 37 passed; 0 failed; 0 ignored; 0 measured; 427 filtered out; finished in 0.90s"
+      ]
+    },
+    {
+      "check": "compile-otsuka_kernel",
+      "exit_code": 0,
+      "summary": []
+    },
+    {
+      "check": "otsuka_kernel",
+      "exit_code": 0,
+      "summary": [
+        "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.70s"
+      ]
+    },
+    {
+      "check": "compile-native_conformance",
+      "exit_code": 0,
+      "summary": []
+    },
+    {
+      "check": "native_conformance",
+      "exit_code": 0,
+      "summary": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.12s"
+      ]
+    },
+    {
+      "check": "clippy",
+      "exit_code": 0,
+      "summary": []
+    },
+    {
+      "check": "format",
+      "exit_code": 0,
+      "summary": []
+    }
+  ],
+  "note": "Historical build. The environment boolean parser fix and runtime integration regression test are in the final validation."
+}

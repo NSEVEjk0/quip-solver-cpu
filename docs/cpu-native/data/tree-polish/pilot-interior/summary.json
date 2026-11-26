@@ -1,0 +1,21 @@
+{
+  "label": "residual-induced-edge-pilot",
+  "pairs": 4,
+  "median_speedup": 0.6896126450630506,
+  "bootstrap95_median": [
+    0.6563792466267764,
+    0.7430114433040257
+  ],
+  "mean_reference_seconds": 6.38348518425,
+  "mean_candidate_seconds": 9.1869226515,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -5028.895,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.6897460256119698,
+    "cycles": 0.7008102243363679,
+    "instructions": 0.8120573153963773,
+    "branches": 0.7642193467625784,
+    "branch-misses": 0.5244226900924138,
+    "cache-misses": 0.8172458639097706
+  }
+}

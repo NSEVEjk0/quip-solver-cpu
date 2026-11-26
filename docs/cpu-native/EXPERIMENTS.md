@@ -435,6 +435,112 @@ matched outputs and recorded a 0.948× median wall ratio against the
 component build, with 1.5% fewer cycles at the median. The flag was retired
 after the pilot. [Raw pilot results](data/cluster-fields/pilot-integer/results.json).
 
+## Tree and cyclic polishing
+
+The solver first completes the C41 population anneal, archive, and
+regular polishing. Tree polishing then optimizes the original integer Ising
+objective on the finished batch. A randomized partition starts from each
+unassigned root and adds a node only while it has one nonzero edge to the
+current group. Each induced tree consequently has exactly the parent edges
+recorded when it was built.
+
+For a node with spin `s[u]` and full local field `f[u]`, the cost of flipping
+it alone is `-2*s[u]*f[u]`. If both endpoints of an internal edge flip, the
+two field terms counted a change that cancels. Add `4*J*s[u]*s[v]` to the
+joint cost. A bottom-up pass keeps two costs per node, one for each choice
+its parent can make. A forward pass reconstructs the minimum, and the solver
+applies it only when the total delta is negative. Updating the neighboring
+fields makes the next tree conditional on the current spins.
+
+Sixteen seeded partitions are reused for up to sixteen passes per candidate.
+The eight lowest-energy reads are processed first. For up to four other
+reads, the solver copies only the donor's energy-lowering disagreement
+components and then runs tree descent again. Nonzero edges do not connect
+different disagreement components, so the merge can choose the better
+contribution independently. The benchmark verifies every output against the
+canonical scorer.
+
+The optional cyclic pass also enumerates all assignments of blocks with up
+to eight spins. It starts from a tile or dimer and selects neighboring spins
+by coupling magnitude. Its subset recurrence accounts for every internal
+coupling, including cycles. The cyclic study compares the combined tree and
+block polish with C41. Its contribution relative to trees alone is unmeasured.
+
+### Full-budget candidate quality
+
+Each pair used the archive preset, the same canonical instance, 16 replicas,
+8,192 annealing sweeps, and 256 regular polishing sweeps. Both builds ran
+sequentially on one CPU within each pair on a single EPYC 7663 VPS, balancing
+which build went first. Best gain is reference minus candidate energy in
+integer milli units. Positive gains indicate lower candidate energies.
+
+| Candidate | Instances | Lower best energy | Ties | Higher | Median gain | Range | Median wall ratio |
+|---|---|---:|---:|---:|---:|---:|---:|
+| [Tree and recombination](data/tree-polish/full-tree/results.json) | 1341–1352 | 10/12 | 2 | 0 | 90 | 0 to 360 | 0.958× |
+| [Tree and recombination, confirmation](data/tree-polish/confirm-tree/results.json) | 1371–1378 | 5/8 | 3 | 0 | 90 | 0 to 360 | 1.125× |
+| [Tree, recombination, and cyclic blocks](data/tree-polish/full-cyclic/results.json) | 1421–1428 | 4/8 | 4 | 0 | 45 | 0 to 180 | 0.972× |
+
+The two tree series lowered the best candidate energy on **15 of 20** fresh
+instances and tied on five. The pooled median gain was **90 milli units**,
+and the maximum was **360 milli units**. All ranks of the sorted 16-candidate
+energy list tied or improved in every comparison above. Candidate spins can
+change. The timing intervals span parity in all three series. The first tree
+series showed 1.6% more CPU cycles and the repeat was within 0.1% of parity.
+[First summary](data/tree-polish/full-tree/summary.json),
+[repeat summary](data/tree-polish/confirm-tree/summary.json),
+[cyclic summary](data/tree-polish/full-cyclic/summary.json).
+
+Exhaustive tests compare tree and cyclic assignments with direct rescoring
+on a six-spin cyclic graph. The recombination test compares all 4,096 parent
+pairs. The final release checks exercise the opt-in canonical pipeline and
+its native protocol. [Validation](data/tree-polish/validation-final-enabled.json).
+
+### Smaller search budgets and restarts
+
+The [matched-budget pilots](data/tree-polish/quality-equal-1271.json) tested
+tree polishing with 256 and 32 regular polish sweeps. The shorter setting
+regressed on three of four short runs, and matched the longer variant's best
+gain on six exploratory full-budget runs.
+[Full-budget pilots](data/tree-polish/quality-equal-1301.json).
+
+Halving and quartering the annealing budget both worsened the best energy in
+all four 4,096-sweep reference pairs. With tree polishing and the full 4,096
+annealing sweeps, running Metropolis every two, four, or eight cluster sweeps
+regressed on three, three, or two of four instances, respectively. Sixteen
+collective restart attempts tied the existing tree build on four instances.
+[Smaller budgets](data/tree-polish/quality-reduced-1281.json),
+[cadence 2](data/tree-polish/pilot-cadence-2/results.json),
+[cadence 4](data/tree-polish/pilot-cadence-4/results.json),
+[cadence 8](data/tree-polish/pilot-cadence-8/results.json),
+[restart](data/tree-polish/pilot-restart/results.json).
+
+## Residual-scan and compiler trials after C41
+
+A sampled C41 profile attributed 46.95% of user-space cycles to optimized
+cluster sweeps, 32.76% to partitioning, and 13.68% to cached Metropolis
+sweeps. The hottest annotated cluster loop was the interior-edge correction.
+The following pilots use 16 replicas and 2,048 sweeps. They compare the same
+candidate output digests, with the matching binary revisions and hashes in
+the [build manifest](data/tree-polish/builds.json).
+
+| Candidate | Pairs | Median wall ratio | Median CPU cycle change | Exact matches |
+|---|---:|---:|---:|---:|
+| [Motif-specific residual rows](data/tree-polish/pilot-motif/results.json) | 4 | 0.803× | +18.4% | 4/4 |
+| [Explicit induced-edge lists](data/tree-polish/pilot-interior/results.json) | 4 | 0.690× | +42.7% | 4/4 |
+| [16-bit field-link dictionary](data/tree-polish/pilot-dictionary/results.json) | 4 | 1.204× | -0.3% | 4/4 |
+| [AVX2 residual gathers](data/tree-polish/pilot-avx2/results.json) | 4 | 1.056× | -5.5% | 4/4 |
+| [Byte membership](data/tree-polish/pilot-byte/results.json) | 4 | 1.008× | +11.6% | 4/4 |
+| [Signed population-count groups](data/tree-polish/pilot-bitmask/results.json) | 6 | 0.772× | +33.4% | 6/6 |
+| [Zen 3 target and thin LTO](data/tree-polish/pilot-tuned/results.json) | 4 | 0.918× | +4.4% | 4/4 |
+| [Zen 3 target, thin LTO, and PGO](data/tree-polish/pilot-pgo-c41/results.json) | 4 | 1.055× | -1.7% | 4/4 |
+
+The 16-bit dictionary reduced measured cache misses by 34.9% at the median,
+with cycles within 0.4% of parity. Its elapsed ratios ranged from 0.502× to
+2.296× while a separate exploratory benchmark ran on the same cores. The
+AVX2 cycle reduction and PGO
+timing are short-budget pilot results. The PGO comparison used two runs per
+build in ABBA or BAAB order on one CPU.
+
 ## Correctness and protocol checks
 
 The release validation checks the actual native binary and its family adapter:
@@ -563,6 +669,24 @@ python3 tools/cpu-native/compare_builds.py --reference-binary "$study/c39" --can
 python3 tools/cpu-native/compare_builds.py --serial --reference-binary "$study/c39" --candidate-binary "$study/final" --label serial-final-c39 --cpus 3 4 --output "$study/serial-final-c39" --seed-start 1231 --sweeps 8192 --mode pipeline --preset archive --perf
 python3 tools/cpu-native/compare_builds.py --reference-binary "$study/native" --candidate-binary "$study/final" --label full-final-native --cpus 3 4 --output "$study/full-final-native" --seed-start 1241 --sweeps 8192 --mode pipeline --preset archive --perf
 ```
+
+### Reproduce tree and cyclic polishing
+
+The [build manifest](data/tree-polish/builds.json) pins the reference and
+candidate revisions. Build `cpu_native_bench` with the recorded feature list
+at each revision, save the copied executables, and use the current harness.
+This command reproduces the eight-instance tree confirmation.
+
+```sh
+python3 tools/cpu-native/compare_builds.py --serial --compare-energy --reference-binary "$study/reference" --candidate-binary "$study/tree-final" --label tree-polish-confirmation --cpus 2 5 --output "$study/tree-confirm" --seed-start 1371 --reads 16 --sweeps 8192 --mode pipeline --preset archive --perf
+```
+
+Use candidate `cyclic-final`, CPUs 3 and 4, and seed start 1421 for the
+eight-instance cyclic comparison. The default candidate cadence is one
+Metropolis sweep per cluster sweep. The harness records timings and
+canonical energy deltas with `--compare-energy`. In exact-output mode its
+existing digest check remains mandatory. `--serial --bracket` repeats both
+builds in ABBA or BAAB order on the same CPU and saves all four runs.
 
 The evidence covers the specified Quip family, recipe, toolchain, and VPS.
 It establishes exact CPU execution improvements and measured candidate

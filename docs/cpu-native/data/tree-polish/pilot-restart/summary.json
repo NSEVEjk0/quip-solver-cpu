@@ -1,0 +1,56 @@
+{
+  "label": "collective-restart-pilot",
+  "pairs": 4,
+  "median_speedup": 0.9891545411418923,
+  "bootstrap95_median": [
+    0.8795254980118855,
+    1.0796209125414973
+  ],
+  "mean_reference_seconds": 13.604344072,
+  "mean_candidate_seconds": 13.83532356325,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -5035.0325,
+  "energy": {
+    "best_gain_milli": {
+      "median": 0.0,
+      "mean": 0,
+      "range": [
+        0,
+        0
+      ],
+      "improved": 0,
+      "tied": 4,
+      "regressed": 0
+    },
+    "median_gain_milli": {
+      "median": 0.0,
+      "mean": 0.0,
+      "range": [
+        0.0,
+        0.0
+      ],
+      "improved": 0,
+      "tied": 4,
+      "regressed": 0
+    },
+    "worst_gain_milli": {
+      "median": 0.0,
+      "mean": 0,
+      "range": [
+        0,
+        0
+      ],
+      "improved": 0,
+      "tied": 4,
+      "regressed": 0
+    }
+  },
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.9895818800080154,
+    "cycles": 0.9860807341763187,
+    "instructions": 0.9979230197810043,
+    "branches": 0.9999658287925959,
+    "branch-misses": 1.003180771319832,
+    "cache-misses": 1.0273450175406216
+  }
+}

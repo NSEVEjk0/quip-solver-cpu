@@ -1,0 +1,21 @@
+{
+  "label": "avx2-residual-scan",
+  "pairs": 4,
+  "median_speedup": 1.0560991955261136,
+  "bootstrap95_median": [
+    0.8408456790131642,
+    1.1410977929006363
+  ],
+  "mean_reference_seconds": 6.77528170825,
+  "mean_candidate_seconds": 6.6567999375,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -5024.8575,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.0651611393816705,
+    "cycles": 1.058646102530974,
+    "instructions": 1.2286160352351603,
+    "branches": 1.221503166590089,
+    "branch-misses": 1.033785215813837,
+    "cache-misses": 0.9173974311492608
+  }
+}

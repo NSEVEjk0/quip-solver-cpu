@@ -1,0 +1,40 @@
+{
+  "started_utc": "2026-11-26T20:56:25.780560+00:00",
+  "label": "zen3-thinlto-pilot",
+  "source_revision": "9ece0c7e08ed213456d74c878b985c3548c6a342",
+  "source_dirty": false,
+  "platform": "Linux-7.0.0-14-generic-x86_64-with-glibc2.43",
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.97.1\nLLVM version: 22.1.6",
+  "cpus": [
+    2,
+    5
+  ],
+  "concurrent_processes": 2,
+  "mode": "pipeline",
+  "preset": "archive",
+  "reads": 16,
+  "sweeps": 2048,
+  "seed_start": 1361,
+  "instances": 4,
+  "candidate_selective_resampling": false,
+  "candidate_cache_slots": 8192,
+  "reference_cache_slots": 8192,
+  "binary_sha256": {
+    "reference": "eca2f641e82033e45b7d1138ecdda5d11810033b7c026dafbe9f009f8b8ced84",
+    "candidate": "3ce20287bf882c6f37e1fc93bb3ddb028ecb55c01d0d99b8bbf7d8d00ae77de7"
+  },
+  "input_sha256": {
+    "tools/cpu-funnel/inputs/current-topology.spec.json": "a8e00f86543c45eb14a91f12725ff4dad42f5482451923d12d639a606bbd0e15",
+    "tools/cpu-funnel/inputs/current-family.params": "dcb359726b1efb2a453b6af7c158b163155855f63ada4b6a5ae6d0f9dab2081d"
+  },
+  "perf_events": [
+    "task-clock",
+    "cycles",
+    "instructions",
+    "branches",
+    "branch-misses",
+    "cache-misses"
+  ],
+  "perf_task_clock_unit": "ms",
+  "completed_utc": "2026-11-26T20:57:13.964081+00:00"
+}

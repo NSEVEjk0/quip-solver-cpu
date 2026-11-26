@@ -1,0 +1,21 @@
+{
+  "label": "zen3-thinlto-pilot",
+  "pairs": 4,
+  "median_speedup": 0.9180042848246204,
+  "bootstrap95_median": [
+    0.732929449382321,
+    1.41023671825786
+  ],
+  "mean_reference_seconds": 10.42914419325,
+  "mean_candidate_seconds": 10.93340620575,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -5029.7825,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.9562472581588602,
+    "cycles": 0.9574775905358328,
+    "instructions": 1.0153664647202492,
+    "branches": 0.9903741571797563,
+    "branch-misses": 1.0009677423295635,
+    "cache-misses": 0.9987628018920349
+  }
+}

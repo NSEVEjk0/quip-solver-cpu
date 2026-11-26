@@ -1,0 +1,315 @@
+{
+  "host": "AMD EPYC 7663 VPS",
+  "toolchain": "Rust 1.97.1, locked dependencies, Cargo release profile",
+  "benchmark": "examples/cpu_native_bench.rs",
+  "binaries": {
+    "published-c41": {
+      "build_revision": "6e7fc4728b0ea666c857fbb2c78b85557dd4d985",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields"
+      ],
+      "sha256": "0441e499ab11d1ba378e8b5a8c8bcdd7da8071b6e524bc1d6a02ed4f3fa7a5bc"
+    },
+    "reference": {
+      "build_revision": "8343db1fb3447331756a225e75c848eb3b6dc28f",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields"
+      ],
+      "sha256": "eca2f641e82033e45b7d1138ecdda5d11810033b7c026dafbe9f009f8b8ced84"
+    },
+    "tree": {
+      "build_revision": "8343db1fb3447331756a225e75c848eb3b6dc28f",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "tree-polish"
+      ],
+      "sha256": "1f3c266f6b5c5965daf095108cc45ff6343f1588544b83ea5100f406db5c7166"
+    },
+    "tree-cadence": {
+      "build_revision": "61bdc7e49c53278628a40d0cf399b2c8834cbfe2",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "tree-polish"
+      ],
+      "sha256": "d5887082249ab153d083820355cce5b68f712ad82f71be2f43f295ba30f24745"
+    },
+    "tree-final": {
+      "build_revision": "9ece0c7e08ed213456d74c878b985c3548c6a342",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "tree-polish"
+      ],
+      "sha256": "a7744af50e0c88ede61232336110d0b1f407b08c270a586b3b9dd4c4d344efbb"
+    },
+    "motif": {
+      "build_revision": "3395cae8f48b06cd3b851ec328aa136e58b225e6",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "motif-residual-correction"
+      ],
+      "sha256": "9ede393dc35faad28dc482819e5cd153346e98f0b7e0135e9113d0b3f99af5a7"
+    },
+    "interior": {
+      "build_revision": "b721f86aafe019e6b9e3ed75d70ea203d147ad50",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "internal-edge-lists"
+      ],
+      "sha256": "3195ef0ad374125879243459ab2bb0e7e76ab942d766d423e32352858bc5314d"
+    },
+    "dictionary": {
+      "build_revision": "e9f7351562c05c7cd84518c4643c3ef6080cc4b6",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "dictionary-field-links"
+      ],
+      "sha256": "ac18395d01a13e21e0a072700b5c8daaf191477c7252efbfcbc87c1970e3f3ed"
+    },
+    "avx2": {
+      "build_revision": "d327d4b9673f56bfa2ae3d924d5c76de59fa5aca",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "avx2-interior-correction"
+      ],
+      "sha256": "cb9c1639a78acdaf6183df090a1ec9918403fcb753e5dae1ae151816bde5b78e"
+    },
+    "byte": {
+      "build_revision": "badb8cbbfad94aeeed396abdd223e9dfb32c51df",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "bitset-interior-correction"
+      ],
+      "sha256": "5769040ea8cc61266d9f3f3240fc574592ce7fa74e4ab406be01dca2a7c46a79"
+    },
+    "signed-popcount": {
+      "build_revision": "c4c6fa9c652155b023085c59a0976a257565cd1a",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "masked-block-correction"
+      ],
+      "sha256": "0db3dd6be5e18e6e106101adc1b819544f3ccd9122d22cedd8365380c91c5e41"
+    },
+    "cyclic": {
+      "build_revision": "26e33385c9880b99b86e83dffd0105ca19406d17",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "cyclic-polish"
+      ],
+      "sha256": "1b770a7aefc1dafe974458dc546272c286d8c3584c16d54a3f518cc29be1c687"
+    },
+    "cyclic-final": {
+      "build_revision": "0abddef19b252f1597915ac87b2a9323d31eedc6",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "cyclic-polish"
+      ],
+      "sha256": "4cbbfb23b66e54a33c7cfce829bf4aedb8eb84c1f1bb8994e098af14dbce8ba9"
+    },
+    "tuned": {
+      "build_revision": "11411a1ad1c1268377d38fe162aefce30e41d441",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields"
+      ],
+      "sha256": "3ce20287bf882c6f37e1fc93bb3ddb028ecb55c01d0d99b8bbf7d8d00ae77de7"
+    },
+    "pgo-c41": {
+      "build_revision": "35ebdf41fc944bb289982c48a0f4348ee00fd231",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields"
+      ],
+      "sha256": "bf367cfce248c69c4ee927d58f48e6620331cf3bb722cd3a5b71390c91c9597e"
+    },
+    "restart": {
+      "build_revision": "713d4028dbc4dd875b6d9bd08e0741a69b470361",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "tree-restart-polish"
+      ],
+      "sha256": "0e01dde91fe04f25e6074903ce9e37a96ac48cfdabab8177eefe84e75d6cc8e4"
+    }
+  },
+  "comparisons": {
+    "pilot-motif": {
+      "reference": "published-c41",
+      "candidate": "motif"
+    },
+    "pilot-interior": {
+      "reference": "reference",
+      "candidate": "interior"
+    },
+    "pilot-dictionary": {
+      "reference": "reference",
+      "candidate": "dictionary"
+    },
+    "pilot-avx2": {
+      "reference": "reference",
+      "candidate": "avx2"
+    },
+    "pilot-byte": {
+      "reference": "reference",
+      "candidate": "byte"
+    },
+    "pilot-bitmask": {
+      "reference": "published-c41",
+      "candidate": "signed-popcount"
+    },
+    "pilot-cyclic": {
+      "reference": "reference",
+      "candidate": "cyclic"
+    },
+    "pilot-cadence-2": {
+      "reference": "reference",
+      "candidate": "tree-cadence"
+    },
+    "pilot-cadence-4": {
+      "reference": "reference",
+      "candidate": "tree-cadence"
+    },
+    "pilot-cadence-8": {
+      "reference": "reference",
+      "candidate": "tree-cadence"
+    },
+    "full-tree": {
+      "reference": "reference",
+      "candidate": "tree-cadence"
+    },
+    "confirm-tree": {
+      "reference": "reference",
+      "candidate": "tree-final"
+    },
+    "full-cyclic": {
+      "reference": "reference",
+      "candidate": "cyclic-final"
+    },
+    "pilot-tuned": {
+      "reference": "reference",
+      "candidate": "tuned"
+    },
+    "pilot-pgo-c41": {
+      "reference": "published-c41",
+      "candidate": "pgo-c41"
+    },
+    "pilot-restart": {
+      "reference": "tree-final",
+      "candidate": "restart"
+    }
+  },
+  "pgo_training": {
+    "flags": [
+      "-C target-cpu=znver3"
+    ],
+    "profile": {
+      "lto": "thin",
+      "codegen_units": 1
+    },
+    "target": "x86_64-unknown-linux-gnu",
+    "seeds_reads_sweeps": [
+      [
+        1355,
+        16,
+        2048
+      ],
+      [
+        1356,
+        16,
+        4096
+      ],
+      [
+        1357,
+        4,
+        1024
+      ],
+      [
+        1358,
+        2,
+        512
+      ]
+    ],
+    "merged_profile_sha256": "9b5d83b17bff0699f9297868b735b69620e9a17009d2d1d3978d35811327a8f0"
+  },
+  "notes": [
+    "The runtime opt-in changes landed after the prototype. The benchmark enables tree polish in its configuration whenever its feature is built.",
+    "The tree-final and cyclic-final builds reject a crossover candidate that duplicates an existing output.",
+    "The native protocol test in validation-final-enabled set QUIP_CPU_NATIVE_TREE_POLISH=true."
+  ]
+}
