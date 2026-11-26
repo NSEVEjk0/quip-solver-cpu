@@ -67,6 +67,11 @@ def main():
     parser.add_argument("--cache-slots", type=int, default=8192)
     parser.add_argument("--reference-cache-slots", type=int, default=8192)
     parser.add_argument(
+        "--serial",
+        action="store_true",
+        help="run both builds on the same CPU in balanced sequential order",
+    )
+    parser.add_argument(
         "--perf",
         action="store_true",
         help="record Linux perf counters for each process",
@@ -102,7 +107,7 @@ def main():
         "platform": platform.platform(),
         "rustc": capture(["rustc", "-vV"]),
         "cpus": args.cpus,
-        "concurrent_processes": 2,
+        "concurrent_processes": 1 if args.serial else 2,
         "mode": args.mode,
         "preset": args.preset,
         "reads": args.reads,
@@ -185,11 +190,21 @@ def main():
             range(args.seed_start, args.seed_start + args.instances)
         ):
             left, right = args.cpus if number % 2 == 0 else reversed(args.cpus)
-            futures = [
-                pool.submit(run, "reference", seed, left),
-                pool.submit(run, "candidate", seed, right),
-            ]
-            pair = [future.result() for future in futures]
+            if args.serial:
+                roles = ("reference", "candidate")
+                order = roles if number % 4 < 2 else reversed(roles)
+                by_role = {}
+                for position, role in enumerate(order, start=1):
+                    row = run(role, seed, left)
+                    row["serial_order"] = position
+                    by_role[role] = row
+                pair = [by_role[role] for role in roles]
+            else:
+                futures = [
+                    pool.submit(run, "reference", seed, left),
+                    pool.submit(run, "candidate", seed, right),
+                ]
+                pair = [future.result() for future in futures]
             ratio = pair[0]["seconds"] / pair[1]["seconds"]
             same = pair[0]["trajectory_digest"] == pair[1]["trajectory_digest"]
             for row in pair:
