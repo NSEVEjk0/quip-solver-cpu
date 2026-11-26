@@ -56,6 +56,16 @@ struct Args {
     polish_sweeps: usize,
     #[arg(long, default_value_t = 1)]
     single_every: usize,
+    #[arg(long, default_value_t = 0.0)]
+    beta_hold: f64,
+    #[arg(long, default_value_t = 250)]
+    tile_milli: i32,
+    #[arg(long, default_value_t = 250)]
+    pair_milli: i32,
+    #[arg(long, default_value_t = 1.5)]
+    weak_scale: f64,
+    #[arg(long, default_value_t = 512)]
+    resamples: usize,
     #[arg(long, default_value_t = 8192)]
     cache_slots: usize,
     #[arg(long)]
@@ -75,6 +85,12 @@ struct Topology {
 #[expect(clippy::print_stdout, reason = "benchmark emits one JSON result")]
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
+    if !(0.0..1.0).contains(&args.beta_hold) {
+        return Err("beta hold must be in [0, 1)".into());
+    }
+    if args.beta_hold != 0.0 && matches!(args.mode, Mode::Kernel) {
+        return Err("beta hold requires pipeline mode".into());
+    }
     let spec: Topology = serde_json::from_slice(&std::fs::read(&args.topology)?)?;
     let edges: Vec<_> = spec.edges.into_iter().map(|[u, v]| (u, v)).collect();
     let topology = BaseTopology::new(spec.nodes, &edges).map_err(|e| format!("topology: {e:?}"))?;
@@ -100,6 +116,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         polish_beta: args.polish_beta,
         polish_sweeps: args.polish_sweeps,
         single_every: args.single_every,
+        beta_hold: args.beta_hold,
+        tile_milli: args.tile_milli,
+        pair_milli: args.pair_milli,
+        weak_scale: args.weak_scale,
+        resamples: args.resamples,
         #[cfg(feature = "tree-polish")]
         tree_polish: true,
         cache_slots: args.cache_slots,
@@ -239,6 +260,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         "cyclic_polish":cfg!(feature="cyclic-polish"),
         "polish_sweeps":args.polish_sweeps,
         "single_every":args.single_every,
+        "beta_hold":args.beta_hold,"weak_scale":args.weak_scale,
+        "tile_milli":args.tile_milli,"pair_milli":args.pair_milli,"resamples":args.resamples,
         "seconds":seconds,"best_energy_milli":best,
         "energies_milli":energies,"trajectory_digest":fingerprint.finalize().to_hex().to_string(),"metrics":metrics});
     println!("{row}");

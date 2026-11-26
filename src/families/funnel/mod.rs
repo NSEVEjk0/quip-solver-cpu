@@ -83,6 +83,8 @@ pub struct FunnelConfig {
     pub polish_sweeps: usize,
     /// Metropolis cadence during the population phase. Zero uses clusters alone.
     pub single_every: usize,
+    /// Fraction of annealing sweeps held at the schedule's final temperature.
+    pub beta_hold: f64,
     /// Enable conditional tree descent on the completed candidate batch.
     #[cfg(feature = "tree-polish")]
     pub tree_polish: bool,
@@ -125,6 +127,7 @@ impl Default for FunnelConfig {
             houdayer_every: 0,
             polish_sweeps: 256,
             single_every: 1,
+            beta_hold: 0.0,
             #[cfg(feature = "tree-polish")]
             tree_polish: false,
             shared_cache: false,
@@ -236,6 +239,13 @@ impl FunnelConfig {
                 .filter(|n| *n <= 262_144)
                 .ok_or("invalid funnel_single_every")?;
         }
+        if let Some(v) = table.get("funnel_beta_hold") {
+            self.beta_hold = v
+                .as_float()
+                .or_else(|| v.as_integer().map(|n| n as f64))
+                .filter(|n| (0.0..1.0).contains(n))
+                .ok_or("funnel_beta_hold must be in [0, 1)")?;
+        }
         #[cfg(feature = "tree-polish")]
         if let Some(v) = table.get("funnel_tree_polish") {
             self.tree_polish = v.as_bool().ok_or("funnel_tree_polish must be a boolean")?;
@@ -271,6 +281,7 @@ impl FunnelConfig {
             "houdayer_every",
             "polish_sweeps",
             "single_every",
+            "beta_hold",
             #[cfg(feature = "tree-polish")]
             "tree_polish",
             "shared_cache",
@@ -298,7 +309,7 @@ impl FunnelConfig {
                 | "fused_updates"
                 | "archive"
                 | "motif_score" => raw.parse::<bool>().ok().map(toml::Value::Boolean),
-                "weak_scale" | "weak_beta_end" | "polish_beta" => {
+                "weak_scale" | "weak_beta_end" | "polish_beta" | "beta_hold" => {
                     raw.parse::<f64>().ok().map(toml::Value::Float)
                 }
                 _ => raw.parse::<i64>().ok().map(toml::Value::Integer),
@@ -569,7 +580,29 @@ pub fn tuned_reads(
         ..params.clone()
     };
     let per_beta = effective_sweeps_per_beta(params.num_sweeps, params.sweeps_per_beta);
-    let betas: Vec<f64> = build_beta_schedule(&graph, &params)
+    if !(0.0..1.0).contains(&config.beta_hold) {
+        return Err(SampleError::Capacity);
+    }
+    let mut rungs = if config.beta_hold > 0.0 {
+        let rungs = (params.num_sweeps / per_beta).max(1);
+        let warmup = ((rungs as f64 * (1.0 - config.beta_hold)).round() as usize).clamp(1, rungs);
+        build_beta_schedule(
+            &graph,
+            &SampleParams {
+                num_sweeps: warmup * per_beta,
+                sweeps_per_beta: per_beta,
+                ..params.clone()
+            },
+        )
+    } else {
+        build_beta_schedule(&graph, &params)
+    };
+    if config.beta_hold > 0.0 {
+        if let Some(&last) = rungs.last() {
+            rungs.resize((params.num_sweeps / per_beta).max(1), last);
+        }
+    }
+    let betas: Vec<f64> = rungs
         .into_iter()
         .flat_map(|beta| std::iter::repeat_n(beta, per_beta))
         .collect();
