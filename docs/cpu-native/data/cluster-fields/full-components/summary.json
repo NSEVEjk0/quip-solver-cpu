@@ -1,0 +1,21 @@
+{
+  "label": "c39-components-full",
+  "pairs": 8,
+  "median_speedup": 1.2181697730663303,
+  "bootstrap95_median": [
+    1.1206794365408088,
+    1.2993133999174544
+  ],
+  "mean_reference_seconds": 35.8547780915,
+  "mean_candidate_seconds": 29.677707544,
+  "exact_output_pairs": 8,
+  "mean_best_original_energy": -5044.7975,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.2176669384478007,
+    "cycles": 1.165121603866735,
+    "instructions": 1.0110523124951092,
+    "branches": 1.046277694739317,
+    "branch-misses": 1.565717610146222,
+    "cache-misses": 1.0000449580081885
+  }
+}

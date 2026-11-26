@@ -49,6 +49,13 @@ An opt-in lookup table for the four-spin tile patterns reached a **1.129× media
 full-pipeline speedup** over that masked build. All eight paired runs returned
 identical candidate spins and energies. [Finding C39](docs/cpu-native/FINDINGS.md#c39).
 
+A later opt-in cluster build constructs membership during labeling and
+keeps the full and residual local fields in one word. It reached a
+**1.341× median speedup over C39** in eight balanced same-CPU pairs,
+with identical outputs in every pair. The report includes the timing
+control and direct comparison with the earlier native build.
+[Finding C41](docs/cpu-native/FINDINGS.md#c41).
+
 ![CPU execution ablation](docs/cpu-native/figures/kernel-ablation.svg)
 
 The [experiment report](docs/cpu-native/EXPERIMENTS.md) contains the complete

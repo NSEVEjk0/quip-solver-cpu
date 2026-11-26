@@ -1,0 +1,21 @@
+{
+  "label": "packed-linked-shallow-pilot",
+  "pairs": 4,
+  "median_speedup": 1.0316842467093001,
+  "bootstrap95_median": [
+    0.9201078154747404,
+    1.2909809612676284
+  ],
+  "mean_reference_seconds": 8.9452412445,
+  "mean_candidate_seconds": 8.50062624525,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -5031.145,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.0277052416313297,
+    "cycles": 1.0864798961442754,
+    "instructions": 1.3463153850832703,
+    "branches": 1.0854480987598945,
+    "branch-misses": 0.666262267868007,
+    "cache-misses": 0.7366404853934083
+  }
+}

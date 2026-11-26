@@ -1,0 +1,21 @@
+{
+  "label": "full-final-c39",
+  "pairs": 8,
+  "median_speedup": 1.4202976116070394,
+  "bootstrap95_median": [
+    1.3459504203026251,
+    1.4801063668647354
+  ],
+  "mean_reference_seconds": 34.83102155925,
+  "mean_candidate_seconds": 24.896143801,
+  "exact_output_pairs": 8,
+  "mean_best_original_energy": -5045.905,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.4184387871611048,
+    "cycles": 1.3790404304207424,
+    "instructions": 1.2880240674988737,
+    "branches": 1.2932036626775805,
+    "branch-misses": 1.270338018725635,
+    "cache-misses": 0.8468254869032503
+  }
+}

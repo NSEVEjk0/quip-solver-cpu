@@ -1,0 +1,21 @@
+{
+  "label": "c39-components-pilot",
+  "pairs": 4,
+  "median_speedup": 1.2314573690002226,
+  "bootstrap95_median": [
+    1.1912013697329742,
+    1.2775349511029923
+  ],
+  "mean_reference_seconds": 8.8334756515,
+  "mean_candidate_seconds": 7.16696594625,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -5031.145,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.2333353473430435,
+    "cycles": 1.1602516826076956,
+    "instructions": 1.0109517814870048,
+    "branches": 1.0456179012080722,
+    "branch-misses": 1.5460537300034236,
+    "cache-misses": 0.9459133630732075
+  }
+}

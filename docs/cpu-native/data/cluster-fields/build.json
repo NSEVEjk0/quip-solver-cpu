@@ -1,0 +1,111 @@
+{
+  "host_cpu": "AMD EPYC 7663",
+  "build_command": [
+    "cargo",
+    "+1.97.1",
+    "build",
+    "--release",
+    "--locked",
+    "--features",
+    "<flags>",
+    "--example",
+    "cpu_native_bench"
+  ],
+  "binaries": {
+    "native": {
+      "source_revision": "3f8d34c451727a608045e293e534b5b4cb40f1cd",
+      "features": [
+        "experimental"
+      ],
+      "sha256": "31f266d42f059d57a64a19a726c665d1b0e228de0595a81588cc9421ee55056a"
+    },
+    "c39": {
+      "source_revision": "c308965df077fe2a240005609b3d99ba5bd2d73a",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds"
+      ],
+      "sha256": "201f528151ea05eb5c2817a7bc37b71d8dbcd7fca717b7ad596dcc7d975a4a89"
+    },
+    "components": {
+      "source_revision": "26c28b2972b847444132efa8c86fe5c0cba6c291",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots"
+      ],
+      "sha256": "3c215a6227b2726c94608a96dc476bf082dc6a9e70ab759f05e4e438212db670"
+    },
+    "packed-initial": {
+      "source_revision": "26c28b2972b847444132efa8c86fe5c0cba6c291",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "packed-residual-fields"
+      ],
+      "sha256": "6e6246fcaad9b67adc963a0a7f5aa71e7c444627e6119cd5ac60afe7a097e882"
+    },
+    "combined-initial": {
+      "source_revision": "26c28b2972b847444132efa8c86fe5c0cba6c291",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields"
+      ],
+      "sha256": "771beddc98ff923137cd2f0774426326e887b0b06fd5c11b0bc032b13fb51d92"
+    },
+    "integer-cutoffs": {
+      "source_revision": "e633212acca5cb228018592cab7f5e1f7a4212d5",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "integer-draw-thresholds"
+      ],
+      "sha256": "06c0557c6e95d326fd124beb86e0bf826e2465b6235fe8ee5441987c0b782c74"
+    },
+    "packed-two-spin": {
+      "source_revision": "e633212acca5cb228018592cab7f5e1f7a4212d5",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields"
+      ],
+      "sha256": "e9be6c95baa2f7de47b2bf929401202ecb5afff57e873b866decb4e993bffa66"
+    },
+    "final": {
+      "source_revision": "6e7fc4728b0ea666c857fbb2c78b85557dd4d985",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields"
+      ],
+      "sha256": "0441e499ab11d1ba378e8b5a8c8bcdd7da8071b6e524bc1d6a02ed4f3fa7a5bc"
+    }
+  },
+  "historical_binaries": {
+    "native": "The reference executable archived with the C38 pipeline study.",
+    "c39": "The candidate executable archived with the C39 pipeline study."
+  },
+  "allocated_vcpus": [
+    3,
+    4
+  ],
+  "pipeline_timing": "Elapsed time inside the tuned_reads call, including graph preparation and archive polishing.",
+  "counter_scope": "Whole benchmark process."
+}

@@ -293,6 +293,10 @@ pair. The measurements cover the specified recipe and one EPYC 7663 VPS. The
 masked path is an opt-in build. [Counter summary](data/residual-edge-scan/confirm-masked/summary.json),
 [build and hashes](data/residual-edge-scan/masked-build.json).
 
+The C38 wall-time ratio describes those eight pairs. A subsequent
+same-binary control with C39 on the same VPS produced ratios from 0.952×
+to 1.120×. [Control and measurement setup](#same-binary-timing-control).
+
 ## Table-driven tile bond sampling
 
 In a profile of the C38 archive pipeline at 16 × 4,096, `Workspace::partition`
@@ -320,6 +324,116 @@ Whole-process median ratios correspond to 17.5% fewer branch misses, 5.9%
 fewer cycles, and 0.4% more retired instructions. Branch misses and cycles
 fell in every pair in both comparisons. [Pipeline summary](data/tile-bonds/pipeline/summary.json),
 [kernel summary](data/tile-bonds/kernel/summary.json).
+
+## Same-binary timing control
+
+At the full archive budget of 16 replicas × 8,192 sweeps, eight pairs ran
+the same C39 executable on this EPYC 7663 VPS. The wall-time ratios ranged
+from 0.952× to 1.120×, with a median of 0.985×. Across the same pairs, CPU
+cycle ratios ranged from 0.998× to 1.019×. The two processes alternated
+between CPUs 3 and 4. [Raw control pairs](data/cluster-fields/control-c39/results.json).
+
+## Component construction
+
+The `shallow-union-roots` path tests whether the parent is already a root.
+Roots and their immediate children finish at that check. Deeper paths still
+use path halving. A union attaches the larger root to the smaller one, so a
+component's root is still its smallest node.
+
+With `linked-component-lists`, the pass that labels the nodes also builds
+component membership. The root opens a list and later members prepend one
+node at a time. This removes the separate count, prefix sum, and placement
+passes. Components keep their heat-bath order. The accepted flips inside a
+component can visit its members in reverse order because the integer field
+patches add to the same final fields and the energy differences telescope.
+
+The combined change reached 1.231× at the median in four kernel pilot
+pairs. At the full archive budget on eight fresh instances it reached
+**1.218×** over C39, with a paired bootstrap 95% median interval of 1.121–1.299×.
+The component build won all eight full-budget pairs and returned identical
+candidate spins and energies in all eight. The whole-process median showed
+14.2% fewer cycles and 36.1% fewer branch misses.
+[Pilot](data/cluster-fields/pilot-components/results.json),
+[full-budget pairs](data/cluster-fields/full-components/results.json).
+
+## Packed residual fields
+
+The `packed-residual-fields` path stores the signed full local field in the
+upper 32 bits and the residual field plus `2^31` in the lower 32 bits. Admitted
+graphs have at most `2^21` nodes, distinct neighbors, zero fields, and
+coupling magnitude at most 1,000 milli. Each local field therefore has
+magnitude at most 2,097,151,000, which fits within signed 32 bits. Each move
+keeps the biased residual field within its lane. A neighbor's complete
+update multiplies `J_full * 2^32 + J_residual` by the signed spin change and
+applies the result to both fields with one wrapping addition. The signed
+coefficient fits in 43 bits alongside the 21-bit neighbor index.
+
+At the heat-bath draw, the component gets its residual delta from the
+current residual fields. For member `u`, the field term is
+`-2 * s[u] * residual_field[u]`. An interior edge occurs twice in that sum,
+so the solver adds back `4 * J_residual * s[u] * s[v]` once per interior edge.
+Singletons get their delta directly from the field. A two-node component has
+exactly one sampled bond and one edge between its members. The residual
+energy is `tile_milli - 1000` for opposite gauged spins in a tile and
+`pair_milli - 1000` for equal spins on a dimer. A graph-local pair lookup
+identifies which constant to use. Larger components scan the forward
+residual rows and mask the contribution from every exterior edge.
+
+Each accepted move updates both fields for subsequent components. The packed
+implementation uses its own fused field updates and takes precedence over
+the compact local-field, cluster-boundary, and masked residual initialization
+experiments when those build flags are combined.
+
+### Pilot builds
+
+| Candidate | Reference | 16-replica pilot | Median wall ratio | Median CPU cycle change | Exact matches |
+|---|---|---|---:|---:|---:|
+| [Initial packed fields](data/cluster-fields/pilot-packed/results.json) | C39 | Core kernel, 2,048 sweeps | 0.842× | +9.2% | 4/4 |
+| [Initial packing with linked membership and shallow roots](data/cluster-fields/pilot-packed-linked-shallow/results.json) | C39 | Core kernel, 2,048 sweeps | 1.032× | −8.0% | 4/4 |
+| [Packing with the two-spin shortcut and masked interior scan](data/cluster-fields/pilot-packed-pairs/results.json) | Component build | Archive pipeline, 2,048 sweeps | 1.145× | −14.0% | 4/4 |
+
+The initial packed-only pilot recorded a dirty measurement checkout during
+the benchmark harness edit. The executable was already built from the
+revision and feature set recorded in the manifest.
+[Build revisions and executable hashes](data/cluster-fields/build.json).
+
+### Full-budget comparisons
+
+The final build enables linked component lists, shallow roots, and packed
+residual fields alongside the C39 tile lookup. Each comparison uses the
+archive preset at 16 replicas × 8,192 sweeps on the same EPYC 7663 VPS.
+The timer covers the complete offline solver call, including graph
+preparation and archive polishing. Hardware counters cover the benchmark
+process. Each pair has the same canonical instance and checks the ordered
+candidate spins and original energies.
+
+The side-by-side runs swap CPU assignments each pair. The sequential
+retest runs both binaries on the same CPU within a pair. In each block
+of four pairs, both CPUs run reference-first and candidate-first once.
+Each comparison uses fresh canonical instances.
+
+| Reference and run order | Seeds | Median speedup | Range across pairs | Paired bootstrap 95% median interval | Exact matches |
+|---|---:|---:|---:|---:|---:|
+| [C39, side by side](data/cluster-fields/full-final-c39/results.json) | 1221–1228 | **1.420×** | 1.182–1.511× | 1.346–1.480× | 8/8 |
+| [C39, sequential on the same CPU](data/cluster-fields/serial-final-c39/results.json) | 1231–1238 | **1.341×** | 1.256–1.467× | 1.291–1.398× | 8/8 |
+| [Earlier native build, side by side](data/cluster-fields/full-final-native/results.json) | 1241–1248 | **1.516×** | 1.332–1.720× | 1.418–1.674× | 8/8 |
+
+The final build ran faster in all 24 pairs. Against C39 the whole-process
+median cycle reduction was 27.5% side by side and 27.3% sequentially.
+Retired instructions fell 22.4% at the median in the sequential comparison.
+Against the earlier native reference the median cycle reduction was 35.5%.
+[Side-by-side summary](data/cluster-fields/full-final-c39/summary.json),
+[same-CPU summary](data/cluster-fields/serial-final-c39/summary.json),
+[earlier-native summary](data/cluster-fields/full-final-native/summary.json).
+
+## Integer cutoffs for transition draws
+
+The trial encoded each probability `p` as `ceil(p * 2^53)`. This makes
+comparing the original 53-bit random integer with the cutoff equivalent
+to comparing its normalized value with `p`. The four archive pilot pairs
+matched outputs and recorded a 0.948× median wall ratio against the
+component build, with 1.5% fewer cycles at the median. The flag was retired
+after the pilot. [Raw pilot results](data/cluster-fields/pilot-integer/results.json).
 
 ## Correctness and protocol checks
 
@@ -349,6 +463,12 @@ See the [validation record](data/residual-edge-scan/masked-validation.json).
 The tile-table build verifies position order for all 16 patterns and runs the
 family library, kernel, and native protocol checks.
 [Tile-table validation record](data/tile-bonds/validation.json).
+The final packed-field build passed 35 family-library tests, 23 kernel
+tests, and native protocol conformance. The added fixtures verify both
+field lanes and rescore every heat-bath delta directly for singleton,
+dimer, tile-pair, and larger components using full and distinct soft
+weights. Clippy, formatting, and the all-feature library compile passed.
+[Validation record](data/cluster-fields/validation.json).
 Native deployment observations are recorded separately in
 [live operation](LIVE_OPERATION.md); coordinator candidate validation is a
 different event from inclusion of a winning proof in a block.
@@ -428,6 +548,20 @@ cargo +1.97.1 build --release --locked --features experimental,masked-residual-d
 cp target/release/examples/cpu_native_bench "$study/tile-table"
 python3 tools/cpu-native/compare_builds.py --reference-binary "$study/tile-reference" --candidate-binary "$study/tile-table" --label table-tile-bonds-kernel --cpus 3 4 --output "$study/tile-kernel" --seed-start 1129 --reads 16 --sweeps 2048 --mode kernel --preset core --perf
 python3 tools/cpu-native/compare_builds.py --reference-binary "$study/tile-reference" --candidate-binary "$study/tile-table" --label table-tile-bonds-pipeline --cpus 3 4 --output "$study/tile-pipeline" --seed-start 1141 --reads 16 --sweeps 8192 --mode pipeline --preset archive --perf
+```
+
+Use the [build manifest](data/cluster-fields/build.json) to build the
+historical `c39` and `native` references at their pinned source revisions.
+Save those reference executables as `"$study/c39"` and `"$study/native"`.
+Build the final configuration from the revision listed as `final`.
+
+```sh
+cargo +1.97.1 build --release --locked --features experimental,masked-residual-deltas,table-tile-bonds,linked-component-lists,shallow-union-roots,packed-residual-fields --example cpu_native_bench -j 2
+cp target/release/examples/cpu_native_bench "$study/final"
+python3 tools/cpu-native/compare_builds.py --reference-binary "$study/c39" --candidate-binary "$study/c39" --label control-c39 --cpus 3 4 --output "$study/control-c39" --seed-start 1161 --sweeps 8192 --mode pipeline --preset archive --perf
+python3 tools/cpu-native/compare_builds.py --reference-binary "$study/c39" --candidate-binary "$study/final" --label full-final-c39 --cpus 3 4 --output "$study/full-final-c39" --seed-start 1221 --sweeps 8192 --mode pipeline --preset archive --perf
+python3 tools/cpu-native/compare_builds.py --serial --reference-binary "$study/c39" --candidate-binary "$study/final" --label serial-final-c39 --cpus 3 4 --output "$study/serial-final-c39" --seed-start 1231 --sweeps 8192 --mode pipeline --preset archive --perf
+python3 tools/cpu-native/compare_builds.py --reference-binary "$study/native" --candidate-binary "$study/final" --label full-final-native --cpus 3 4 --output "$study/full-final-native" --seed-start 1241 --sweeps 8192 --mode pipeline --preset archive --perf
 ```
 
 The evidence covers the specified Quip family, recipe, toolchain, and VPS.

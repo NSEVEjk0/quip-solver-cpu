@@ -1,0 +1,21 @@
+{
+  "label": "c39-same-binary",
+  "pairs": 8,
+  "median_speedup": 0.984556312967892,
+  "bootstrap95_median": [
+    0.9600806698730986,
+    1.0545167754060247
+  ],
+  "mean_reference_seconds": 34.839633245875,
+  "mean_candidate_seconds": 34.685088756249996,
+  "exact_output_pairs": 8,
+  "mean_best_original_energy": -5042.075,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.9837397525336562,
+    "cycles": 1.0024551868667513,
+    "instructions": 1.0000221658352437,
+    "branches": 1.0000280854997197,
+    "branch-misses": 1.000745778170463,
+    "cache-misses": 0.9982317343029967
+  }
+}

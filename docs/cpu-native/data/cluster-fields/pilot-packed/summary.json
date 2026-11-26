@@ -1,0 +1,21 @@
+{
+  "label": "c39-packed-pilot",
+  "pairs": 4,
+  "median_speedup": 0.8424043438095645,
+  "bootstrap95_median": [
+    0.772627038902744,
+    1.0660687203695545
+  ],
+  "mean_reference_seconds": 9.0189697805,
+  "mean_candidate_seconds": 10.30358383625,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -5031.145,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.8438357917501325,
+    "cycles": 0.9161209104554849,
+    "instructions": 1.2980705681626923,
+    "branches": 1.1006774264387928,
+    "branch-misses": 0.5427946391931109,
+    "cache-misses": 0.7894774550942886
+  }
+}

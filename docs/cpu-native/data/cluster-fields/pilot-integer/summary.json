@@ -1,0 +1,21 @@
+{
+  "label": "integer-vs-components-pilot",
+  "pairs": 4,
+  "median_speedup": 0.9480947832054604,
+  "bootstrap95_median": [
+    0.8137992661360327,
+    1.0262856227132864
+  ],
+  "mean_reference_seconds": 7.5418731885,
+  "mean_candidate_seconds": 8.13172519025,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -5028.1825,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.9463568772011383,
+    "cycles": 1.0156078223945424,
+    "instructions": 0.9962436729171091,
+    "branches": 0.9879280856708634,
+    "branch-misses": 0.9967431645973908,
+    "cache-misses": 1.010997657584788
+  }
+}

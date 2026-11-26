@@ -1,0 +1,21 @@
+{
+  "label": "packed-pairs-vs-components-pilot",
+  "pairs": 4,
+  "median_speedup": 1.144643127606511,
+  "bootstrap95_median": [
+    0.9320755296950645,
+    1.2696050929990215
+  ],
+  "mean_reference_seconds": 7.6037295755,
+  "mean_candidate_seconds": 6.84311362375,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -5028.1825,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.144710772057096,
+    "cycles": 1.1629394586322281,
+    "instructions": 1.2671725430753902,
+    "branches": 1.2294370292630339,
+    "branch-misses": 0.8186458068440898,
+    "cache-misses": 0.7766802210051635
+  }
+}

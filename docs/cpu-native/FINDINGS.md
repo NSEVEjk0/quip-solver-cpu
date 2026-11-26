@@ -55,6 +55,9 @@ with block eligibility checked separately by the coordinator and runtime.
 | [C37](#c37) | Group residual edges by endpoint | 10.6% fewer instructions; full-pipeline time near parity |
 | [C38](#c38) | Mask interior edges in the residual scan | 1.028× median full-pipeline speedup; eight exact output matches |
 | [C39](#c39) | Table-driven tile bond sampling | 1.129× median full-pipeline speedup over C38 with eight exact output matches |
+| [C40](#c40) | Component construction during labeling | 1.218× over C39 at full budget with 8/8 exact outputs |
+| [C41](#c41) | Packed full and residual local fields | 1.341× over C39 in the same-CPU repeat with 8/8 exact outputs |
+| [C42](#c42) | Integer cutoffs for transition draws | 0.948× archive pilot wall ratio and 4/4 exact outputs |
 
 <a id="c01"></a>
 ## C01. Packed adjacency fusion
@@ -505,3 +508,34 @@ the C38 configuration on one EPYC 7663 VPS. All eight held-out pairs ran
 faster and returned identical candidate spins and energies. Median branch
 misses fell 17.5% and cycles fell 5.9%.
 [Results and reproduction](EXPERIMENTS.md#table-driven-tile-bond-sampling).
+
+<a id="c40"></a>
+## C40. Component construction during labeling
+
+The union-find lookup stops at the parent when it is already a root.
+Component labeling builds each member list directly and retains the original
+root order. The combined build reached **1.218×** over C39 in eight matched
+archive runs at 16 × 8,192. All eight returned the same candidate spins and
+energies, and median CPU cycles fell 14.2%. [Study](EXPERIMENTS.md#component-construction).
+
+<a id="c41"></a>
+## C41. Packed full and residual local fields
+
+One field update carries both exact local sums. The heat-bath step reads
+the residual field directly for a singleton and uses a fixed correction for
+the sampled bond in a two-spin component. Larger components account for
+interior edges with the forward rows.
+
+At 16 × 8,192 on one EPYC 7663 VPS, the final opt-in build reached **1.341×**
+over C39 in balanced sequential pairs on the same CPU and **1.420×**
+in side-by-side pairs. The direct run against the earlier native C38 reference
+reached **1.516×**. The final build won all 24 pairs with identical candidate
+spins and energies. [Full-budget comparisons and raw data](EXPERIMENTS.md#full-budget-comparisons).
+
+<a id="c42"></a>
+## C42. Integer cutoffs for transition draws
+
+Comparing the 53 random bits with an integer cutoff preserved the sampled
+choices. All four archive pilot pairs returned identical outputs. The median
+elapsed ratio was 0.948× and the experiment was retired.
+[Study](EXPERIMENTS.md#integer-cutoffs-for-transition-draws).
