@@ -1492,6 +1492,49 @@ mod tests {
         }
     }
 
+    #[cfg(feature = "pair-worm-polish")]
+    #[test]
+    fn pair_worm_polish_keeps_candidates_and_lowers_original_energy() {
+        let (_, _, instances) = reference();
+        let instance = &instances[0];
+        for polish_sweeps in [0, 4] {
+            let config = FunnelConfig {
+                archive: true,
+                polish_sweeps,
+                ..FunnelConfig::default()
+            };
+            let mut polished = config.clone();
+            polished
+                .apply(
+                    &"funnel_pair_worm_polish = true"
+                        .parse::<toml::Table>()
+                        .unwrap(),
+                )
+                .unwrap();
+            let params = SampleParams {
+                num_reads: 4,
+                num_sweeps: 32,
+                seed: 5281,
+                ..SampleParams::default()
+            };
+            let before = tuned_reads(instance, &params, &config, || false)
+                .unwrap()
+                .unwrap();
+            let after = tuned_reads(instance, &params, &polished, || false)
+                .unwrap()
+                .unwrap();
+            assert_eq!(after.len(), params.num_reads);
+            assert_eq!(before.len(), after.len());
+            for (original, polished) in before.iter().zip(&after) {
+                assert!(polished.energy_milli <= original.energy_milli);
+                assert_eq!(
+                    polished.energy_milli + instance.offset_milli(),
+                    instance_energy(instance, &polished.spins)
+                );
+            }
+        }
+    }
+
     #[cfg(feature = "tree-polish")]
     #[test]
     fn configured_tree_polish_preserves_candidate_count_and_canonical_energy() {

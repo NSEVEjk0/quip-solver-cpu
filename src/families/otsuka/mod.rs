@@ -697,6 +697,51 @@ mod snapshot_tests {
     use super::*;
 
     #[test]
+    fn exchange_boundary_matches_rescoring_for_each_disagreement_subset() {
+        let graph = OtsukaGraph::new(
+            &Model {
+                h_milli: &[0; 4],
+                edges: &[(0, 1), (0, 2), (0, 3), (1, 2), (2, 3)],
+                j_milli: &[-1000, 45, -67, 26, 87],
+            },
+            &Motifs {
+                tiles: &[],
+                gauges: &[],
+                pairs: &[(0, 1)],
+            },
+            Weights::FULL,
+        )
+        .unwrap();
+        for a_mask in 0..16 {
+            for b_mask in 0..16 {
+                let a: [i8; 4] =
+                    std::array::from_fn(|u| if a_mask & (1 << u) == 0 { 1 } else { -1 });
+                let b: [i8; 4] =
+                    std::array::from_fn(|u| if b_mask & (1 << u) == 0 { 1 } else { -1 });
+                for mask in 0..16 {
+                    if mask & !(a_mask ^ b_mask) != 0 {
+                        continue;
+                    }
+                    let mut a_after = a;
+                    let mut b_after = b;
+                    let inside: [bool; 4] = std::array::from_fn(|u| mask & (1 << u) != 0);
+                    let nodes: Vec<_> = (0..4).filter(|&u| inside[u as usize]).collect();
+                    for &u in &nodes {
+                        std::mem::swap(&mut a_after[u as usize], &mut b_after[u as usize]);
+                    }
+                    let expected = graph.energy(&a_after) + graph.energy(&b_after)
+                        - graph.energy(&a)
+                        - graph.energy(&b);
+                    assert_eq!(
+                        exchange_boundary_delta(&graph, &nodes, &inside, &a, &b),
+                        expected
+                    );
+                }
+            }
+        }
+    }
+
+    #[test]
     fn selective_snapshots_preserve_cycles_repeated_parents_and_fields() {
         let graph = OtsukaGraph::new(
             &Model {
