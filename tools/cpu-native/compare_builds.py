@@ -74,6 +74,9 @@ def main():
     parser.add_argument("--reference-sweeps", type=int)
     parser.add_argument("--candidate-polish-sweeps", type=int)
     parser.add_argument("--candidate-single-every", type=int)
+    parser.add_argument("--candidate-houdayer-every", type=int)
+    parser.add_argument("--candidate-strong-exchanges", action="store_true")
+    parser.add_argument("--candidate-slot-archive", action="store_true")
     parser.add_argument(
         "--serial",
         action="store_true",
@@ -102,9 +105,12 @@ def main():
         parser.error("--bracket requires --serial")
     if args.candidate_single_every is not None and args.candidate_single_every < 0:
         parser.error("Metropolis cadence must be nonnegative")
-    if not args.compare_energy and any(
-        option is not None
-        for option in (args.reference_sweeps, args.candidate_polish_sweeps, args.candidate_single_every)
+    if args.candidate_houdayer_every is not None and args.candidate_houdayer_every < 0:
+        parser.error("Houdayer cadence must be nonnegative")
+    overrides = (args.reference_sweeps, args.candidate_polish_sweeps, args.candidate_single_every, args.candidate_houdayer_every)
+    if not args.compare_energy and (
+        any(option is not None for option in overrides)
+        or args.candidate_strong_exchanges or args.candidate_slot_archive
     ):
         parser.error("different solve budgets require --compare-energy")
     if len(set(args.cpus)) != 2 or min(args.cpus) < 0:
@@ -163,6 +169,9 @@ def main():
             reference_sweeps=args.reference_sweeps or args.sweeps,
             candidate_polish_sweeps=args.candidate_polish_sweeps,
             candidate_single_every=args.candidate_single_every,
+            candidate_houdayer_every=args.candidate_houdayer_every,
+            candidate_strong_exchanges=args.candidate_strong_exchanges,
+            candidate_slot_archive=args.candidate_slot_archive,
         )
     if args.bracket:
         metadata["repeats_per_build"] = 2
@@ -197,6 +206,12 @@ def main():
             command.extend(("--polish-sweeps", str(args.candidate_polish_sweeps)))
         if role == "candidate" and args.candidate_single_every is not None:
             command.extend(("--single-every", str(args.candidate_single_every)))
+        if role == "candidate" and args.candidate_houdayer_every is not None:
+            command.extend(("--houdayer-every", str(args.candidate_houdayer_every)))
+        if role == "candidate" and args.candidate_strong_exchanges:
+            command.append("--strong-exchanges")
+        if role == "candidate" and args.candidate_slot_archive:
+            command.append("--slot-archive")
         stem = f"{seed}-{role}" if repetition is None else f"{seed}-{role}-{repetition}"
         if args.perf:
             perf_path = output / f"{stem}.perf.csv"
@@ -231,6 +246,12 @@ def main():
                 raise RuntimeError(f"reported candidate polishing budget differs at seed {seed}")
             if args.candidate_single_every is not None and row.get("single_every") != args.candidate_single_every:
                 raise RuntimeError(f"reported candidate Metropolis cadence differs at seed {seed}")
+            if args.candidate_houdayer_every is not None and row.get("houdayer_every") != args.candidate_houdayer_every:
+                raise RuntimeError(f"reported candidate Houdayer cadence differs at seed {seed}")
+            if args.candidate_strong_exchanges and not row.get("strong_exchanges"):
+                raise RuntimeError(f"strong exchanges were absent at seed {seed}")
+            if args.candidate_slot_archive and not row.get("slot_archive"):
+                raise RuntimeError(f"slot archive was absent at seed {seed}")
         row.update(role=role, label=args.label, cpu=cpu, command=command)
         if args.perf:
             row["perf"] = read_perf(perf_path)
