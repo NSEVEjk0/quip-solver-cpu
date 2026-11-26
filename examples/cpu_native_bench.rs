@@ -56,8 +56,6 @@ struct Args {
     polish_sweeps: usize,
     #[arg(long, default_value_t = 1)]
     single_every: usize,
-    #[arg(long, default_value_t = 0.0)]
-    beta_hold: f64,
     #[arg(long, default_value_t = 250)]
     tile_milli: i32,
     #[arg(long, default_value_t = 250)]
@@ -68,12 +66,6 @@ struct Args {
     resamples: usize,
     #[arg(long, default_value_t = 0)]
     houdayer_every: usize,
-    #[arg(long)]
-    independent_ancestry: bool,
-    #[arg(long)]
-    strong_exchanges: bool,
-    #[arg(long)]
-    slot_archive: bool,
     #[arg(long, default_value_t = 8192)]
     cache_slots: usize,
     #[arg(long)]
@@ -93,12 +85,6 @@ struct Topology {
 #[expect(clippy::print_stdout, reason = "benchmark emits one JSON result")]
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
-    if !(0.0..1.0).contains(&args.beta_hold) {
-        return Err("beta hold must be in [0, 1)".into());
-    }
-    if args.beta_hold != 0.0 && matches!(args.mode, Mode::Kernel) {
-        return Err("beta hold requires pipeline mode".into());
-    }
     let spec: Topology = serde_json::from_slice(&std::fs::read(&args.topology)?)?;
     let edges: Vec<_> = spec.edges.into_iter().map(|[u, v]| (u, v)).collect();
     let topology = BaseTopology::new(spec.nodes, &edges).map_err(|e| format!("topology: {e:?}"))?;
@@ -124,15 +110,11 @@ fn main() -> Result<(), Box<dyn Error>> {
         polish_beta: args.polish_beta,
         polish_sweeps: args.polish_sweeps,
         single_every: args.single_every,
-        beta_hold: args.beta_hold,
         tile_milli: args.tile_milli,
         pair_milli: args.pair_milli,
         weak_scale: args.weak_scale,
         resamples: args.resamples,
         houdayer_every: args.houdayer_every,
-        independent_ancestry: args.independent_ancestry,
-        strong_exchanges: args.strong_exchanges,
-        slot_archive: args.slot_archive,
         #[cfg(feature = "tree-polish")]
         tree_polish: true,
         #[cfg(feature = "pair-worm-polish")]
@@ -188,8 +170,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 PopulationOptions {
                     resamples: config.resamples,
                     houdayer_every: config.houdayer_every,
-                    independent_ancestry: args.independent_ancestry,
-                    strong_exchanges: args.strong_exchanges,
                     shared_cache: config.shared_cache,
                     cache_slots: config.cache_slots,
                     copy_resampling: config.copy_resampling,
@@ -229,9 +209,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                     "metropolis_hits":c.metropolis_hits,"metropolis_misses":c.metropolis_misses,
                     "fallbacks":c.fallbacks,"temperatures":c.temperatures,
                     "epoch_wraps":c.epoch_wraps,
-                    "exchange_proposals": m.exchange_proposals,
-                    "exchange_partial": m.exchange_partial,
-                    "exchange_rejected": m.exchange_rejected,
                 }),
             )
         }
@@ -281,16 +258,13 @@ fn main() -> Result<(), Box<dyn Error>> {
         "tree_polish":cfg!(feature="tree-polish"),
         "cyclic_polish":cfg!(feature="cyclic-polish"),
         "pair_worm_polish":cfg!(feature="pair-worm-polish"),
-        "interleaved_probability_cache":cfg!(feature="interleaved-probability-cache"),
     });
     let schedule = serde_json::json!({
         "polish_sweeps":args.polish_sweeps,
         "single_every":args.single_every,
-        "beta_hold":args.beta_hold,"weak_scale":args.weak_scale,
+        "weak_scale":args.weak_scale,
         "tile_milli":args.tile_milli,"pair_milli":args.pair_milli,"resamples":args.resamples,
-        "houdayer_every":args.houdayer_every,"independent_ancestry":args.independent_ancestry,
-        "slot_archive":args.slot_archive,
-        "strong_exchanges":args.strong_exchanges,
+        "houdayer_every":args.houdayer_every,
     });
     let row_fields = row
         .as_object_mut()

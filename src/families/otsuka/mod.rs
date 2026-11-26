@@ -166,10 +166,6 @@ pub struct PopulationOptions {
     pub resamples: usize,
     /// Sweeps between Houdayer moves; zero uses the resampling cadence.
     pub houdayer_every: usize,
-    /// Advance each replica's own chain while retaining the configured swap cadence.
-    pub independent_ancestry: bool,
-    /// Propose exchanges on the strong graph, with full-energy Metropolis acceptance.
-    pub strong_exchanges: bool,
     /// Share temperature-local transition probabilities across replicas.
     pub shared_cache: bool,
     /// Positive half-delta slots in the bounded probability table.
@@ -189,8 +185,6 @@ impl Default for PopulationOptions {
         Self {
             resamples: RESAMPLES,
             houdayer_every: 1,
-            independent_ancestry: false,
-            strong_exchanges: false,
             shared_cache: false,
             cache_slots: 8192,
             copy_resampling: false,
@@ -232,12 +226,6 @@ pub struct PopulationMetrics {
     pub observer_records: usize,
     /// Probability table size in bytes.
     pub cache_bytes: usize,
-    /// Nonempty disagreement components proposed for exchange.
-    pub exchange_proposals: usize,
-    /// Accepted exchanges involving a strict subset of the disagreement set.
-    pub exchange_partial: usize,
-    /// Exchanges rejected by the full-energy acceptance test.
-    pub exchange_rejected: usize,
     /// Temperature-local probability counters.
     pub cache: CacheStats,
 }
@@ -369,27 +357,6 @@ pub fn anneal_population_observed(
     stopped: impl Fn() -> bool,
     mut observe: impl FnMut(i64, &[i8]),
 ) -> Result<PopulationOutcome, AnnealError> {
-    anneal_population_with_slots(
-        graph,
-        schedule,
-        replicas,
-        seed,
-        options,
-        stopped,
-        |_, energy, spins| observe(energy, spins),
-    )
-}
-
-/// As above, with the current replica slot for each record.
-pub(crate) fn anneal_population_with_slots(
-    graph: &OtsukaGraph,
-    schedule: &Schedule<'_>,
-    replicas: usize,
-    seed: u64,
-    options: PopulationOptions,
-    stopped: impl Fn() -> bool,
-    mut observe: impl FnMut(usize, i64, &[i8]),
-) -> Result<PopulationOutcome, AnnealError> {
     let mut rng = SmallRng::seed_from_u64(seed);
     let mut chains: Vec<Chain<'_>> = (0..replicas)
         .map(|_| Chain::random(graph, &mut rng))
@@ -403,21 +370,22 @@ pub(crate) fn anneal_population_with_slots(
     let mut metrics = PopulationMetrics {
         field_rebuilds: replicas,
         local_field_bytes: replicas * graph.n * size_of::<LocalField>(),
-        snapshot_bytes: if options.copy_resampling && !options.independent_ancestry {
+        snapshot_bytes: if options.copy_resampling {
             replicas * graph.n * (size_of::<i8>() + size_of::<LocalField>())
         } else {
             0
         },
         ..PopulationMetrics::default()
     };
-    for (slot, (chain, &e)) in chains.iter().zip(&energy).enumerate() {
-        observe(slot, e, chain.spins());
+    for (chain, &e) in chains.iter().zip(&energy) {
+        observe(e, chain.spins());
         metrics.observer_records += 1;
     }
     let mut cache = options
         .shared_cache
         .then(|| SweepCache::new(options.cache_slots));
-    let mut snapshot = (options.copy_resampling && !options.independent_ancestry)
+    let mut snapshot = options
+        .copy_resampling
         .then(|| PopulationSnapshot::new(replicas, graph.n));
     let every = schedule
         .betas
@@ -433,7 +401,7 @@ pub(crate) fn anneal_population_with_slots(
     let mut scratch = Houdayer::new(graph.n);
     let mut last_beta = schedule.betas[0];
     for (sweep, &beta) in schedule.betas.iter().enumerate() {
-        if !options.independent_ancestry && sweep > 0 && sweep % every == 0 && replicas > 1 {
+        if sweep > 0 && sweep % every == 0 && replicas > 1 {
             let picks = resample(&energy, beta - last_beta, &mut rng);
             if let Some(snapshot) = &mut snapshot {
                 if options.selective_resampling {
@@ -468,12 +436,7 @@ pub(crate) fn anneal_population_with_slots(
             best = picks.iter().map(|&i| best[i].clone()).collect();
             last_beta = beta;
         }
-        for (slot, ((chain, e), lowest)) in chains
-            .iter_mut()
-            .zip(&mut energy)
-            .zip(&mut best)
-            .enumerate()
-        {
+        for ((chain, e), lowest) in chains.iter_mut().zip(&mut energy).zip(&mut best) {
             if stopped() {
                 return Err(AnnealError::Cancelled);
             }
@@ -490,7 +453,7 @@ pub(crate) fn anneal_population_with_slots(
                 *e += chain.cluster_sweep(beta, &mut rng);
             }
             if *e < lowest.1 {
-                observe(slot, *e, chain.spins());
+                observe(*e, chain.spins());
                 metrics.observer_records += 1;
             }
             if schedule.single_every > 0 && (sweep + 1).is_multiple_of(schedule.single_every) {
@@ -500,7 +463,7 @@ pub(crate) fn anneal_population_with_slots(
                     chain.single_sweep(beta, &mut rng)
                 };
                 if *e < lowest.1 {
-                    observe(slot, *e, chain.spins());
+                    observe(*e, chain.spins());
                     metrics.observer_records += 1;
                 }
             }
@@ -515,20 +478,12 @@ pub(crate) fn anneal_population_with_slots(
                 let (a, b) = (pair[0].min(pair[1]), pair[0].max(pair[1]));
                 let (left, right) = chains.split_at_mut(b);
                 let (ca, cb) = (&mut left[a], &mut right[0]);
-                if let Some((da, db)) = houdayer(
-                    graph,
-                    ca,
-                    cb,
-                    &mut scratch,
-                    &mut rng,
-                    options.strong_exchanges.then_some(beta),
-                    &mut metrics,
-                ) {
+                if let Some((da, db)) = houdayer(graph, ca, cb, &mut scratch, &mut rng) {
                     energy[a] += da;
                     energy[b] += db;
                     for i in [a, b] {
                         if energy[i] < best[i].1 {
-                            observe(i, energy[i], chains[i].spins());
+                            observe(energy[i], chains[i].spins());
                             metrics.observer_records += 1;
                             best[i].0.copy_from_slice(chains[i].spins());
                             best[i].1 = energy[i];
@@ -589,8 +544,6 @@ fn houdayer(
     b: &mut Chain<'_>,
     scratch: &mut Houdayer,
     rng: &mut SmallRng,
-    strong_beta: Option<f64>,
-    metrics: &mut PopulationMetrics,
 ) -> Option<(i64, i64)> {
     let (sa, sb) = (a.spins(), b.spins());
     scratch.differ.clear();
@@ -600,7 +553,6 @@ fn houdayer(
     if scratch.differ.is_empty() {
         return None;
     }
-    metrics.exchange_proposals += 1;
     let root = scratch.differ[rng.gen_range(0..scratch.differ.len())];
     scratch.cluster.clear();
     scratch.cluster.push(root);
@@ -611,60 +563,21 @@ fn houdayer(
         at += 1;
         for link in graph.all.row(u) {
             let v = link.node();
-            if !scratch.seen[v]
-                && sa[v] != sb[v]
-                && (strong_beta.is_none() || link.j().abs() == STRONG_MILLI)
-            {
+            if !scratch.seen[v] && sa[v] != sb[v] {
                 scratch.seen[v] = true;
                 scratch.cluster.push(v as u32);
             }
         }
     }
-    let summed_delta = if strong_beta.is_some() && scratch.cluster.len() != scratch.differ.len() {
-        exchange_boundary_delta(graph, &scratch.cluster, &scratch.seen, sa, sb)
-    } else {
-        0
-    };
     for &u in &scratch.cluster {
         scratch.seen[u as usize] = false;
     }
-    if summed_delta > 0
-        && strong_beta
-            .is_some_and(|beta| rng.gen::<f64>() >= (-beta * summed_delta as f64 / 1000.0).exp())
-    {
-        metrics.exchange_rejected += 1;
-        return None;
-    }
-    metrics.exchange_partial += usize::from(scratch.cluster.len() < scratch.differ.len());
     let change = (
         a.flip_nodes(&scratch.cluster),
         b.flip_nodes(&scratch.cluster),
     );
-    debug_assert_eq!(change.0 + change.1, summed_delta);
+    debug_assert_eq!(change.0 + change.1, 0, "a swap keeps the summed energy");
     Some(change)
-}
-
-// On a boundary edge with one disagreeing endpoint, the two energy changes
-// cancel if the other endpoint agrees. With two disagreeing endpoints they
-// are equal. Every internal edge preserves its spin product in both replicas.
-fn exchange_boundary_delta(
-    graph: &OtsukaGraph,
-    nodes: &[u32],
-    inside: &[bool],
-    a: &[i8],
-    b: &[i8],
-) -> i64 {
-    let mut delta = 0;
-    for &node in nodes {
-        let u = node as usize;
-        for &link in graph.all.row(u) {
-            let v = link.node();
-            if !inside[v] && a[v] != b[v] {
-                delta -= 4 * i64::from(link.j()) * i64::from(a[u] * a[v]);
-            }
-        }
-    }
-    delta
 }
 
 /// Systematic resampling: the replica each slot copies, drawn in proportion
@@ -695,51 +608,6 @@ fn resample(energy: &[i64], step: f64, rng: &mut SmallRng) -> Vec<usize> {
 #[cfg(test)]
 mod snapshot_tests {
     use super::*;
-
-    #[test]
-    fn exchange_boundary_matches_rescoring_for_each_disagreement_subset() {
-        let graph = OtsukaGraph::new(
-            &Model {
-                h_milli: &[0; 4],
-                edges: &[(0, 1), (0, 2), (0, 3), (1, 2), (2, 3)],
-                j_milli: &[-1000, 45, -67, 26, 87],
-            },
-            &Motifs {
-                tiles: &[],
-                gauges: &[],
-                pairs: &[(0, 1)],
-            },
-            Weights::FULL,
-        )
-        .unwrap();
-        for a_mask in 0..16 {
-            for b_mask in 0..16 {
-                let a: [i8; 4] =
-                    std::array::from_fn(|u| if a_mask & (1 << u) == 0 { 1 } else { -1 });
-                let b: [i8; 4] =
-                    std::array::from_fn(|u| if b_mask & (1 << u) == 0 { 1 } else { -1 });
-                for mask in 0..16 {
-                    if mask & !(a_mask ^ b_mask) != 0 {
-                        continue;
-                    }
-                    let mut a_after = a;
-                    let mut b_after = b;
-                    let inside: [bool; 4] = std::array::from_fn(|u| mask & (1 << u) != 0);
-                    let nodes: Vec<_> = (0..4).filter(|&u| inside[u as usize]).collect();
-                    for &u in &nodes {
-                        std::mem::swap(&mut a_after[u as usize], &mut b_after[u as usize]);
-                    }
-                    let expected = graph.energy(&a_after) + graph.energy(&b_after)
-                        - graph.energy(&a)
-                        - graph.energy(&b);
-                    assert_eq!(
-                        exchange_boundary_delta(&graph, &nodes, &inside, &a, &b),
-                        expected
-                    );
-                }
-            }
-        }
-    }
 
     #[test]
     fn selective_snapshots_preserve_cycles_repeated_parents_and_fields() {

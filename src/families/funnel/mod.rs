@@ -21,8 +21,8 @@ mod stage0v2;
 #[cfg(feature = "tree-polish")]
 use super::otsuka::TreePolish;
 use super::otsuka::{
-    anneal_population_with_slots, AnnealError, Chain, Model, Motifs, OtsukaGraph,
-    PopulationOptions, Schedule, SweepCache, Weights,
+    anneal_population_observed, AnnealError, Chain, Model, Motifs, OtsukaGraph, PopulationOptions,
+    Schedule, SweepCache, Weights,
 };
 use super::otsuka_sampler::{parse_pairs, section, PAIRS_SECTION};
 #[cfg(feature = "pair-worm-polish")]
@@ -84,18 +84,10 @@ pub struct FunnelConfig {
     pub resamples: usize,
     /// Houdayer cadence; zero means checkpoints only.
     pub houdayer_every: usize,
-    /// Keep independent replica histories while retaining Houdayer exchanges.
-    pub independent_ancestry: bool,
-    /// Propose Houdayer exchanges on strong edges and accept against full energy.
-    pub strong_exchanges: bool,
-    /// Keep one original-objective record per replica slot through resampling.
-    pub slot_archive: bool,
     /// Cold cluster continuation sweeps on the four best reads.
     pub polish_sweeps: usize,
     /// Metropolis cadence during the population phase. Zero uses clusters alone.
     pub single_every: usize,
-    /// Fraction of annealing sweeps held at the schedule's final temperature.
-    pub beta_hold: f64,
     /// Enable conditional tree descent on the completed candidate batch.
     #[cfg(feature = "tree-polish")]
     pub tree_polish: bool,
@@ -139,12 +131,8 @@ impl Default for FunnelConfig {
             weak_scale: 1.5,
             resamples: 512,
             houdayer_every: 0,
-            independent_ancestry: false,
-            strong_exchanges: false,
-            slot_archive: false,
             polish_sweeps: 256,
             single_every: 1,
-            beta_hold: 0.0,
             #[cfg(feature = "tree-polish")]
             tree_polish: false,
             #[cfg(feature = "pair-worm-polish")]
@@ -189,12 +177,6 @@ impl FunnelConfig {
             ("funnel_fused_updates", &mut self.fused_updates),
             ("funnel_archive", &mut self.archive),
             ("funnel_motif_score", &mut self.motif_score),
-            (
-                "funnel_independent_ancestry",
-                &mut self.independent_ancestry,
-            ),
-            ("funnel_slot_archive", &mut self.slot_archive),
-            ("funnel_strong_exchanges", &mut self.strong_exchanges),
         ] {
             if let Some(v) = table.get(key) {
                 *value = v
@@ -264,13 +246,6 @@ impl FunnelConfig {
                 .filter(|n| *n <= 262_144)
                 .ok_or("invalid funnel_single_every")?;
         }
-        if let Some(v) = table.get("funnel_beta_hold") {
-            self.beta_hold = v
-                .as_float()
-                .or_else(|| v.as_integer().map(|n| n as f64))
-                .filter(|n| (0.0..1.0).contains(n))
-                .ok_or("funnel_beta_hold must be in [0, 1)")?;
-        }
         #[cfg(feature = "tree-polish")]
         if let Some(v) = table.get("funnel_tree_polish") {
             self.tree_polish = v.as_bool().ok_or("funnel_tree_polish must be a boolean")?;
@@ -310,12 +285,8 @@ impl FunnelConfig {
             "weak_scale",
             "resamples",
             "houdayer_every",
-            "independent_ancestry",
-            "strong_exchanges",
-            "slot_archive",
             "polish_sweeps",
             "single_every",
-            "beta_hold",
             #[cfg(feature = "tree-polish")]
             "tree_polish",
             #[cfg(feature = "pair-worm-polish")]
@@ -346,11 +317,8 @@ impl FunnelConfig {
                 | "inline_union"
                 | "fused_updates"
                 | "archive"
-                | "independent_ancestry"
-                | "strong_exchanges"
-                | "slot_archive"
                 | "motif_score" => raw.parse::<bool>().ok().map(toml::Value::Boolean),
-                "weak_scale" | "weak_beta_end" | "polish_beta" | "beta_hold" => {
+                "weak_scale" | "weak_beta_end" | "polish_beta" => {
                     raw.parse::<f64>().ok().map(toml::Value::Float)
                 }
                 _ => raw.parse::<i64>().ok().map(toml::Value::Integer),
@@ -621,29 +589,7 @@ pub fn tuned_reads(
         ..params.clone()
     };
     let per_beta = effective_sweeps_per_beta(params.num_sweeps, params.sweeps_per_beta);
-    if !(0.0..1.0).contains(&config.beta_hold) {
-        return Err(SampleError::Capacity);
-    }
-    let mut rungs = if config.beta_hold > 0.0 {
-        let rungs = (params.num_sweeps / per_beta).max(1);
-        let warmup = ((rungs as f64 * (1.0 - config.beta_hold)).round() as usize).clamp(1, rungs);
-        build_beta_schedule(
-            &graph,
-            &SampleParams {
-                num_sweeps: warmup * per_beta,
-                sweeps_per_beta: per_beta,
-                ..params.clone()
-            },
-        )
-    } else {
-        build_beta_schedule(&graph, &params)
-    };
-    if config.beta_hold > 0.0 {
-        if let Some(&last) = rungs.last() {
-            rungs.resize((params.num_sweeps / per_beta).max(1), last);
-        }
-    }
-    let betas: Vec<f64> = rungs
+    let betas: Vec<f64> = build_beta_schedule(&graph, &params)
         .into_iter()
         .flat_map(|beta| std::iter::repeat_n(beta, per_beta))
         .collect();
@@ -654,8 +600,7 @@ pub fn tuned_reads(
         .flatten();
     let mut archive: Option<SamplerResult> = None;
     let mut last_scored: Option<SamplerResult> = None;
-    let mut slot_archive = config.slot_archive.then(|| vec![None; params.num_reads]);
-    let outcome = match anneal_population_with_slots(
+    let outcome = match anneal_population_observed(
         &biased,
         &schedule,
         params.num_reads,
@@ -663,8 +608,6 @@ pub fn tuned_reads(
         PopulationOptions {
             resamples: config.resamples,
             houdayer_every: config.houdayer_every,
-            independent_ancestry: config.independent_ancestry,
-            strong_exchanges: config.strong_exchanges,
             shared_cache: config.shared_cache,
             cache_slots: config.cache_slots,
             copy_resampling: config.copy_resampling,
@@ -673,8 +616,8 @@ pub fn tuned_reads(
             fused_updates: config.fused_updates,
         },
         &stopped,
-        |slot, biased_energy, spins| {
-            if !config.archive && slot_archive.is_none() {
+        |biased_energy, spins| {
+            if !config.archive {
                 return;
             }
             let energy_milli = if let Some(previous) = &last_scored {
@@ -692,21 +635,9 @@ pub fn tuned_reads(
                     energy_milli,
                 });
             }
-            if let Some(records) = &mut slot_archive {
-                if records[slot]
-                    .as_ref()
-                    .is_none_or(|r: &SamplerResult| energy_milli < r.energy_milli)
-                {
-                    records[slot] = Some(SamplerResult {
-                        spins: spins.to_vec(),
-                        energy_milli,
-                    });
-                }
-            }
-            if config.archive
-                && archive
-                    .as_ref()
-                    .is_none_or(|r| energy_milli < r.energy_milli)
+            if archive
+                .as_ref()
+                .is_none_or(|r| energy_milli < r.energy_milli)
             {
                 archive = Some(SamplerResult {
                     spins: spins.to_vec(),
@@ -730,11 +661,6 @@ pub fn tuned_reads(
             }
         })
         .collect();
-    if let Some(records) = slot_archive {
-        for record in records.into_iter().flatten() {
-            retain_record(&mut reads, record, params.num_reads);
-        }
-    }
     if config.polish_sweeps == 0 {
         if let Some(record) = archive {
             retain_record(&mut reads, record, params.num_reads);

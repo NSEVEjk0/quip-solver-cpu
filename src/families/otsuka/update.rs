@@ -195,26 +195,11 @@ pub struct SweepCache {
     breakup: Breakup,
     epoch: CacheEpoch,
     slots: usize,
-    #[cfg(feature = "interleaved-probability-cache")]
-    heat: Vec<TaggedProbability>,
-    #[cfg(feature = "interleaved-probability-cache")]
-    metropolis: Vec<TaggedProbability>,
-    #[cfg(not(feature = "interleaved-probability-cache"))]
     heat: Vec<f64>,
-    #[cfg(not(feature = "interleaved-probability-cache"))]
     heat_epoch: Vec<CacheEpoch>,
-    #[cfg(not(feature = "interleaved-probability-cache"))]
     metropolis: Vec<f64>,
-    #[cfg(not(feature = "interleaved-probability-cache"))]
     metropolis_epoch: Vec<CacheEpoch>,
     stats: CacheStats,
-}
-
-#[cfg(feature = "interleaved-probability-cache")]
-#[derive(Clone, Copy, Debug, Default)]
-struct TaggedProbability {
-    epoch: CacheEpoch,
-    probability: f64,
 }
 
 impl SweepCache {
@@ -230,17 +215,9 @@ impl SweepCache {
             breakup: Breakup::new(1.0, Weights::FULL),
             epoch: 0,
             slots,
-            #[cfg(feature = "interleaved-probability-cache")]
-            heat: vec![TaggedProbability::default(); 2 * slots + 1],
-            #[cfg(feature = "interleaved-probability-cache")]
-            metropolis: vec![TaggedProbability::default(); slots + 1],
-            #[cfg(not(feature = "interleaved-probability-cache"))]
             heat: vec![0.0; 2 * slots + 1],
-            #[cfg(not(feature = "interleaved-probability-cache"))]
             heat_epoch: vec![0; 2 * slots + 1],
-            #[cfg(not(feature = "interleaved-probability-cache"))]
             metropolis: vec![0.0; slots + 1],
-            #[cfg(not(feature = "interleaved-probability-cache"))]
             metropolis_epoch: vec![0; slots + 1],
             stats: CacheStats::default(),
         }
@@ -255,15 +232,7 @@ impl SweepCache {
     /// Bytes occupied by table payloads, excluding the small struct.
     #[must_use]
     pub fn table_bytes(&self) -> usize {
-        let entries = self.heat.len() + self.metropolis.len();
-        #[cfg(feature = "interleaved-probability-cache")]
-        {
-            entries * size_of::<TaggedProbability>()
-        }
-        #[cfg(not(feature = "interleaved-probability-cache"))]
-        {
-            entries * (size_of::<f64>() + size_of::<CacheEpoch>())
-        }
+        (self.heat.len() + self.metropolis.len()) * (size_of::<f64>() + size_of::<CacheEpoch>())
     }
 
     fn prepare(&mut self, beta: f64, weights: Weights) {
@@ -275,16 +244,8 @@ impl SweepCache {
         self.breakup = Breakup::new(beta, weights);
         self.epoch = self.epoch.wrapping_add(1);
         if self.epoch == 0 {
-            #[cfg(feature = "interleaved-probability-cache")]
-            {
-                self.heat.fill(TaggedProbability::default());
-                self.metropolis.fill(TaggedProbability::default());
-            }
-            #[cfg(not(feature = "interleaved-probability-cache"))]
-            {
-                self.heat_epoch.fill(0);
-                self.metropolis_epoch.fill(0);
-            }
+            self.heat_epoch.fill(0);
+            self.metropolis_epoch.fill(0);
             self.epoch = 1;
             self.stats.epoch_wraps += 1;
         }
@@ -298,30 +259,15 @@ impl SweepCache {
             return heat_probability(self.beta * delta as f64 / 1000.0);
         }
         let slot = slot as usize;
-        #[cfg(feature = "interleaved-probability-cache")]
-        {
-            let entry = &mut self.heat[slot];
-            if entry.epoch == self.epoch {
-                self.stats.heat_hits += 1;
-                return entry.probability;
-            }
-            entry.epoch = self.epoch;
-            entry.probability = heat_probability(self.beta * delta as f64 / 1000.0);
-            self.stats.heat_misses += 1;
-            entry.probability
+        if self.heat_epoch[slot] == self.epoch {
+            self.stats.heat_hits += 1;
+            return self.heat[slot];
         }
-        #[cfg(not(feature = "interleaved-probability-cache"))]
-        {
-            if self.heat_epoch[slot] == self.epoch {
-                self.stats.heat_hits += 1;
-                return self.heat[slot];
-            }
-            let probability = heat_probability(self.beta * delta as f64 / 1000.0);
-            self.heat[slot] = probability;
-            self.heat_epoch[slot] = self.epoch;
-            self.stats.heat_misses += 1;
-            probability
-        }
+        let probability = heat_probability(self.beta * delta as f64 / 1000.0);
+        self.heat[slot] = probability;
+        self.heat_epoch[slot] = self.epoch;
+        self.stats.heat_misses += 1;
+        probability
     }
 
     fn metropolis_probability(&mut self, delta: i64) -> f64 {
@@ -331,30 +277,15 @@ impl SweepCache {
             return (-self.beta * delta as f64 / 1000.0).exp();
         }
         let slot = slot as usize;
-        #[cfg(feature = "interleaved-probability-cache")]
-        {
-            let entry = &mut self.metropolis[slot];
-            if entry.epoch == self.epoch {
-                self.stats.metropolis_hits += 1;
-                return entry.probability;
-            }
-            entry.epoch = self.epoch;
-            entry.probability = (-self.beta * delta as f64 / 1000.0).exp();
-            self.stats.metropolis_misses += 1;
-            entry.probability
+        if self.metropolis_epoch[slot] == self.epoch {
+            self.stats.metropolis_hits += 1;
+            return self.metropolis[slot];
         }
-        #[cfg(not(feature = "interleaved-probability-cache"))]
-        {
-            if self.metropolis_epoch[slot] == self.epoch {
-                self.stats.metropolis_hits += 1;
-                return self.metropolis[slot];
-            }
-            let probability = (-self.beta * delta as f64 / 1000.0).exp();
-            self.metropolis[slot] = probability;
-            self.metropolis_epoch[slot] = self.epoch;
-            self.stats.metropolis_misses += 1;
-            probability
-        }
+        let probability = (-self.beta * delta as f64 / 1000.0).exp();
+        self.metropolis[slot] = probability;
+        self.metropolis_epoch[slot] = self.epoch;
+        self.stats.metropolis_misses += 1;
+        probability
     }
 
     fn heat_bath(&mut self, delta: i64, rng: &mut SmallRng) -> bool {

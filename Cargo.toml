@@ -213,8 +213,6 @@ tree-polish = []
 cyclic-polish = ["tree-polish"]
 # Find collective ice moves by alternating disjoint pair flips and tile repairs.
 pair-worm-polish = []
-# Increase temperature-local probability cache locality on repeated sweeps.
-interleaved-probability-cache = []
 # Off by default. Adds per-spin-decision and per-flip spans INSIDE the hot loop.
 # These spans distort absolute timing (millions of enters per read), so they are
 # used only for the diagnostic cross-check pass, never for headline per-part JSON.
