@@ -319,9 +319,77 @@ pub struct OtsukaGraph {
     pub(crate) weak: Csr,
     #[cfg(feature = "row-grouped-residual-deltas")]
     weak_forward: OnceLock<Csr>,
+    #[cfg(feature = "masked-block-correction")]
+    residual_masks: OnceLock<Option<ResidualMasks>>,
     /// Every coupling, for single-spin moves.
     pub(crate) all: Csr,
     fused: OnceLock<FusedCsr>,
+}
+
+#[cfg(feature = "masked-block-correction")]
+#[derive(Clone, Copy, Debug)]
+pub(crate) struct ResidualMask {
+    pub(crate) word: u32,
+    pub(crate) coefficient: i32,
+    pub(crate) neighbors: u64,
+    pub(crate) negative: u64,
+}
+
+#[cfg(feature = "masked-block-correction")]
+#[derive(Debug)]
+pub(crate) struct ResidualMasks {
+    start: Vec<usize>,
+    groups: Vec<ResidualMask>,
+}
+
+#[cfg(feature = "masked-block-correction")]
+impl ResidualMasks {
+    fn build(graph: &OtsukaGraph) -> Option<Self> {
+        let rows = graph.weak_forward();
+        let mut start = Vec::with_capacity(graph.n + 1);
+        let mut groups = Vec::<ResidualMask>::new();
+        let mut max_degree = 0;
+        let mut edges = 0;
+        for u in 0..graph.n {
+            let row = rows.row(u);
+            max_degree = max_degree.max(row.len());
+            edges += row.len();
+            let begin = groups.len();
+            start.push(begin);
+            for &link in row {
+                let v = link.node();
+                let coefficient = link.j().abs();
+                if coefficient == 0 {
+                    continue;
+                }
+                let word = (v / 64) as u32;
+                let bit = 1_u64 << (v % 64);
+                let group = groups[begin..]
+                    .iter_mut()
+                    .find(|group| group.word == word && group.coefficient == coefficient);
+                if let Some(group) = group {
+                    group.neighbors |= bit;
+                    if link.j() < 0 {
+                        group.negative |= bit;
+                    }
+                } else {
+                    groups.push(ResidualMask {
+                        word,
+                        coefficient,
+                        neighbors: bit,
+                        negative: if link.j() < 0 { bit } else { 0 },
+                    });
+                }
+            }
+        }
+        start.push(groups.len());
+        (max_degree >= 8 && groups.len() < edges).then_some(Self { start, groups })
+    }
+
+    #[inline]
+    pub(crate) fn row(&self, u: usize) -> &[ResidualMask] {
+        &self.groups[self.start[u]..self.start[u + 1]]
+    }
 }
 
 /// An edge and its coupling in milli. Node positions fit `u32`, because the
@@ -504,6 +572,8 @@ impl OtsukaGraph {
             weak: Csr::build(n, &weak_edges),
             #[cfg(feature = "row-grouped-residual-deltas")]
             weak_forward: OnceLock::new(),
+            #[cfg(feature = "masked-block-correction")]
+            residual_masks: OnceLock::new(),
             all: Csr::build(n, &edges),
             fused: OnceLock::new(),
             weak_edges: weak_edges
@@ -522,6 +592,13 @@ impl OtsukaGraph {
 
     pub(crate) fn fused(&self) -> &FusedCsr {
         self.fused.get_or_init(|| FusedCsr::build(self))
+    }
+
+    #[cfg(feature = "masked-block-correction")]
+    pub(crate) fn residual_masks(&self) -> Option<&ResidualMasks> {
+        self.residual_masks
+            .get_or_init(|| ResidualMasks::build(self))
+            .as_ref()
     }
 
     /// Each residual edge appears only in the row of its lower endpoint.

@@ -306,6 +306,8 @@ struct Workspace {
     members: Vec<u32>,
     /// The weak-energy change of flipping each component.
     delta: Vec<i64>,
+    #[cfg(feature = "masked-block-correction")]
+    component_bits: Vec<u64>,
     /// Boltzmann factors of the current Metropolis sweep.
     boltzmann: Boltzmann,
     /// The full local field, or full and residual fields in one word.
@@ -357,6 +359,8 @@ impl Workspace {
             start: Vec::with_capacity(n + 1),
             members: vec![0; n],
             delta: Vec::with_capacity(n),
+            #[cfg(feature = "masked-block-correction")]
+            component_bits: vec![0; n.div_ceil(64)],
             boltzmann: Boltzmann::new(),
             field: vec![0; n],
             boundary_work: [0; 3],
@@ -611,7 +615,9 @@ impl Workspace {
         }
         if linked {
             self.delta.clear();
-            self.delta.resize(self.start.len(), 0);
+            if !cfg!(feature = "masked-block-correction") {
+                self.delta.resize(self.start.len(), 0);
+            }
             return;
         }
         for c in 1..self.start.len() {
@@ -658,6 +664,28 @@ impl Workspace {
             let node = self.members[*at as usize] as usize;
             *at += 1;
             node
+        }
+    }
+
+    #[cfg(feature = "masked-block-correction")]
+    fn mark_component(&mut self, spins: &[i8], mut at: u32) {
+        while at != END_OF_COMPONENT {
+            let u = self.next_member(&mut at);
+            let word = u / 64;
+            let bit = 1_u64 << (u % 64);
+            self.component_bits[word] |= bit;
+            if spins[u] < 0 {
+                self.delta[word] |= bit as i64;
+            }
+        }
+    }
+
+    #[cfg(feature = "masked-block-correction")]
+    fn clear_component(&mut self, mut at: u32) {
+        while at != END_OF_COMPONENT {
+            let u = self.next_member(&mut at);
+            self.component_bits[u / 64] = 0;
+            self.delta[u / 64] = 0;
         }
     }
 
@@ -847,10 +875,18 @@ impl Workspace {
         self.partition::<INLINE>(graph, s, p, rng);
         let rows = graph.fused();
         let forward = graph.weak_forward();
+        #[cfg(feature = "masked-block-correction")]
+        let mask_rows = graph.residual_masks();
+        #[cfg(feature = "masked-block-correction")]
+        self.delta.resize(self.component_bits.len(), 0);
         let tile_energy = i64::from(graph.weights.tile_milli - super::graph::STRONG_MILLI);
         let pair_energy = i64::from(graph.weights.pair_milli - super::graph::STRONG_MILLI);
         let mut change = 0;
-        for c in 0..self.delta.len() {
+        #[cfg(feature = "masked-block-correction")]
+        let component_count = self.start.len();
+        #[cfg(not(feature = "masked-block-correction"))]
+        let component_count = self.delta.len();
+        for c in 0..component_count {
             let (start, end) = self.component_range(c);
             let mut at = start;
             let first = self.next_member(&mut at);
@@ -882,18 +918,48 @@ impl Workspace {
 
             // Summed residual fields count each interior edge twice. Restore
             // that contribution once per interior edge using the forward rows.
+            #[cfg(feature = "masked-block-correction")]
+            if mask_rows.is_some() {
+                self.mark_component(s, start);
+            }
             let mut delta = 0;
             let mut at = start;
             while at != end {
                 let u = self.next_member(&mut at);
                 let mut interior = 0_i32;
-                for &link in forward.row(u) {
-                    let v = link.node();
-                    let inside = -i32::from(self.label[v] as usize == c);
-                    interior += (link.j() * i32::from(s[v])) & inside;
+                let scalar = || {
+                    forward
+                        .row(u)
+                        .iter()
+                        .map(|link| {
+                            let v = link.node();
+                            let inside = -i32::from(self.label[v] as usize == c);
+                            (link.j() * i32::from(s[v])) & inside
+                        })
+                        .sum::<i32>()
+                };
+                #[cfg(feature = "masked-block-correction")]
+                if let Some(masks) = mask_rows {
+                    for group in masks.row(u) {
+                        let word = group.word as usize;
+                        let live = self.component_bits[word] & group.neighbors;
+                        let negative = live & (self.delta[word] as u64 ^ group.negative);
+                        interior += group.coefficient
+                            * (live.count_ones() as i32 - 2 * negative.count_ones() as i32);
+                    }
+                } else {
+                    interior = scalar();
+                }
+                #[cfg(not(feature = "masked-block-correction"))]
+                {
+                    interior = scalar();
                 }
                 delta +=
                     i64::from(s[u]) * (4 * i64::from(interior) - 2 * residual_field(self.field[u]));
+            }
+            #[cfg(feature = "masked-block-correction")]
+            if mask_rows.is_some() {
+                self.clear_component(start);
             }
             if draw(delta, rng) {
                 let mut at = start;
@@ -1277,7 +1343,12 @@ fn packed_heat_bath_deltas_match_rescoring_at_each_component() {
                     accept
                 },
             );
-            assert_eq!(component as usize, partition.delta.len());
+            let components = if cfg!(feature = "linked-component-lists") {
+                partition.start.len()
+            } else {
+                partition.start.len() - 1
+            };
+            assert_eq!(component as usize, components);
             assert_eq!(spins, expected);
             assert_eq!(change, graph.energy(&spins) - before);
             assert_eq!(rng.gen::<u64>(), partition_rng.gen::<u64>());
