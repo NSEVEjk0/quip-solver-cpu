@@ -67,6 +67,13 @@ def main():
     parser.add_argument("--cache-slots", type=int, default=8192)
     parser.add_argument("--reference-cache-slots", type=int, default=8192)
     parser.add_argument(
+        "--compare-energy",
+        action="store_true",
+        help="compare original candidate energies when the solver may return different spins",
+    )
+    parser.add_argument("--reference-sweeps", type=int)
+    parser.add_argument("--candidate-polish-sweeps", type=int)
+    parser.add_argument(
         "--serial",
         action="store_true",
         help="run both builds on the same CPU in balanced sequential order",
@@ -79,6 +86,14 @@ def main():
     args = parser.parse_args()
     if min(args.instances, args.reads, args.sweeps) < 1 or args.seed_start < 0:
         parser.error("positive budgets and a nonnegative seed are required")
+    if args.reference_sweeps is not None and args.reference_sweeps < 1:
+        parser.error("reference sweeps must be positive")
+    if args.candidate_polish_sweeps is not None and args.candidate_polish_sweeps < 0:
+        parser.error("candidate polish sweeps must be nonnegative")
+    if args.compare_energy and args.mode != "pipeline":
+        parser.error("--compare-energy requires the pipeline's original-energy verification")
+    if not args.compare_energy and (args.reference_sweeps is not None or args.candidate_polish_sweeps is not None):
+        parser.error("different solve budgets require --compare-energy")
     if len(set(args.cpus)) != 2 or min(args.cpus) < 0:
         parser.error("select two different available CPU IDs")
     if hasattr(os, "sched_getaffinity") and not set(args.cpus).issubset(
@@ -129,14 +144,22 @@ def main():
             )
         },
     }
+    if args.compare_energy:
+        metadata.update(
+            comparison="energy",
+            reference_sweeps=args.reference_sweeps or args.sweeps,
+            candidate_polish_sweeps=args.candidate_polish_sweeps,
+        )
     if args.perf:
         metadata["perf_events"] = PERF_EVENTS
         metadata["perf_task_clock_unit"] = "ms"
     write_json(output / "metadata.json", metadata)
-    rows, ratios = [], []
+    rows, ratios, improvements = [], [], []
+    exact_pairs = 0
 
     def run(role, seed, cpu):
         slots = args.reference_cache_slots if role == "reference" else args.cache_slots
+        sweeps = (args.reference_sweeps or args.sweeps) if role == "reference" else args.sweeps
         command = [
             str(binaries[role]),
             "--mode",
@@ -148,12 +171,14 @@ def main():
             "--reads",
             str(args.reads),
             "--sweeps",
-            str(args.sweeps),
+            str(sweeps),
             "--cache-slots",
             str(slots),
         ]
         if role == "candidate" and args.selective_resampling:
             command.append("--selective-resampling")
+        if role == "candidate" and args.candidate_polish_sweeps is not None:
+            command.extend(("--polish-sweeps", str(args.candidate_polish_sweeps)))
         if args.perf:
             perf_path = output / f"{seed}-{role}.perf.csv"
             command = [
@@ -207,16 +232,30 @@ def main():
                 pair = [future.result() for future in futures]
             ratio = pair[0]["seconds"] / pair[1]["seconds"]
             same = pair[0]["trajectory_digest"] == pair[1]["trajectory_digest"]
+            if pair[0]["nonce"] != pair[1]["nonce"]:
+                raise RuntimeError(f"different canonical instances at seed {seed}")
+            if any(len(row["energies_milli"]) != args.reads for row in pair):
+                raise RuntimeError(f"candidate count differs from the requested reads at seed {seed}")
+            energy_change = {}
+            if args.compare_energy:
+                ref, candidate = [sorted(row["energies_milli"]) for row in pair]
+                energy_change = {
+                    "best_gain_milli": ref[0] - candidate[0],
+                    "median_gain_milli": statistics.median(ref) - statistics.median(candidate),
+                    "worst_gain_milli": ref[-1] - candidate[-1],
+                }
+                improvements.append(energy_change)
             for row in pair:
-                row.update(paired_speedup=ratio, exact_output=same)
+                row.update(paired_speedup=ratio, exact_output=same, **energy_change)
                 write_json(output / f"{seed}-{row['role']}.json", row)
             rows.extend(pair)
             write_json(output / "results.json", rows)
-            if not same:
+            if not same and not args.compare_energy:
                 raise RuntimeError(
                     f"candidate output differs at seed {seed}; records retained"
                 )
             ratios.append(ratio)
+            exact_pairs += same
             print(
                 json.dumps(
                     {
@@ -226,6 +265,7 @@ def main():
                         "reference_seconds": pair[0]["seconds"],
                         "candidate_seconds": pair[1]["seconds"],
                         "exact_output": same,
+                        **energy_change,
                     }
                 ),
                 flush=True,
@@ -241,13 +281,25 @@ def main():
         "mean_candidate_seconds": statistics.mean(
             row["seconds"] for row in rows if row["role"] == "candidate"
         ),
-        "exact_output_pairs": len(ratios),
+        "exact_output_pairs": exact_pairs,
         "mean_best_original_energy": statistics.mean(
             row["best_energy_milli"] / 1000
             for row in rows
             if row["role"] == "candidate"
         ),
     }
+    if args.compare_energy:
+        summary["energy"] = {}
+        for key in ("best_gain_milli", "median_gain_milli", "worst_gain_milli"):
+            values = [row[key] for row in improvements]
+            summary["energy"][key] = {
+                "median": statistics.median(values),
+                "mean": statistics.mean(values),
+                "range": [min(values), max(values)],
+                "improved": sum(value > 0 for value in values),
+                "tied": values.count(0),
+                "regressed": sum(value < 0 for value in values),
+            }
     if args.perf:
         counter_ratios = {}
         for event in PERF_EVENTS:
