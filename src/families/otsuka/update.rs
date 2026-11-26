@@ -98,17 +98,62 @@ const COMPONENT_SPIN_SIGN: u32 = 1 << 31;
 
 const END_OF_COMPONENT: u32 = u32::MAX;
 
+const UNIFORM_RANGE: u64 = 1 << 53;
+
+#[cfg(feature = "integer-draw-thresholds")]
+type UniformValue = u64;
+#[cfg(not(feature = "integer-draw-thresholds"))]
+type UniformValue = f64;
+
+#[inline]
+fn draw_cutoff(probability: f64) -> UniformValue {
+    #[cfg(feature = "integer-draw-thresholds")]
+    {
+        // A uniform draw is k / 2^53. The accepted integers satisfy
+        // k < ceil(probability * 2^53), including exact grid boundaries.
+        (probability * UNIFORM_RANGE as f64).ceil() as u64
+    }
+    #[cfg(not(feature = "integer-draw-thresholds"))]
+    {
+        probability
+    }
+}
+
+#[inline]
+fn uniform_from_word(word: u64) -> UniformValue {
+    #[cfg(feature = "integer-draw-thresholds")]
+    {
+        word >> 11
+    }
+    #[cfg(not(feature = "integer-draw-thresholds"))]
+    {
+        (word >> 11) as f64 * (1.0 / UNIFORM_RANGE as f64)
+    }
+}
+
+#[inline]
+fn uniform_draw(rng: &mut SmallRng) -> UniformValue {
+    #[cfg(feature = "integer-draw-thresholds")]
+    {
+        uniform_from_word(rng.gen::<u64>())
+    }
+    #[cfg(not(feature = "integer-draw-thresholds"))]
+    {
+        rng.gen::<f64>()
+    }
+}
+
 /// Bond probabilities at one inverse temperature.
 #[derive(Clone, Copy, Debug)]
 struct Breakup {
     /// An ice tile (two spins up in the gauge) takes no bond below this.
-    zero_ice: f64,
+    zero_ice: UniformValue,
     /// An ice tile takes one bond below this and two above it.
-    single_ice: f64,
+    single_ice: UniformValue,
     /// A defect tile (one or three up) takes no bond below this.
-    zero_defect: f64,
+    zero_defect: UniformValue,
     /// An aligned pair takes its bond below this.
-    pair_link: f64,
+    pair_link: UniformValue,
 }
 
 impl Breakup {
@@ -117,11 +162,20 @@ impl Breakup {
         let z = (-2.0 * tile_beta).exp();
         let w0 = z.powi(4);
         let w1 = (z - w0) / 3.0;
+        let zero_defect = (-6.0 * tile_beta).exp();
+        // An at-or-above comparison with NaN is false for every draw.
+        let zero_defect = if cfg!(feature = "integer-draw-thresholds") && zero_defect.is_nan() {
+            f64::INFINITY
+        } else {
+            zero_defect
+        };
         Self {
-            zero_ice: w0,
-            single_ice: w0 + 4.0 * w1,
-            zero_defect: (-6.0 * tile_beta).exp(),
-            pair_link: -(-2.0 * beta * f64::from(weights.pair_milli) / 1000.0).exp_m1(),
+            zero_ice: draw_cutoff(w0),
+            single_ice: draw_cutoff(w0 + 4.0 * w1),
+            zero_defect: draw_cutoff(zero_defect),
+            pair_link: draw_cutoff(
+                -(-2.0 * beta * f64::from(weights.pair_milli) / 1000.0).exp_m1(),
+            ),
         }
     }
 }
@@ -195,9 +249,9 @@ pub struct SweepCache {
     breakup: Breakup,
     epoch: CacheEpoch,
     slots: usize,
-    heat: Vec<f64>,
+    heat: Vec<UniformValue>,
     heat_epoch: Vec<CacheEpoch>,
-    metropolis: Vec<f64>,
+    metropolis: Vec<UniformValue>,
     metropolis_epoch: Vec<CacheEpoch>,
     stats: CacheStats,
 }
@@ -215,9 +269,9 @@ impl SweepCache {
             breakup: Breakup::new(1.0, Weights::FULL),
             epoch: 0,
             slots,
-            heat: vec![0.0; 2 * slots + 1],
+            heat: vec![UniformValue::default(); 2 * slots + 1],
             heat_epoch: vec![0; 2 * slots + 1],
-            metropolis: vec![0.0; slots + 1],
+            metropolis: vec![UniformValue::default(); slots + 1],
             metropolis_epoch: vec![0; slots + 1],
             stats: CacheStats::default(),
         }
@@ -232,7 +286,8 @@ impl SweepCache {
     /// Bytes occupied by table payloads, excluding the small struct.
     #[must_use]
     pub fn table_bytes(&self) -> usize {
-        (self.heat.len() + self.metropolis.len()) * (size_of::<f64>() + size_of::<CacheEpoch>())
+        (self.heat.len() + self.metropolis.len())
+            * (size_of::<UniformValue>() + size_of::<CacheEpoch>())
     }
 
     fn prepare(&mut self, beta: f64, weights: Weights) {
@@ -252,36 +307,36 @@ impl SweepCache {
         self.stats.temperatures += 1;
     }
 
-    fn heat_probability(&mut self, delta: i64) -> f64 {
+    fn heat_probability(&mut self, delta: i64) -> UniformValue {
         let slot = delta / 2 + self.slots as i64;
         if delta % 2 != 0 || !(0..self.heat.len() as i64).contains(&slot) {
             self.stats.fallbacks += 1;
-            return heat_probability(self.beta * delta as f64 / 1000.0);
+            return draw_cutoff(heat_probability(self.beta * delta as f64 / 1000.0));
         }
         let slot = slot as usize;
         if self.heat_epoch[slot] == self.epoch {
             self.stats.heat_hits += 1;
             return self.heat[slot];
         }
-        let probability = heat_probability(self.beta * delta as f64 / 1000.0);
+        let probability = draw_cutoff(heat_probability(self.beta * delta as f64 / 1000.0));
         self.heat[slot] = probability;
         self.heat_epoch[slot] = self.epoch;
         self.stats.heat_misses += 1;
         probability
     }
 
-    fn metropolis_probability(&mut self, delta: i64) -> f64 {
+    fn metropolis_probability(&mut self, delta: i64) -> UniformValue {
         let slot = delta / 2;
         if delta % 2 != 0 || !(0..self.metropolis.len() as i64).contains(&slot) {
             self.stats.fallbacks += 1;
-            return (-self.beta * delta as f64 / 1000.0).exp();
+            return draw_cutoff((-self.beta * delta as f64 / 1000.0).exp());
         }
         let slot = slot as usize;
         if self.metropolis_epoch[slot] == self.epoch {
             self.stats.metropolis_hits += 1;
             return self.metropolis[slot];
         }
-        let probability = (-self.beta * delta as f64 / 1000.0).exp();
+        let probability = draw_cutoff((-self.beta * delta as f64 / 1000.0).exp());
         self.metropolis[slot] = probability;
         self.metropolis_epoch[slot] = self.epoch;
         self.stats.metropolis_misses += 1;
@@ -289,7 +344,7 @@ impl SweepCache {
     }
 
     fn heat_bath(&mut self, delta: i64, rng: &mut SmallRng) -> bool {
-        rng.gen::<f64>() < self.heat_probability(delta)
+        uniform_draw(rng) < self.heat_probability(delta)
     }
 }
 
@@ -536,7 +591,7 @@ impl Workspace {
             // One draw per tile: the top 53 bits make the uniform, and the
             // two lowest bits pick the spins of an ice tile's bonds.
             let x = rng.gen::<u64>();
-            let r = (x >> 11) as f64 * (1.0 / (1_u64 << 53) as f64);
+            let r = uniform_from_word(x);
             if ups == 2 {
                 if r < p.zero_ice {
                     continue;
@@ -561,7 +616,7 @@ impl Workspace {
             }
         }
         for &(u, v) in &graph.pairs {
-            if s[u as usize] == s[v as usize] && rng.gen::<f64>() < p.pair_link {
+            if s[u as usize] == s[v as usize] && uniform_draw(rng) < p.pair_link {
                 self.join_selected::<INLINE>(u, v);
             }
         }
@@ -1130,7 +1185,7 @@ impl<'g> Chain<'g> {
         let mut change = 0;
         for u in 0..graph.n {
             let delta = -2 * i64::from(s[u]) * field_energy(work.field[u]);
-            if delta <= 0 || rng.gen::<f64>() < cache.metropolis_probability(delta) {
+            if delta <= 0 || uniform_draw(rng) < cache.metropolis_probability(delta) {
                 change += work.flip(graph, s, u);
             }
         }
@@ -1207,27 +1262,30 @@ mod cache_tests {
         cache.prepare(2.0, Weights::FULL);
         assert_eq!(cache.epoch, 1);
         assert_eq!(cache.stats.epoch_wraps, 1);
-        assert_eq!(cache.heat_probability(4), heat_probability(0.008));
-        assert_eq!(cache.metropolis_probability(4), (-0.008_f64).exp());
+        assert_eq!(
+            cache.heat_probability(4),
+            draw_cutoff(heat_probability(0.008))
+        );
+        assert_eq!(
+            cache.metropolis_probability(4),
+            draw_cutoff((-0.008_f64).exp())
+        );
     }
 
     #[test]
-    fn cached_probabilities_match_scalar_bits_and_epoch_changes() {
+    fn cached_draw_thresholds_match_scalar_calculations_after_epoch_changes() {
         let mut cache = SweepCache::new(64);
         for beta in [0.001, 0.5, 1.0, 12.0, 48.0, 700.0, 1.0] {
             cache.prepare(beta, Weights::FULL);
             for delta in (-300..300).chain([i64::MIN, i64::MAX]) {
                 let expected = heat_probability(beta * delta as f64 / 1000.0);
                 for _ in 0..2 {
-                    assert_eq!(cache.heat_probability(delta).to_bits(), expected.to_bits());
+                    assert_eq!(cache.heat_probability(delta), draw_cutoff(expected));
                 }
                 if delta > 0 {
                     let expected = (-beta * delta as f64 / 1000.0).exp();
                     for _ in 0..2 {
-                        assert_eq!(
-                            cache.metropolis_probability(delta).to_bits(),
-                            expected.to_bits()
-                        );
+                        assert_eq!(cache.metropolis_probability(delta), draw_cutoff(expected));
                     }
                 }
             }
@@ -1236,13 +1294,44 @@ mod cache_tests {
         cache.prepare(0.002, Weights::FULL);
         assert_eq!(cache.epoch, 1);
         assert_eq!(
-            cache.heat_probability(2).to_bits(),
-            heat_probability(0.002 * 2.0 / 1000.0).to_bits()
+            cache.heat_probability(2),
+            draw_cutoff(heat_probability(0.002 * 2.0 / 1000.0))
         );
         assert!(
             cache.stats.heat_hits > 0
                 && cache.stats.metropolis_hits > 0
                 && cache.stats.fallbacks > 0
         );
+    }
+
+    #[cfg(feature = "integer-draw-thresholds")]
+    #[test]
+    fn integer_draws_match_float_comparisons_at_threshold_boundaries() {
+        for probability in [
+            0.0,
+            f64::from_bits(1),
+            1e-12,
+            0.1,
+            0.5_f64.next_down(),
+            0.5,
+            0.5_f64.next_up(),
+            1.0_f64.next_down(),
+            1.0,
+        ] {
+            let cutoff = draw_cutoff(probability);
+            for draw in [
+                0,
+                cutoff.saturating_sub(1),
+                cutoff,
+                cutoff + 1,
+                UNIFORM_RANGE - 1,
+            ] {
+                if draw < UNIFORM_RANGE {
+                    let float = draw as f64 / UNIFORM_RANGE as f64;
+                    assert_eq!(draw < cutoff, float < probability);
+                    assert_eq!(draw >= cutoff, float >= probability);
+                }
+            }
+        }
     }
 }
