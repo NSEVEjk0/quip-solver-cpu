@@ -1,0 +1,21 @@
+{
+  "label": "row-grouped-residual-deltas",
+  "pairs": 8,
+  "median_speedup": 1.066212495164586,
+  "bootstrap95_median": [
+    0.8847396081747806,
+    1.2276404444318632
+  ],
+  "mean_reference_seconds": 10.514191539375,
+  "mean_candidate_seconds": 10.14433081675,
+  "exact_output_pairs": 8,
+  "mean_best_original_energy": -5030.06625,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.0722918884447192,
+    "cycles": 0.9656734119064854,
+    "instructions": 1.1186443497696683,
+    "branches": 1.0940389377283866,
+    "branch-misses": 0.8351402721712757,
+    "cache-misses": 1.0465835573359603
+  }
+}

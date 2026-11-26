@@ -1,0 +1,31 @@
+{
+  "build_source_commit": "2675092019181eed13b13302c266cfb9202b59eb",
+  "build_command": [
+    "cargo",
+    "+1.97.1",
+    "build",
+    "--release",
+    "--locked",
+    "--features",
+    "<features>",
+    "--example",
+    "cpu_native_bench",
+    "-j",
+    "2"
+  ],
+  "binaries": {
+    "reference": {
+      "features": [
+        "experimental"
+      ],
+      "sha256": "a10f3b22e3bc9504b53b423016d09e653fe3fe96dd922e1bf852ace030531748"
+    },
+    "candidate": {
+      "features": [
+        "experimental",
+        "row-grouped-residual-deltas"
+      ],
+      "sha256": "e38401a3112771095692781e0fad4c2f553d0dfc36b1fbd33312895bcb30db9c"
+    }
+  }
+}

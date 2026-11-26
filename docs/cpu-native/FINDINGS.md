@@ -52,6 +52,7 @@ with block eligibility checked separately by the coordinator and runtime.
 | [C34](#c34) | Combined storage and resampling | All outputs matched; no speedup established |
 | [C35](#c35) | Cluster-boundary field updates | 1.129× in the kernel pilot; full-pipeline speedup unconfirmed |
 | [C36](#c36) | Packed component labels and spin signs | Exact outputs; 4.9% more instructions on fresh seeds |
+| [C37](#c37) | Group residual edges by endpoint | 10.6% fewer instructions; full-pipeline time near parity |
 
 <a id="c01"></a>
 ## C01. Packed adjacency fusion
@@ -462,3 +463,17 @@ All 16 pairs matched. The initial pilot's 1.124× median ratio had a wide
 interval. Eight fresh instrumented pairs gave 0.939× with 4.9% more retired
 instructions at the median. The feature stays opt-in.
 [Paired timings and counters](EXPERIMENTS.md#packed-component-labels-and-spin-signs).
+
+<a id="c37"></a>
+## C37. Group residual edges by endpoint
+
+A one-direction adjacency layout assigns each residual edge to its lower
+endpoint. The scan loads that endpoint's spin and component label once per
+row, sums its contributions in a local accumulator, and writes the resulting
+component delta once per row. Each opposite endpoint gets its exact share.
+
+At 16 × 8,192, the grouped build retired 10.6% fewer instructions and incurred
+20.0% more branch misses at the median. The median elapsed-time ratio was
+0.997× and all eight candidate digests matched. The instruction reduction is
+consistent across the kernel pilot and full-pipeline runs.
+[Paired timings and counters](EXPERIMENTS.md#row-grouped-residual-energy-scan).

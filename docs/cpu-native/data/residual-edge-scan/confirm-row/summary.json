@@ -1,0 +1,21 @@
+{
+  "label": "row-grouped-residual-deltas-pipeline",
+  "pairs": 8,
+  "median_speedup": 0.9972321525362796,
+  "bootstrap95_median": [
+    0.9003466309517961,
+    1.036057781603845
+  ],
+  "mean_reference_seconds": 39.790743883875,
+  "mean_candidate_seconds": 40.78517137725,
+  "exact_output_pairs": 8,
+  "mean_best_original_energy": -5043.63375,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.993424313456737,
+    "cycles": 0.9647460281326303,
+    "instructions": 1.1186785714682301,
+    "branches": 1.0938621581158867,
+    "branch-misses": 0.8330809196956946,
+    "cache-misses": 1.0354955460266433
+  }
+}

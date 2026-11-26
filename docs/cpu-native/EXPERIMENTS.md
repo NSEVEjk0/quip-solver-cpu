@@ -247,6 +247,25 @@ the harness timer. The total instruction count establishes an increase
 for this build, without attributing it to individual operations.
 [Counter summary](data/packed-component-spins/perf-packed/summary.json).
 
+## Row-grouped residual energy scan
+
+With `row-grouped-residual-deltas`, a lazy compressed adjacency stores each
+residual edge once, from the lower endpoint. The scan uses one spin and
+component lookup for the head of each row and one component-delta update for
+its subtotal. Additions use 64-bit integers and retain the reference
+component draw order. The row-grouped scan takes precedence if the two
+residual layout features are built together.
+
+| Comparison | Seeds | Replicas × sweeps | Median speed ratio | Paired bootstrap 95% median interval | Matches |
+|---|---:|---:|---:|---:|---:|
+| [Kernel](data/residual-edge-scan/pilot-row/results.json) | 1081–1088 | 16 × 2,048 | 1.066× | 0.885–1.228× | 8/8 |
+| [Full pipeline](data/residual-edge-scan/confirm-row/results.json) | 1091–1098 | 16 × 8,192 | 0.997× | 0.900–1.036× | 8/8 |
+
+In the full pipeline, the median changes in whole-process counters were
+**−10.6% instructions, +20.0% branch misses, and +3.7% cycles**. The retired
+instruction count fell on every seed. The elapsed-time interval spans parity,
+so the feature remains experimental. [Full-pipeline counter summary](data/residual-edge-scan/confirm-row/summary.json).
+
 ## Correctness and protocol checks
 
 The release validation checks the actual native binary and its family adapter:
@@ -315,6 +334,16 @@ cargo build --release --locked --features experimental,cluster-boundary-updates 
 cp target/release/examples/cpu_native_bench "$study/boundary"
 python3 tools/cpu-native/compare_builds.py --reference-binary "$study/wide" --candidate-binary "$study/boundary" --label cluster-boundary --cpus 3 4 --output "$study/boundary-pilot" --seed-start 1041 --sweeps 2048 --mode kernel --preset core
 python3 tools/cpu-native/compare_builds.py --reference-binary "$study/wide" --candidate-binary "$study/boundary" --label cluster-boundary-pipeline --cpus 3 4 --output "$study/boundary-pipeline" --seed-start 1051 --sweeps 8192 --mode pipeline --preset archive
+```
+
+To repeat the grouped-edge instrumented study, build with
+`experimental,row-grouped-residual-deltas` and save the example as
+`"$study/rows"`. The runner's `--perf` option requires Linux `perf` and access
+to hardware counters. The results include per-process instructions, cycles,
+branch and cache events, and task-clock milliseconds.
+
+```sh
+python3 tools/cpu-native/compare_builds.py --reference-binary "$study/wide" --candidate-binary "$study/rows" --label row-grouped-residual-deltas-pipeline --cpus 3 4 --output "$study/row-pipeline" --seed-start 1091 --sweeps 8192 --mode pipeline --preset archive --perf
 ```
 
 The evidence covers the specified Quip family, recipe, toolchain, and VPS.
