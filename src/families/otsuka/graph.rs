@@ -175,6 +175,16 @@ impl Link {
     pub(crate) fn j(self) -> i32 {
         (self.0 & ((1 << Self::SHIFT) - 1)) as i32 - 1024
     }
+
+    #[cfg(feature = "internal-edge-lists")]
+    pub(crate) fn with_source(self, source: usize) -> u64 {
+        ((source as u64) << 32) | u64::from(self.0)
+    }
+
+    #[cfg(feature = "internal-edge-lists")]
+    pub(crate) fn source_and_link(word: u64) -> (usize, Self) {
+        ((word >> 32) as usize, Self(word as u32))
+    }
 }
 
 /// Adjacency in compressed rows: the neighbours of `u` and their couplings

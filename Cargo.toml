@@ -209,6 +209,8 @@ linked-component-lists = []
 packed-residual-fields = ["row-grouped-residual-deltas"]
 # Reoptimize connected induced trees against their fixed boundary spins.
 tree-polish = []
+# Cache exact residual contributions on internal edges during partitioning.
+internal-edge-lists = ["packed-residual-fields", "linked-component-lists"]
 # Off by default. Adds per-spin-decision and per-flip spans INSIDE the hot loop.
 # These spans distort absolute timing (millions of enters per read), so they are
 # used only for the diagnostic cross-check pass, never for headline per-part JSON.

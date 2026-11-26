@@ -301,3 +301,91 @@ impl<'a> TreePolish<'a> {
         Some(())
     }
 }
+
+#[cfg(test)]
+mod tests {
+    use super::*;
+    use crate::families::otsuka::{Model, Motifs, Weights};
+
+    fn graph() -> OtsukaGraph {
+        OtsukaGraph::new(
+            &Model {
+                h_milli: &[0; 6],
+                edges: &[(0, 1), (1, 2), (2, 3), (0, 3), (2, 4), (4, 5), (3, 5)],
+                j_milli: &[-9, 5, -4, 12, -11, 6, -19],
+            },
+            &Motifs {
+                tiles: &[],
+                gauges: &[],
+                pairs: &[],
+            },
+            Weights::FULL,
+        )
+        .unwrap()
+    }
+
+    fn spins(bits: usize) -> [i8; 6] {
+        std::array::from_fn(|i| if bits & (1 << i) != 0 { -1 } else { 1 })
+    }
+
+    #[test]
+    fn every_tree_move_matches_brute_force_with_fixed_boundary_spins() {
+        let graph = graph();
+        let partitions = TreePolish::new(&graph, 763, &|| false).unwrap().partitions;
+        let mut scratch = Scratch::new(graph.n);
+        for partition in &partitions {
+            let mut start = 0;
+            for &end in &partition.ends {
+                let mut vertices = partition.vertices[start..end].to_vec();
+                for vertex in &mut vertices[1..] {
+                    vertex.parent -= start as u32;
+                }
+                let tree = Tree {
+                    vertices,
+                    ends: vec![end - start],
+                };
+                for bits in 0..64 {
+                    let before = spins(bits);
+                    let expected = (0..1 << tree.vertices.len())
+                        .map(|mask| {
+                            let mut candidate = before;
+                            for (i, vertex) in tree.vertices.iter().enumerate() {
+                                if mask & (1 << i) != 0 {
+                                    candidate[vertex.node as usize] *= -1;
+                                }
+                            }
+                            graph.energy(&candidate)
+                        })
+                        .min()
+                        .unwrap();
+                    let mut actual = before;
+                    scratch.reset(&graph, &before);
+                    let changed = tree
+                        .descend(&graph, &mut actual, &mut scratch, &|| false)
+                        .unwrap();
+                    assert_eq!(graph.energy(&actual), expected);
+                    assert_eq!(changed, expected < graph.energy(&before));
+                    let mut direct = Scratch::new(graph.n);
+                    direct.reset(&graph, &actual);
+                    assert_eq!(scratch.field, direct.field);
+                }
+                start = end;
+            }
+        }
+    }
+
+    #[test]
+    fn component_recombination_never_increases_either_parents_energy() {
+        let graph = graph();
+        let mut polish = TreePolish::new(&graph, 1, &|| false).unwrap();
+        for left in 0..64 {
+            for right in 0..64 {
+                let mut a = spins(left);
+                let b = spins(right);
+                let limit = graph.energy(&a).min(graph.energy(&b));
+                polish.combine(&mut a, &b, &|| false).unwrap();
+                assert!(graph.energy(&a) <= limit);
+            }
+        }
+    }
+}

@@ -11,6 +11,8 @@ use std::fmt;
 
 #[cfg(feature = "packed-residual-fields")]
 use super::graph::FusedCsr;
+#[cfg(feature = "internal-edge-lists")]
+use super::graph::Link;
 use super::graph::{OtsukaGraph, Weights};
 
 // Unique, non-self edges, |J| <= 1000, zero fields, and at most 2^21 nodes
@@ -304,7 +306,7 @@ struct Workspace {
     start: Vec<u32>,
     /// Consecutive nodes, or a next-node index for each node with linked lists.
     members: Vec<u32>,
-    /// The weak-energy change of flipping each component.
+    /// Component energy deltas, or packed interior-edge links.
     delta: Vec<i64>,
     /// Boltzmann factors of the current Metropolis sweep.
     boltzmann: Boltzmann,
@@ -611,7 +613,9 @@ impl Workspace {
         }
         if linked {
             self.delta.clear();
-            self.delta.resize(self.start.len(), 0);
+            if !cfg!(feature = "internal-edge-lists") {
+                self.delta.resize(self.start.len(), 0);
+            }
             return;
         }
         for c in 1..self.start.len() {
@@ -646,6 +650,15 @@ impl Workspace {
             self.start[c + 1]
         };
         (self.start[c], end)
+    }
+
+    #[inline]
+    fn component_count(&self) -> usize {
+        if cfg!(feature = "linked-component-lists") {
+            self.start.len()
+        } else {
+            self.start.len() - 1
+        }
     }
 
     #[inline]
@@ -850,7 +863,7 @@ impl Workspace {
         let tile_energy = i64::from(graph.weights.tile_milli - super::graph::STRONG_MILLI);
         let pair_energy = i64::from(graph.weights.pair_milli - super::graph::STRONG_MILLI);
         let mut change = 0;
-        for c in 0..self.delta.len() {
+        for c in 0..self.component_count() {
             let (start, end) = self.component_range(c);
             let mut at = start;
             let first = self.next_member(&mut at);
@@ -884,6 +897,26 @@ impl Workspace {
             // that contribution once per interior edge using the forward rows.
             let mut delta = 0;
             let mut at = start;
+            #[cfg(feature = "internal-edge-lists")]
+            {
+                // Collect the induced edges before loading their spin values.
+                // The hot scan then resolves membership with one indirect load.
+                self.delta.clear();
+                while at != end {
+                    let u = self.next_member(&mut at);
+                    delta -= 2 * i64::from(s[u]) * residual_field(self.field[u]);
+                    for &link in forward.row(u) {
+                        if self.label[link.node()] as usize == c {
+                            self.delta.push(link.with_source(u) as i64);
+                        }
+                    }
+                }
+                for &word in &self.delta {
+                    let (u, link) = Link::source_and_link(word as u64);
+                    delta += 4 * i64::from(link.j()) * i64::from(s[u] * s[link.node()]);
+                }
+            }
+            #[cfg(not(feature = "internal-edge-lists"))]
             while at != end {
                 let u = self.next_member(&mut at);
                 let mut interior = 0_i32;
@@ -1277,7 +1310,7 @@ fn packed_heat_bath_deltas_match_rescoring_at_each_component() {
                     accept
                 },
             );
-            assert_eq!(component as usize, partition.delta.len());
+            assert_eq!(component as usize, partition.component_count());
             assert_eq!(spins, expected);
             assert_eq!(change, graph.energy(&spins) - before);
             assert_eq!(rng.gen::<u64>(), partition_rng.gen::<u64>());
