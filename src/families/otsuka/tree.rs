@@ -9,6 +9,8 @@ const PARTITIONS: usize = 16;
 const PASSES: usize = 16;
 const INITIAL_READS: usize = 8;
 const CROSSOVERS: usize = 4;
+#[cfg(feature = "cyclic-polish")]
+const BLOCK_NODES: usize = 8;
 
 #[derive(Clone, Copy)]
 struct Vertex {
@@ -145,12 +147,7 @@ impl Tree {
                 }
                 for at in start..end {
                     if scratch.selected[at] {
-                        let u = self.vertices[at].node as usize;
-                        let old = i64::from(spins[u]);
-                        spins[u] = -spins[u];
-                        for &link in graph.all.row(u) {
-                            scratch.field[link.node()] -= 2 * old * i64::from(link.j());
-                        }
+                        scratch.flip(graph, spins, self.vertices[at].node as usize);
                     }
                 }
             }
@@ -187,12 +184,94 @@ impl Scratch {
                 .sum();
         }
     }
+
+    fn flip(&mut self, graph: &OtsukaGraph, spins: &mut [i8], u: usize) {
+        let old = i64::from(spins[u]);
+        spins[u] = -spins[u];
+        for &link in graph.all.row(u) {
+            self.field[link.node()] -= 2 * old * i64::from(link.j());
+        }
+    }
+}
+
+#[cfg(feature = "cyclic-polish")]
+struct Block {
+    nodes: Vec<usize>,
+    lower_couplings: Vec<[i32; BLOCK_NODES]>,
+}
+
+#[cfg(feature = "cyclic-polish")]
+impl Block {
+    fn new(graph: &OtsukaGraph, seed: impl IntoIterator<Item = u32>) -> Self {
+        let mut nodes: Vec<_> = seed.into_iter().map(|u| u as usize).collect();
+        let mut neighbors = Vec::new();
+        for &u in &nodes {
+            neighbors.extend(graph.all.row(u).iter().filter_map(|link| {
+                let v = link.node();
+                (!nodes.contains(&v) && link.j() != 0).then_some((v, link.j().abs()))
+            }));
+        }
+        neighbors.sort_by_key(|&(v, j)| (std::cmp::Reverse(j), v));
+        for (v, _) in neighbors {
+            if nodes.len() == BLOCK_NODES {
+                break;
+            }
+            if !nodes.contains(&v) {
+                nodes.push(v);
+            }
+        }
+        let mut lower_couplings = vec![[0; BLOCK_NODES]; nodes.len()];
+        for (i, &u) in nodes.iter().enumerate() {
+            for &link in graph.all.row(u) {
+                if let Some(j) = nodes[..i].iter().position(|&other| other == link.node()) {
+                    lower_couplings[i][j] = link.j();
+                }
+            }
+        }
+        Self {
+            nodes,
+            lower_couplings,
+        }
+    }
+
+    fn descend(&self, graph: &OtsukaGraph, spins: &mut [i8], scratch: &mut Scratch) -> bool {
+        let mut delta = [0_i64; 1 << BLOCK_NODES];
+        let mut best = 0;
+        for (i, &u) in self.nodes.iter().enumerate() {
+            let spin = i64::from(spins[u]);
+            let size = 1 << i;
+            let mut correction = [0_i64; 1 << (BLOCK_NODES - 1)];
+            correction[0] = -2 * spin * scratch.field[u];
+            for (j, &v) in self.nodes[..i].iter().enumerate() {
+                let adjust = 4 * i64::from(self.lower_couplings[i][j]) * spin * i64::from(spins[v]);
+                let bit = 1 << j;
+                for mask in 0..bit {
+                    correction[bit + mask] = correction[mask] + adjust;
+                }
+            }
+            for mask in 0..size {
+                let at = size + mask;
+                delta[at] = delta[mask] + correction[mask];
+                if delta[at] < delta[best] {
+                    best = at;
+                }
+            }
+        }
+        for (i, &u) in self.nodes.iter().enumerate() {
+            if best & (1 << i) != 0 {
+                scratch.flip(graph, spins, u);
+            }
+        }
+        best != 0
+    }
 }
 
 pub(crate) struct TreePolish<'a> {
     graph: &'a OtsukaGraph,
     partitions: Vec<Tree>,
     scratch: Scratch,
+    #[cfg(feature = "cyclic-polish")]
+    blocks: Vec<Block>,
 }
 
 impl<'a> TreePolish<'a> {
@@ -208,10 +287,30 @@ impl<'a> TreePolish<'a> {
             order.shuffle(&mut rng);
             partitions.push(Tree::partition(graph, &order, stopped)?);
         }
+        #[cfg(feature = "cyclic-polish")]
+        let blocks = {
+            let mut blocks = Vec::with_capacity(graph.tiles.len() + graph.pairs.len());
+            for tile in &graph.tiles {
+                if stopped() {
+                    return None;
+                }
+                blocks.push(Block::new(graph, tile.nodes));
+            }
+            for &(u, v) in &graph.pairs {
+                if stopped() {
+                    return None;
+                }
+                blocks.push(Block::new(graph, [u, v]));
+            }
+            blocks.shuffle(&mut rng);
+            blocks
+        };
         Some(Self {
             graph,
             partitions,
             scratch: Scratch::new(graph.n),
+            #[cfg(feature = "cyclic-polish")]
+            blocks,
         })
     }
 
@@ -221,6 +320,13 @@ impl<'a> TreePolish<'a> {
             let mut changed = false;
             for partition in &self.partitions {
                 changed |= partition.descend(self.graph, spins, &mut self.scratch, stopped)?;
+            }
+            #[cfg(feature = "cyclic-polish")]
+            for (i, block) in self.blocks.iter().enumerate() {
+                if i.is_multiple_of(64) && stopped() {
+                    return None;
+                }
+                changed |= block.descend(self.graph, spins, &mut self.scratch);
             }
             if !changed {
                 break;

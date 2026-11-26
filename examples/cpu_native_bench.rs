@@ -231,6 +231,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "linked_component_lists":cfg!(feature="linked-component-lists"),
         "packed_residual_fields":cfg!(feature="packed-residual-fields"),
         "tree_polish":cfg!(feature="tree-polish"),
+        "cyclic_polish":cfg!(feature="cyclic-polish"),
         "internal_edge_lists":cfg!(feature="internal-edge-lists"),
         "dictionary_field_links":cfg!(feature="dictionary-field-links"),
         "polish_sweeps":args.polish_sweeps,

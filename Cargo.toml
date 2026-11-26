@@ -209,6 +209,8 @@ linked-component-lists = []
 packed-residual-fields = ["row-grouped-residual-deltas"]
 # Reoptimize connected induced trees against their fixed boundary spins.
 tree-polish = []
+# Mix exact tree moves with small cyclic neighborhoods during polishing.
+cyclic-polish = ["tree-polish"]
 # Cache exact residual contributions on internal edges during partitioning.
 internal-edge-lists = ["packed-residual-fields", "linked-component-lists"]
 # Use 16-bit links when the node count and coupling dictionary fit.
