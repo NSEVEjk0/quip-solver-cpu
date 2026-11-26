@@ -288,6 +288,8 @@ impl FunnelConfig {
                 continue;
             };
             let value = match key {
+                #[cfg(feature = "tree-polish")]
+                "tree_polish" => raw.parse::<bool>().ok().map(toml::Value::Boolean),
                 "screen"
                 | "shared_cache"
                 | "copy_resampling"
@@ -1349,6 +1351,42 @@ mod tests {
                     instance_energy(instance, &read.spins)
                 );
             }
+        }
+    }
+
+    #[cfg(feature = "tree-polish")]
+    #[test]
+    fn configured_tree_polish_preserves_candidate_count_and_canonical_energy() {
+        let (_, _, instances) = reference();
+        let config = FunnelConfig {
+            polish_sweeps: 0,
+            archive: true,
+            ..FunnelConfig::default()
+        };
+        let mut polished = config.clone();
+        let settings = "funnel_tree_polish = true".parse::<toml::Table>().unwrap();
+        polished.apply(&settings).unwrap();
+        let params = SampleParams {
+            num_reads: 4,
+            num_sweeps: 16,
+            seed: 5309,
+            ..SampleParams::default()
+        };
+        let instance = &instances[0];
+        let baseline = tuned_reads(instance, &params, &config, || false)
+            .unwrap()
+            .unwrap();
+        let candidate = tuned_reads(instance, &params, &polished, || false)
+            .unwrap()
+            .unwrap();
+        assert_eq!(baseline.len(), candidate.len());
+        assert_eq!(candidate.len(), params.num_reads);
+        assert!(lowest(&candidate) <= lowest(&baseline));
+        for read in candidate {
+            assert_eq!(
+                read.energy_milli + instance.offset_milli(),
+                instance_energy(instance, &read.spins)
+            );
         }
     }
 
