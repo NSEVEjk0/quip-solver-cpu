@@ -1191,6 +1191,101 @@ fn packed_fields_preserve_both_signed_sums_through_flips() {
     }
 }
 
+#[cfg(all(test, feature = "packed-residual-fields"))]
+#[test]
+fn packed_heat_bath_deltas_match_rescoring_at_each_component() {
+    use super::graph::{Model, Motifs};
+    use rand::SeedableRng;
+
+    let model = Model {
+        h_milli: &[0; 7],
+        edges: &[
+            (0, 1),
+            (0, 2),
+            (0, 3),
+            (1, 2),
+            (1, 3),
+            (2, 3),
+            (3, 4),
+            (5, 6),
+            (0, 4),
+            (1, 5),
+            (2, 6),
+            (0, 6),
+            (2, 4),
+        ],
+        j_milli: &[
+            -1000, 1000, -1000, -1000, 1000, -1000, -1000, -1000, -321, 200, -230, 43, 98,
+        ],
+    };
+    let motifs = Motifs {
+        tiles: &[[0, 1, 2, 3]],
+        gauges: &[[1, -1, 1, -1]],
+        pairs: &[(3, 4), (5, 6)],
+    };
+    for weights in [
+        Weights::FULL,
+        Weights {
+            pair_milli: 825,
+            tile_milli: 375,
+        },
+    ] {
+        let graph = OtsukaGraph::new(&model, &motifs, weights).unwrap();
+        let mut covered = [false; 4];
+        for seed in 0..128 {
+            let mut spins: [i8; 7] =
+                std::array::from_fn(|i| if seed & (1 << i) == 0 { 1 } else { -1 });
+            let mut expected = spins;
+            let mut rng = SmallRng::seed_from_u64(seed);
+            let weights_at_beta = Breakup::new([0.2, 1.0, 4.0, 8.0][seed as usize % 4], weights);
+            let mut partition_rng = rng.clone();
+            let mut partition = Workspace::new(graph.n);
+            partition.partition::<true>(&graph, &spins, &weights_at_beta, &mut partition_rng);
+            let mut work = Workspace::new(graph.n);
+            work.set_fields(&graph, &spins);
+            let before = graph.energy(&spins);
+            let mut component = 0;
+            let change = work.cluster_sweep_using::<true, true>(
+                &graph,
+                &mut spins,
+                &weights_at_beta,
+                &mut rng,
+                |delta, _| {
+                    let members: Vec<_> = (0..graph.n)
+                        .filter(|&u| partition.label[u] == component)
+                        .collect();
+                    let kind = match members.as_slice() {
+                        [_] => 0,
+                        &[u, v] if graph.pair_partner[u] == v as u32 => 1,
+                        [_, _] => 2,
+                        _ => 3,
+                    };
+                    covered[kind] = true;
+                    let mut flipped = expected;
+                    for u in members {
+                        flipped[u] = -flipped[u];
+                    }
+                    assert_eq!(
+                        delta,
+                        graph.weak_energy(&flipped) - graph.weak_energy(&expected)
+                    );
+                    let accept = (u64::from(component) + seed).is_multiple_of(2);
+                    if accept {
+                        expected = flipped;
+                    }
+                    component += 1;
+                    accept
+                },
+            );
+            assert_eq!(component as usize, partition.delta.len());
+            assert_eq!(spins, expected);
+            assert_eq!(change, graph.energy(&spins) - before);
+            assert_eq!(rng.gen::<u64>(), partition_rng.gen::<u64>());
+        }
+        assert!(covered.into_iter().all(|seen| seen));
+    }
+}
+
 #[cfg(test)]
 mod cache_tests {
     use super::*;
