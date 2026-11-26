@@ -555,11 +555,18 @@ impl Workspace {
                 for &link in row {
                     let v = link.node();
                     let lv = label[v] as usize;
-                    if lu != lv {
-                        let change = i64::from(factor * link.j() * i32::from(s[v]));
-                        row_delta += change;
-                        delta[lv] += change;
+                    let outside = lu != lv;
+                    if !cfg!(feature = "masked-residual-deltas") && !outside {
+                        continue;
                     }
+                    let product = factor * link.j() * i32::from(s[v]);
+                    let change = if cfg!(feature = "masked-residual-deltas") {
+                        i64::from(product & -i32::from(outside))
+                    } else {
+                        i64::from(product)
+                    };
+                    row_delta += change;
+                    delta[lv] += change;
                 }
                 delta[lu] += row_delta;
             }
