@@ -66,6 +66,15 @@ conformance suite separately checks expired deadlines, stale leases, canonical
 witness validation, and balanced credits. The [final validation records](data/validation/)
 cover 30 family-library tests, 21 kernel tests, and the native session test.
 
+## Extended observation
+
+The same deployed binary was observed through 09:43:22 UTC on 21 November.
+The coordinator counter reached 715 validated salt results across 41 observed
+rounds. The solver logged 717 salt results, with a best original energy of
+−5060.025. The record shows zero job rejections, stale drops, proof submissions,
+submission errors, restarts, and OOM kills. The endpoint resource snapshot
+was 62.2 MiB and approximately two vCPUs. [Extended observation record](data/live-observation-extended.json).
+
 ## Reproduce the observation
 
 The [read-only observer](../../tools/cpu-native/observe_node.py) collects Docker

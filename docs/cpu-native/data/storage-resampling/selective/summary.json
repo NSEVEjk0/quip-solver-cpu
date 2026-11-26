@@ -1,0 +1,13 @@
+{
+  "label": "selective",
+  "pairs": 8,
+  "median_speedup": 1.0096985128433982,
+  "bootstrap95_median": [
+    0.9790714823775455,
+    1.1047922851872385
+  ],
+  "mean_reference_seconds": 9.92958091725,
+  "mean_candidate_seconds": 9.66321785025,
+  "exact_output_pairs": 8,
+  "mean_best_original_energy": -5026.87125
+}

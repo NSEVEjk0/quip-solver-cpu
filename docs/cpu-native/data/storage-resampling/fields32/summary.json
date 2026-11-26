@@ -1,0 +1,13 @@
+{
+  "label": "fields32",
+  "pairs": 8,
+  "median_speedup": 0.9641128280180636,
+  "bootstrap95_median": [
+    0.9274202722502891,
+    1.0193899170033127
+  ],
+  "mean_reference_seconds": 9.82047834375,
+  "mean_candidate_seconds": 9.994656698125,
+  "exact_output_pairs": 8,
+  "mean_best_original_energy": -5026.87125
+}

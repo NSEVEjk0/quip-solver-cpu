@@ -1,0 +1,31 @@
+{
+  "started_utc": "2026-11-26T10:02:40.670985+00:00",
+  "label": "cluster-boundary-pipeline",
+  "source_revision": "2a4e3696581f6d605878d722b1104fd3467434e2",
+  "source_dirty": true,
+  "platform": "Linux-7.0.0-14-generic-x86_64-with-glibc2.43",
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.97.1\nLLVM version: 22.1.6",
+  "cpus": [
+    3,
+    4
+  ],
+  "concurrent_processes": 2,
+  "mode": "pipeline",
+  "preset": "archive",
+  "reads": 16,
+  "sweeps": 8192,
+  "seed_start": 1051,
+  "instances": 8,
+  "candidate_selective_resampling": false,
+  "candidate_cache_slots": 8192,
+  "reference_cache_slots": 8192,
+  "binary_sha256": {
+    "reference": "2b544703be19925fb61ea2a6a01eba9c6c315c1a74687f8a5bfcaf42894f49cd",
+    "candidate": "8427b979268a7c706041b265115e9b8dc6a63c57d49bcf1ebc2cdfec63281fcd"
+  },
+  "input_sha256": {
+    "tools/cpu-funnel/inputs/current-topology.spec.json": "a8e00f86543c45eb14a91f12725ff4dad42f5482451923d12d639a606bbd0e15",
+    "tools/cpu-funnel/inputs/current-family.params": "dcb359726b1efb2a453b6af7c158b163155855f63ada4b6a5ae6d0f9dab2081d"
+  },
+  "completed_utc": "2026-11-26T10:07:41.048344+00:00"
+}

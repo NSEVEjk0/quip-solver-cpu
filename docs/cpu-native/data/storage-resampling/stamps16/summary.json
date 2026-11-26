@@ -1,0 +1,13 @@
+{
+  "label": "stamps16",
+  "pairs": 8,
+  "median_speedup": 0.9616324786355297,
+  "bootstrap95_median": [
+    0.8722788943342168,
+    1.0042894175043424
+  ],
+  "mean_reference_seconds": 9.589023975875,
+  "mean_candidate_seconds": 10.219513670125,
+  "exact_output_pairs": 8,
+  "mean_best_original_energy": -5026.87125
+}

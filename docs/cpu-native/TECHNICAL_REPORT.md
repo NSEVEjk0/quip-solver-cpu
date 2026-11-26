@@ -38,7 +38,8 @@ flowchart LR
     Score --> Result[Bound salt result to coordinator]
 ```
 
-## Packed adjacency fusion
+<a id="packed-adjacency-fusion"></a>
+## C01. Packed adjacency fusion
 
 A cluster flip previously traversed residual adjacency to update neighboring
 component deltas, then full adjacency to patch local fields. The fused path
@@ -60,7 +61,8 @@ and after patching its neighbors. Fields and component deltas occupy separate
 arrays; interleaving these integer updates preserves their values at each
 component boundary. The component draw order remains unchanged.
 
-## Monotone union-find inlining
+<a id="monotone-union-find-inlining"></a>
+## C02. Monotone union-find inlining
 
 Component roots remain the smallest node in their component. Path halving
 and joining the larger root beneath the smaller preserve `parent[u] <= u`,
@@ -69,7 +71,8 @@ The native path specializes and inlines this operation inside the bond draw.
 It preserves the original tree operations and random draws. The scalar
 implementation remains available for direct comparison.
 
-## Temperature-local probability reuse
+<a id="temperature-local-probability-reuse"></a>
+## C03. Temperature-local probability reuse
 
 Replica moves at a shared temperature repeatedly evaluate the same integer
 energy changes. A bounded, collision-free table stores heat-bath and
@@ -88,7 +91,8 @@ The default 8192-slot capacity uses 294936 bytes for probability and stamp
 arrays. Capacity is bounded independently of graph size. Diagnostics expose
 hits, misses, fallbacks, temperature changes, and allocated bytes.
 
-## Exact local-field transfer at resampling
+<a id="exact-local-field-transfer-at-resampling"></a>
+## C04. Exact local-field transfer at resampling
 
 The local field `f_u = sum_v J_uv * s_v` is already maintained incrementally
 by every accepted flip. A resampled child copies an existing parent state
@@ -105,7 +109,8 @@ At `R` replicas and `N` nodes, snapshot storage is `9RN` bytes. A checkpoint
 copies `18RN` bytes instead of rebuilding fields through `2RM` adjacency
 entries. Operation counters record copied fields and coefficient visits avoided.
 
-## Original-objective candidate preservation
+<a id="original-objective-candidate-preservation"></a>
+## C05. Original-objective candidate preservation
 
 Population resampling can remove a useful historical state when its present
 ancestor is not selected. Internal weak bias also makes the search objective
@@ -125,7 +130,8 @@ The archive observes record-improvement states rather than every intermediate
 spin flip. Its evaluation cost and energy benefit are measured separately from
 the execution changes.
 
-## Motif-domain original-energy conversion
+<a id="motif-domain-original-energy-conversion"></a>
+## C06. Motif-domain original-energy conversion
 
 The evaluated family has a uniform weak magnitude. Let `S` be the energy
 of physical strong couplings and `W` the signed sum of weak spin products.
@@ -147,6 +153,30 @@ Random-state tests compare this conversion with full canonical rescoring
 across several bias scales and instances. Every emitted proof candidate
 still receives the independent full canonical score, including its offset.
 
+## C35. Cluster-boundary field updates
+
+For an accepted component `C`, let `f_u` be the current full local field of
+node `u`, and let `f_out(u)` be the contribution from neighbors outside `C`.
+After flipping the component, the inside contribution changes sign and the
+outside contribution stays fixed during the move. For `u` in `C`,
+
+```math
+f'_u=-f_u+2f_{\mathrm{out}}(u),\qquad
+\Delta E=-2\sum_{u\in C}s_u f_{\mathrm{out}}(u).
+```
+
+The fused pass visits every neighbor of an accepted component member. It
+skips field patches through interior edges, transforms each member field
+once, and applies the usual field and residual-delta patches to outside
+neighbors. Component decisions and their random draws still follow the same
+order. The arithmetic uses a 64-bit intermediate so it also works with the
+32-bit field representation.
+
+The experiment counts skipped interior patches, boundary patches, and member
+field transformations. The [paired study](EXPERIMENTS.md#cluster-boundary-field-updates)
+measures their net effect on elapsed time. Enable the research path at build
+time with `cluster-boundary-updates` and use the fused update preset.
+
 ## Temperature and polish studies
 
 The geometric ladder and final original-objective polish have separate
@@ -162,12 +192,12 @@ parameter record and command for each run accompany the results.
 
 ## Mechanical validation
 
-The execution paths are compared across all 15 nonempty combinations of
-cache, field transfer, union inlining, and adjacency fusion. Tests vary bond
-weights, temperatures, seeds, and resampling cadence. Each move's energy
-change and spin state are checked against the scalar implementation; complete
-population samples must match exactly. Canonical family tests independently
-rescore proof energy and check archive non-regression.
+The population tests exercise all flag combinations for cache, field transfer,
+union inlining, adjacency fusion, and selective resampling. Tests vary bond
+weights, temperatures, seeds, and resampling cadence. Per-move checks compare
+the spin state, energy change, and final RNG position with the scalar path.
+Canonical family tests independently rescore proof energy and check archive
+non-regression.
 
 The runtime additionally audits cached coupling generation every 64 salts
 and for every solved survivor. Cancellation is checked during generation,

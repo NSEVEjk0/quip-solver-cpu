@@ -1,0 +1,13 @@
+{
+  "label": "cluster-boundary-pipeline",
+  "pairs": 8,
+  "median_speedup": 0.995640803590891,
+  "bootstrap95_median": [
+    0.9756345928605628,
+    1.0883405547201763
+  ],
+  "mean_reference_seconds": 36.596843230875,
+  "mean_candidate_seconds": 36.475415003875,
+  "exact_output_pairs": 8,
+  "mean_best_original_energy": -5046.24125
+}

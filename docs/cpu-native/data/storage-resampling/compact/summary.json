@@ -1,0 +1,13 @@
+{
+  "label": "compact",
+  "pairs": 8,
+  "median_speedup": 0.9736174718335056,
+  "bootstrap95_median": [
+    0.8458970126777965,
+    1.1357157704191239
+  ],
+  "mean_reference_seconds": 9.821287800124999,
+  "mean_candidate_seconds": 10.233435124625,
+  "exact_output_pairs": 8,
+  "mean_best_original_energy": -5026.87125
+}

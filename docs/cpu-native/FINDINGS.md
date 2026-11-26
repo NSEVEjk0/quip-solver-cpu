@@ -45,6 +45,12 @@ with block eligibility checked separately by the coordinator and runtime.
 | [C27](#c27) | Exactness tests and output digests | Move-level tests complement final-output hashing |
 | [C28](#c28) | Contract and build versions | Evaluated dependency pins recorded explicitly |
 | [C29](#c29) | Release and reproduction checks | Published artifacts match the tested code and inputs |
+| [C30](#c30) | Extended native operation | 715 validations across 41 rounds; no errors or restarts |
+| [C31](#c31) | 32-bit local fields | Field and snapshot payloads shrink; no speedup established |
+| [C32](#c32) | 16-bit probability-cache stamps | Table payload shrinks; no speedup established |
+| [C33](#c33) | Skip identity copies at resampling | 86% fewer field restores at the pilot budget |
+| [C34](#c34) | Combined storage and resampling | All outputs matched; no speedup established |
+| [C35](#c35) | Cluster-boundary field updates | 1.129× in the kernel pilot; full-pipeline speedup unconfirmed |
 
 <a id="c01"></a>
 ## C01. Packed adjacency fusion
@@ -370,10 +376,74 @@ scoring measure different changes.
 [Operator guide](OPERATOR_GUIDE.md),
 [release verification](https://github.com/NSEVEjk0/quip-solver-cpu/releases/tag/cpu-native-2026-11-21).
 
-## Current investigation
+<a id="c30"></a>
+## C30. Extended native operation
 
-The next CPU experiments examine local-field storage width, work repeated at
-resampling checkpoints, probability-cache storage, and solve-budget allocation.
-An execution change must preserve states and energies before timing is used
-to judge it. Search changes are evaluated on matched canonical instances,
-with a held-out confirmation before changing the operating configuration.
+The deployed binary continued from 05:29:22 to the observation at 09:43:22
+UTC on 21 November. The coordinator validation counter reached 715; the
+solver reported 717 salt results across 41 observed rounds. Job rejections,
+error log lines, container restarts, OOM kills, stale drops, and submission
+errors were all zero in the record. The best reported original energy was
+−5060.025. The endpoint resource snapshot was 62.2 MiB and about two vCPUs.
+
+The two candidate counts come from separate, periodically sampled counters.
+The controller recorded zero proof submissions during this window.
+[Extended record](data/live-observation-extended.json).
+
+<a id="c31"></a>
+## C31. 32-bit local fields
+
+The admitted graph has distinct neighbors and `|J| ≤ 1000`, giving a maximum
+absolute field of `2,097,151,000` milli units. The experimental build uses
+32-bit fields and keeps move deltas and total energies in 64 bits. A high-degree
+fixture exercises a move whose energy change exceeds the 32-bit range.
+
+At 16 replicas, live field storage fell from 583,680 to 291,840 bytes and
+snapshot payload fell from 656,640 to 364,800 bytes. Eight paired kernel runs
+matched exactly, with a 0.964× median elapsed-time ratio.
+[Records](data/storage-resampling/fields32/results.json).
+
+<a id="c32"></a>
+## C32. 16-bit probability-cache stamps
+
+Cache stamps identify entries belonging to the current temperature. Using
+16-bit stamps reduces the table payload from 294,936 to 245,780 bytes at
+8,192 slots. On wrap, both stamp arrays clear before epoch 1 is reused.
+The eight paired output digests matched. The median elapsed-time ratio was
+0.962×. [Records](data/storage-resampling/stamps16/results.json).
+
+<a id="c33"></a>
+## C33. Skip identity copies at resampling
+
+When resampling assigns a replica to itself, its spins and fields are
+already in place. Capture only parents of children that change ancestry,
+before restoring any child. Capturing first preserves repeated parents and
+cycles among the assignments.
+
+The eight runs required 1,055–1,269 field restores per run, down from 8,176.
+The median run skipped 86% of restores. All candidate digests matched. The
+median elapsed-time ratio was 1.010×, with timing variation on both sides of
+parity. [Records](data/storage-resampling/selective/results.json).
+
+<a id="c34"></a>
+## C34. Combined storage and resampling
+
+Testing both storage changes together gave a 0.974× median elapsed-time
+ratio. Adding selective resampling gave 1.021×. Both variants matched all
+eight reference digests and had timing intervals spanning parity. The build
+features and the `native_selective_resampling` option remain opt-in.
+[Paired comparisons](EXPERIMENTS.md#storage-and-resampling-pilots).
+
+<a id="c35"></a>
+## C35. Cluster-boundary field updates
+
+When a cluster flips, both spins flip on each internal edge, so only boundary
+edges change the component's total energy. Each member field is transformed
+once from its old field and the contribution of its outside neighbors. The
+update still visits every neighbor of an accepted member.
+
+The kernel pilot gave a 1.129× median speedup on eight instances. At the
+operational budget on eight fresh instances, the full pipeline gave 0.996×.
+All 16 pairs returned the same candidate spins and energies. Keep this
+alternative as an experimental build. [Derivation](TECHNICAL_REPORT.md#c35-cluster-boundary-field-updates),
+[paired study](EXPERIMENTS.md#cluster-boundary-field-updates).

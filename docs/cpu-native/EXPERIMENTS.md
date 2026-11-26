@@ -180,12 +180,60 @@ tested endpoints 48 and 64, with polish β=20 or 80. Those settings produced
 shallower mean energies than the β=12 / polish β=20 reference on that small
 set. The parameters remain available for future recipe-specific experiments.
 
+## Storage and resampling pilots
+
+Five comparisons use the native kernel at 16 replicas × 2,048 sweeps on
+seeds 1031–1038. Both processes use the `core` preset with an 8,192-slot cache.
+CPU assignments alternate on cores 3 and 4. Each variant had a fresh reference
+run for each seed. [Findings C31–C34](FINDINGS.md#c31).
+
+| Candidate | Median speed ratio | Paired bootstrap 95% median interval | Matches |
+|---|---:|---:|---:|
+| [32-bit fields](data/storage-resampling/fields32/summary.json) | 0.964× | 0.927–1.019× | 8/8 |
+| [16-bit cache stamps](data/storage-resampling/stamps16/summary.json) | 0.962× | 0.872–1.004× | 8/8 |
+| [Selective resampling](data/storage-resampling/selective/summary.json) | 1.010× | 0.979–1.105× | 8/8 |
+| [Both storage changes](data/storage-resampling/compact/summary.json) | 0.974× | 0.846–1.136× | 8/8 |
+| [Both storage changes and selective resampling](data/storage-resampling/combined/summary.json) | 1.021× | 0.941–1.143× | 8/8 |
+
+The two storage changes together saved 632,836 bytes across the live fields,
+resampling snapshots, and probability arrays of one 16-replica solve. These
+are allocated array payloads. Selective resampling reduces the copies made at
+each checkpoint while retaining the same reserved snapshot capacity. The
+pilot supports the payload and copy-count reductions. Its timing intervals
+all span 1.0×.
+
+The [source manifest](data/storage-resampling/source-sha256.json) records the
+build inputs captured during the pilot. The listed files match commit
+[`36519c0`](https://github.com/NSEVEjk0/quip-solver-cpu/commit/36519c0bedb029d82246336f9a151559a5eafccb).
+The run metadata records the Git HEAD and working-tree status at measurement
+time. Build feature flags and executable hashes identify each comparison.
+
+## Cluster-boundary field updates
+
+The candidate adds `cluster-boundary-updates` to the locked release build.
+Each run uses the existing native execution options. The pilot times the
+population kernel. The full-budget comparison includes graph preparation,
+the original-energy archive, motif-domain scoring, and polishing.
+
+| Comparison | Seeds | Replicas × sweeps | Mean reference / candidate | Median ratio | Paired bootstrap 95% median interval | Matches |
+|---|---:|---:|---:|---:|---:|---:|
+| [Kernel pilot](data/cluster-boundary/pilot-boundary/results.json) | 1041–1048 | 16 × 2,048 | 10.255 / 9.010 s | 1.129× | 1.069–1.147× | 8/8 |
+| [Full pipeline](data/cluster-boundary/confirm-boundary/results.json) | 1051–1058 | 16 × 8,192 | 36.597 / 36.475 s | 0.996× | 0.976–1.088× | 8/8 |
+
+In the pilot, 3.87–4.36% of the accepted-component adjacency visits were
+interior edges. The candidate skips 3.18–3.55 million interior neighbor
+patches per run and adds 5.45–5.59 million field transformations. Measured
+full-pipeline performance is near parity, with exact output agreement.
+The feature is off by default. [Derivation](TECHNICAL_REPORT.md#c35-cluster-boundary-field-updates),
+[binary and source hashes](data/cluster-boundary/build.json).
+
 ## Correctness and protocol checks
 
 The release validation checks the actual native binary and its family adapter:
 
-- All 15 nonempty combinations of the four execution options are compared
-  with scalar population outputs across seeds, schedules, and bond weights.
+- All flag combinations for the four execution options and selective
+  resampling are compared with scalar population outputs across seeds,
+  schedules, and bond weights.
 - Move-level tests compare cluster and Metropolis spin states and exact
   energy changes with the scalar path; tiny-model tests independently score
   every state and check cluster transition distributions.
@@ -222,6 +270,32 @@ candidate digests, individual results, and paired summaries. Historical raw
 commands preserve the original VPS paths; the public runner resolves paths
 relative to its checkout. Kernel and pipeline budgets remain independently
 selectable. `--disable-motif-score` reproduces scalar archive evaluation.
+
+To reproduce the storage pilots, save the reference executable before building
+each feature variant. Selective resampling uses the same binary in both arms
+when comparing it on its own.
+
+```sh
+study=$(mktemp -d)
+cargo build --release --locked --features experimental --example cpu_native_bench -j 2
+cp target/release/examples/cpu_native_bench "$study/wide"
+cargo build --release --locked --features experimental,compact-local-fields,compact-cache-stamps --example cpu_native_bench -j 2
+cp target/release/examples/cpu_native_bench "$study/compact"
+python3 tools/cpu-native/compare_builds.py --reference-binary "$study/wide" --candidate-binary "$study/compact" --label combined --selective-resampling --cpus 3 4 --output "$study/combined"
+```
+
+Build with one storage feature at a time for the individual comparisons. Use
+the recorded feature and resampling settings for each arm.
+
+For the cluster-boundary comparison, retain `"$study/wide"` from the command
+above and build the alternative update:
+
+```sh
+cargo build --release --locked --features experimental,cluster-boundary-updates --example cpu_native_bench -j 2
+cp target/release/examples/cpu_native_bench "$study/boundary"
+python3 tools/cpu-native/compare_builds.py --reference-binary "$study/wide" --candidate-binary "$study/boundary" --label cluster-boundary --cpus 3 4 --output "$study/boundary-pilot" --seed-start 1041 --sweeps 2048 --mode kernel --preset core
+python3 tools/cpu-native/compare_builds.py --reference-binary "$study/wide" --candidate-binary "$study/boundary" --label cluster-boundary-pipeline --cpus 3 4 --output "$study/boundary-pipeline" --seed-start 1051 --sweeps 8192 --mode pipeline --preset archive
+```
 
 The evidence covers the specified Quip family, recipe, toolchain, and VPS.
 It establishes exact CPU execution improvements and measured candidate
