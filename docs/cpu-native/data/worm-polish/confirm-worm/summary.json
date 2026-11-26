@@ -1,0 +1,56 @@
+{
+  "label": "pair-worm-confirmation",
+  "pairs": 8,
+  "median_speedup": 0.992587491753625,
+  "bootstrap95_median": [
+    0.9343455056008565,
+    1.0330277356851814
+  ],
+  "mean_reference_seconds": 26.61604681975,
+  "mean_candidate_seconds": 27.0483429625,
+  "exact_output_pairs": 1,
+  "mean_best_original_energy": -5048.5675,
+  "energy": {
+    "best_gain_milli": {
+      "median": 10.0,
+      "mean": 245,
+      "range": [
+        0,
+        670
+      ],
+      "improved": 4,
+      "tied": 4,
+      "regressed": 0
+    },
+    "median_gain_milli": {
+      "median": 307.5,
+      "mean": 230.625,
+      "range": [
+        0.0,
+        425.0
+      ],
+      "improved": 6,
+      "tied": 2,
+      "regressed": 0
+    },
+    "worst_gain_milli": {
+      "median": 0.0,
+      "mean": 0,
+      "range": [
+        0,
+        0
+      ],
+      "improved": 0,
+      "tied": 8,
+      "regressed": 0
+    }
+  },
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.9916351581377791,
+    "cycles": 0.9935124257465315,
+    "instructions": 0.9855081781898335,
+    "branches": 0.9832582943590278,
+    "branch-misses": 0.9877004752567486,
+    "cache-misses": 0.9251082217525839
+  }
+}

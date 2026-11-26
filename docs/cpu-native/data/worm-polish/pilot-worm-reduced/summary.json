@@ -1,0 +1,56 @@
+{
+  "label": "worm-short-polish",
+  "pairs": 6,
+  "median_speedup": 1.0354251814127342,
+  "bootstrap95_median": [
+    0.9274921454274108,
+    1.1267190327059207
+  ],
+  "mean_reference_seconds": 15.409209836,
+  "mean_candidate_seconds": 15.114827536,
+  "exact_output_pairs": 0,
+  "mean_best_original_energy": -5041.298333333333,
+  "energy": {
+    "best_gain_milli": {
+      "median": 430.0,
+      "mean": 695,
+      "range": [
+        90,
+        2040
+      ],
+      "improved": 6,
+      "tied": 0,
+      "regressed": 0
+    },
+    "median_gain_milli": {
+      "median": 357.5,
+      "mean": 398.3333333333333,
+      "range": [
+        0.0,
+        705.0
+      ],
+      "improved": 5,
+      "tied": 1,
+      "regressed": 0
+    },
+    "worst_gain_milli": {
+      "median": 0.0,
+      "mean": 0,
+      "range": [
+        0,
+        0
+      ],
+      "improved": 0,
+      "tied": 6,
+      "regressed": 0
+    }
+  },
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.0516284190217964,
+    "cycles": 0.9911570418580959,
+    "instructions": 0.9856979414118381,
+    "branches": 0.9811217200412787,
+    "branch-misses": 0.983395298368235,
+    "cache-misses": 0.8667965586306239
+  }
+}

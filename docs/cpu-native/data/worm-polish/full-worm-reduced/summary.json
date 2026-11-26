@@ -1,0 +1,56 @@
+{
+  "label": "worm-32-polish-full-budget",
+  "pairs": 12,
+  "median_speedup": 0.9890092273971574,
+  "bootstrap95_median": [
+    0.9405531360881596,
+    1.0574503490334257
+  ],
+  "mean_reference_seconds": 30.313182882416665,
+  "mean_candidate_seconds": 30.437692268,
+  "exact_output_pairs": 0,
+  "mean_best_original_energy": -5046.685,
+  "energy": {
+    "best_gain_milli": {
+      "median": 805.0,
+      "mean": 828.3333333333334,
+      "range": [
+        -470,
+        3120
+      ],
+      "improved": 9,
+      "tied": 0,
+      "regressed": 3
+    },
+    "median_gain_milli": {
+      "median": 425.0,
+      "mean": 449.1666666666667,
+      "range": [
+        45.0,
+        1360.0
+      ],
+      "improved": 12,
+      "tied": 0,
+      "regressed": 0
+    },
+    "worst_gain_milli": {
+      "median": 0.0,
+      "mean": 0,
+      "range": [
+        0,
+        0
+      ],
+      "improved": 0,
+      "tied": 12,
+      "regressed": 0
+    }
+  },
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.9715756794751031,
+    "cycles": 1.0007452627207347,
+    "instructions": 0.9923468596503249,
+    "branches": 0.9899577126551478,
+    "branch-misses": 0.9890496266526959,
+    "cache-misses": 0.9131137245367642
+  }
+}

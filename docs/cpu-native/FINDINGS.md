@@ -62,6 +62,10 @@ with block eligibility checked separately by the coordinator and runtime.
 | [C44](#c44) | Exact cyclic blocks | Lower best energy on four of eight full-budget instances, four ties |
 | [C45](#c45) | Anneal and polish budget reduction | Shorter anneals and sparser Metropolis updates lost quality in the pilots |
 | [C46](#c46) | Residual scan and compiler trials | Exact outputs throughout the listed pilots, timing gains unconfirmed at full budget |
+| [C47](#c47) | Pair-aware worm polishing | Lower best energy on 14 of 20 matched C41 instances, six ties |
+| [C48](#c48) | Direct earlier-native comparison | 1.468× median wall ratio for C41 plus worm with 16 × 8,192 |
+| [C49](#c49) | Smaller polish budgets and anneal changes | Shorter polish caused three full-budget regressions |
+| [C50](#c50) | Replica exchanges and probability-cache locality | Strong-edge proposals regressed at the pilot median |
 
 <a id="c01"></a>
 ## C01. Packed adjacency fusion
@@ -577,3 +581,37 @@ Eight variants matched every candidate output in short-budget tests. The
 16-bit link dictionary reduced cache misses, and an AVX2 gather loop reduced
 cycles modestly. The packed scalar C41 kernel remains the reference for
 these tests. [Pilot matrix](EXPERIMENTS.md#residual-scan-and-compiler-trials-after-c41).
+
+<a id="c47"></a>
+## C47. Pair-aware worm polishing
+
+A bounded pass reuses the pair-aware worm to make strictly downhill moves
+on eight final candidates. Compared with the same C41 solver and anneal
+budget, the best energy improved on 14 of 20 instances and tied on six.
+The median candidate improved on 18 of 20. The measured elapsed-time
+intervals span parity. [Full-budget pairs](EXPERIMENTS.md#canonical-energy-and-runtime-comparisons).
+
+<a id="c48"></a>
+## C48. Direct earlier-native comparison
+
+With 16 replicas × 8,192 sweeps, the C41 build with worm polishing reached
+**1.468× median speedup** against the native build used as the C38 reference.
+The best original energy was lower on 7 of eight pairs and tied on
+1. This is a direct measurement of the combined build on one EPYC VPS.
+[Raw data](data/worm-polish/native-worm/results.json).
+
+<a id="c49"></a>
+## C49. Smaller polish budgets and anneal changes
+
+Reducing regular polish from 256 to 32 sweeps ahead of the worm improved
+best energy on nine full-budget instances and regressed on three. Longer
+final-temperature holds reduced candidate quality in the schedule pilot.
+[Study](EXPERIMENTS.md#schedule-replica-histories-and-probability-cache).
+
+<a id="c50"></a>
+## C50. Replica exchanges and probability-cache locality
+
+Independent ancestry and strong-edge exchange proposals worsened median
+best energy in the tested configurations. Interleaving cache epochs and
+values kept all six output digests while the timing interval spanned parity.
+[Study](EXPERIMENTS.md#schedule-replica-histories-and-probability-cache).

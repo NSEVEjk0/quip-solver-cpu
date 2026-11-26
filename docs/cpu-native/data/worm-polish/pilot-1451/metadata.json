@@ -1,0 +1,24 @@
+{
+  "binary": "schedule",
+  "sha256": "d97224a09b28fbaa5aa12915ea08c08c14d6b8dac10f639c5a7adeddf48f94b6",
+  "source_revision": "99a15b42461a622b4d0673d8d8232fe9a2ba4ce7",
+  "seed_start": 1451,
+  "reads": 16,
+  "sweeps": 2048,
+  "cases": [
+    "hold50",
+    "hold75",
+    "beta16-hold50",
+    "beta10-hold50",
+    "motif500",
+    "motif125",
+    "resample64",
+    "weak100",
+    "no-resampling"
+  ],
+  "timing_scope": "Exploratory CPU cycles. Some same-core side-by-side work overlapped.",
+  "input_sha256": {
+    "tools/cpu-funnel/inputs/current-topology.spec.json": "a8e00f86543c45eb14a91f12725ff4dad42f5482451923d12d639a606bbd0e15",
+    "tools/cpu-funnel/inputs/current-family.params": "dcb359726b1efb2a453b6af7c158b163155855f63ada4b6a5ae6d0f9dab2081d"
+  }
+}

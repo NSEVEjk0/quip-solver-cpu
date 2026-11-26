@@ -1,0 +1,18 @@
+{
+  "binary": "strong-exchange",
+  "sha256": "a2c91bce4446f19ffa3e055bc947999b289843bc1aec36bac1b01482b92b4856",
+  "source_revision": "0067d32f8e9cec62a64dd0b73829d8be5a69006d",
+  "seed_start": 1551,
+  "reads": 16,
+  "sweeps": 4096,
+  "cases": [
+    "strong-checkpoint",
+    "strong-every4",
+    "strong-every1"
+  ],
+  "timing_scope": "Exploratory CPU cycles. Some same-core side-by-side work overlapped.",
+  "input_sha256": {
+    "tools/cpu-funnel/inputs/current-topology.spec.json": "a8e00f86543c45eb14a91f12725ff4dad42f5482451923d12d639a606bbd0e15",
+    "tools/cpu-funnel/inputs/current-family.params": "dcb359726b1efb2a453b6af7c158b163155855f63ada4b6a5ae6d0f9dab2081d"
+  }
+}

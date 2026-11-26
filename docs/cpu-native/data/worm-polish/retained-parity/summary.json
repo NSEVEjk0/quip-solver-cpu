@@ -1,0 +1,21 @@
+{
+  "label": "retained-worm-parity",
+  "pairs": 4,
+  "median_speedup": 1.0837421535799197,
+  "bootstrap95_median": [
+    0.8870795696779649,
+    1.389198571313755
+  ],
+  "mean_reference_seconds": 4.4649487755,
+  "mean_candidate_seconds": 4.1712263025,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -5008.0275,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.0643681508535145,
+    "cycles": 1.0066842840545283,
+    "instructions": 1.0007185241732155,
+    "branches": 1.0008445957659762,
+    "branch-misses": 1.0062459848465752,
+    "cache-misses": 1.1220094358338926
+  }
+}

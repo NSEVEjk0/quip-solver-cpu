@@ -1,0 +1,70 @@
+{
+  "source_commit": "705ab300aab3fbcdd2936866bc593a67562d41e7",
+  "native_binary_sha256": "1c7fe298d8b5495385f1d497ff175bc471f1fae65421807b912ab242ba56eb75",
+  "features": [
+    "experimental",
+    "masked-residual-deltas",
+    "table-tile-bonds",
+    "linked-component-lists",
+    "shallow-union-roots",
+    "packed-residual-fields",
+    "pair-worm-polish",
+    "cyclic-polish"
+  ],
+  "integration_method": "Built the native binary with Cargo, then compiled and ran the integration test targets against the release dependencies.",
+  "checks": [
+    {
+      "check": "release-build",
+      "exit_code": 0,
+      "summary": []
+    },
+    {
+      "check": "family-library",
+      "exit_code": 0,
+      "summary": [
+        "test result: ok. 40 passed; 0 failed; 0 ignored; 0 measured; 427 filtered out; finished in 0.91s"
+      ]
+    },
+    {
+      "check": "compile-otsuka_kernel",
+      "exit_code": 0,
+      "summary": []
+    },
+    {
+      "check": "otsuka_kernel",
+      "exit_code": 0,
+      "summary": [
+        "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 4.26s"
+      ]
+    },
+    {
+      "check": "compile-native_conformance",
+      "exit_code": 0,
+      "summary": []
+    },
+    {
+      "check": "native_conformance",
+      "exit_code": 0,
+      "summary": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.15s"
+      ]
+    },
+    {
+      "check": "clippy",
+      "exit_code": 0,
+      "summary": []
+    },
+    {
+      "check": "format",
+      "exit_code": 0,
+      "summary": []
+    },
+    {
+      "check": "all features library and benchmark compile",
+      "exit_code": 0
+    }
+  ],
+  "environment": {
+    "QUIP_CPU_NATIVE_PAIR_WORM_POLISH": "true"
+  }
+}

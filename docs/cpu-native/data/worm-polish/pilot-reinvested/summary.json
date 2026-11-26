@@ -1,0 +1,56 @@
+{
+  "label": "reinvested-sweeps-pilot",
+  "pairs": 4,
+  "median_speedup": 0.9997105203518366,
+  "bootstrap95_median": [
+    0.9457753316012859,
+    1.095417077370293
+  ],
+  "mean_reference_seconds": 38.2200606305,
+  "mean_candidate_seconds": 37.89799510125,
+  "exact_output_pairs": 0,
+  "mean_best_original_energy": -5049.1525,
+  "energy": {
+    "best_gain_milli": {
+      "median": 2460.0,
+      "mean": 4637.5,
+      "range": [
+        -390,
+        14020
+      ],
+      "improved": 2,
+      "tied": 0,
+      "regressed": 2
+    },
+    "median_gain_milli": {
+      "median": 2700.0,
+      "mean": 4466.25,
+      "range": [
+        -690.0,
+        13155.0
+      ],
+      "improved": 2,
+      "tied": 0,
+      "regressed": 2
+    },
+    "worst_gain_milli": {
+      "median": 3200.0,
+      "mean": 4537.5,
+      "range": [
+        -700,
+        12450
+      ],
+      "improved": 3,
+      "tied": 0,
+      "regressed": 1
+    }
+  },
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.0018524818644667,
+    "cycles": 1.0118836016791166,
+    "instructions": 0.82764350955152,
+    "branches": 0.9857562264922102,
+    "branch-misses": 1.453241803332288,
+    "cache-misses": 0.5405006447094679
+  }
+}

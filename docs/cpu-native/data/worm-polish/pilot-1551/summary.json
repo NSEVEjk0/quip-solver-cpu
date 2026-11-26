@@ -1,0 +1,35 @@
+{
+  "strong-checkpoint": {
+    "median_gain_milli": -1540.0,
+    "mean_gain_milli": -2136.6666666666665,
+    "range": [
+      -6650,
+      450
+    ],
+    "wins": 1,
+    "n": 6,
+    "median_cycle_ratio": 1.0109822866355769
+  },
+  "strong-every4": {
+    "median_gain_milli": -1430.0,
+    "mean_gain_milli": -1396.6666666666667,
+    "range": [
+      -3550,
+      1300
+    ],
+    "wins": 1,
+    "n": 6,
+    "median_cycle_ratio": 1.0002437624773897
+  },
+  "strong-every1": {
+    "median_gain_milli": -1305.0,
+    "mean_gain_milli": -850,
+    "range": [
+      -4290,
+      4900
+    ],
+    "wins": 3,
+    "n": 6,
+    "median_cycle_ratio": 0.9898689533462606
+  }
+}

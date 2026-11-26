@@ -1,0 +1,21 @@
+{
+  "label": "observed-slot-default-parity",
+  "pairs": 4,
+  "median_speedup": 1.0356938068096244,
+  "bootstrap95_median": [
+    0.8544855999037989,
+    1.2042684893232973
+  ],
+  "mean_reference_seconds": 2.45767256275,
+  "mean_candidate_seconds": 2.42287403175,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -5001.0575,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.0686771633857317,
+    "cycles": 0.9765764531248834,
+    "instructions": 1.0006113680805142,
+    "branches": 1.0008188090557923,
+    "branch-misses": 1.0073009170066487,
+    "cache-misses": 1.0275656311732604
+  }
+}

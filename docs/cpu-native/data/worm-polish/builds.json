@@ -1,0 +1,170 @@
+{
+  "host": "AMD EPYC 7663 VPS",
+  "rustc": "1.97.1",
+  "default_build_command": [
+    "cargo",
+    "+1.97.1",
+    "build",
+    "--release",
+    "--locked",
+    "--features",
+    "<flags>",
+    "--example",
+    "cpu_native_bench"
+  ],
+  "binaries": {
+    "c41": {
+      "source_revision": "6e7fc4728b0ea666c857fbb2c78b85557dd4d985",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields"
+      ],
+      "sha256": "0441e499ab11d1ba378e8b5a8c8bcdd7da8071b6e524bc1d6a02ed4f3fa7a5bc"
+    },
+    "earlier-native": {
+      "source_revision": "3f8d34c451727a608045e293e534b5b4cb40f1cd",
+      "features": [
+        "experimental"
+      ],
+      "sha256": "31f266d42f059d57a64a19a726c665d1b0e228de0595a81588cc9421ee55056a"
+    },
+    "schedule": {
+      "source_revision": "99a15b42461a622b4d0673d8d8232fe9a2ba4ce7",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields"
+      ],
+      "sha256": "d97224a09b28fbaa5aa12915ea08c08c14d6b8dac10f639c5a7adeddf48f94b6"
+    },
+    "reference": {
+      "source_revision": "0dd61832de4042773fa4db8f1b3307f8f0869b47",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields"
+      ],
+      "sha256": "de54f07e4b0a77eef0818a464a952a68adf73cac023e1b5ea1667b94c98fdaca"
+    },
+    "strong-exchange": {
+      "source_revision": "0067d32f8e9cec62a64dd0b73829d8be5a69006d",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields"
+      ],
+      "sha256": "a2c91bce4446f19ffa3e055bc947999b289843bc1aec36bac1b01482b92b4856"
+    },
+    "cache": {
+      "source_revision": "5e3d222ba0bfcec0d5ce1304c05fd115c719b249",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "interleaved-probability-cache"
+      ],
+      "sha256": "5e4b4ec4dc8f1e2e1441eac5d2654e0f93497a9e495de42f68a1dad071c7fca9"
+    },
+    "worm-pilot": {
+      "source_revision": "d12b5276d081ceebcd4482fc23df485ff562a2cf",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "pair-worm-polish"
+      ],
+      "sha256": "78e8a45392b3c215df6f63b0dcbbff824dede1f51fbe912a329ac018eea95d01"
+    },
+    "worm": {
+      "source_revision": "5e3d222ba0bfcec0d5ce1304c05fd115c719b249",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "pair-worm-polish"
+      ],
+      "sha256": "c1d92c82b80e67920c5cc50c262209508eb5d036b00a9ad058f47bc64c72ed1e"
+    },
+    "worm-retained": {
+      "source_revision": "705ab300aab3fbcdd2936866bc593a67562d41e7",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "pair-worm-polish"
+      ],
+      "sha256": "018cc6e7f3bd5c40289c5303075a934643803e5cc0bc6e762bc6f57bd7993af8"
+    }
+  },
+  "paired_comparisons": {
+    "default-parity": {
+      "reference": "c41",
+      "candidate": "schedule"
+    },
+    "slot-default-parity": {
+      "reference": "c41",
+      "candidate": "reference"
+    },
+    "pilot-cache": {
+      "reference": "reference",
+      "candidate": "cache"
+    },
+    "pilot-worm": {
+      "reference": "reference",
+      "candidate": "worm-pilot"
+    },
+    "pilot-worm-reduced": {
+      "reference": "reference",
+      "candidate": "worm"
+    },
+    "full-worm": {
+      "reference": "reference",
+      "candidate": "worm-pilot"
+    },
+    "confirm-worm": {
+      "reference": "reference",
+      "candidate": "worm"
+    },
+    "full-worm-reduced": {
+      "reference": "reference",
+      "candidate": "worm"
+    },
+    "native-worm": {
+      "reference": "earlier-native",
+      "candidate": "worm"
+    },
+    "pilot-reinvested": {
+      "reference": "earlier-native",
+      "candidate": "worm"
+    },
+    "retained-parity": {
+      "reference": "worm",
+      "candidate": "worm-retained"
+    }
+  }
+}

@@ -1,0 +1,21 @@
+{
+  "label": "interleaved-probability-cache",
+  "pairs": 6,
+  "median_speedup": 1.0120068944464853,
+  "bootstrap95_median": [
+    0.945639923344692,
+    1.1080860860611284
+  ],
+  "mean_reference_seconds": 7.5498575125,
+  "mean_candidate_seconds": 7.4177954495,
+  "exact_output_pairs": 6,
+  "mean_best_original_energy": -5027.846666666666,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.0276880020666355,
+    "cycles": 1.0173919387927652,
+    "instructions": 1.0004616288368315,
+    "branches": 1.0032312469200244,
+    "branch-misses": 1.0005482274799966,
+    "cache-misses": 1.0568398115714952
+  }
+}

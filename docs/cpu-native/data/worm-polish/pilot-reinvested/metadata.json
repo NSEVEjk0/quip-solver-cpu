@@ -1,0 +1,44 @@
+{
+  "started_utc": "2026-11-26T22:24:24.937199+00:00",
+  "label": "reinvested-sweeps-pilot",
+  "source_revision": "705ab300aab3fbcdd2936866bc593a67562d41e7",
+  "source_dirty": false,
+  "platform": "Linux-7.0.0-14-generic-x86_64-with-glibc2.43",
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.97.1\nLLVM version: 22.1.6",
+  "cpus": [
+    3,
+    4
+  ],
+  "concurrent_processes": 1,
+  "mode": "pipeline",
+  "preset": "archive",
+  "reads": 16,
+  "sweeps": 12288,
+  "seed_start": 1601,
+  "instances": 4,
+  "candidate_selective_resampling": false,
+  "candidate_cache_slots": 8192,
+  "reference_cache_slots": 8192,
+  "binary_sha256": {
+    "reference": "31f266d42f059d57a64a19a726c665d1b0e228de0595a81588cc9421ee55056a",
+    "candidate": "c1d92c82b80e67920c5cc50c262209508eb5d036b00a9ad058f47bc64c72ed1e"
+  },
+  "input_sha256": {
+    "tools/cpu-funnel/inputs/current-topology.spec.json": "a8e00f86543c45eb14a91f12725ff4dad42f5482451923d12d639a606bbd0e15",
+    "tools/cpu-funnel/inputs/current-family.params": "dcb359726b1efb2a453b6af7c158b163155855f63ada4b6a5ae6d0f9dab2081d"
+  },
+  "comparison": "energy",
+  "reference_sweeps": 8192,
+  "candidate_polish_sweeps": null,
+  "candidate_single_every": null,
+  "perf_events": [
+    "task-clock",
+    "cycles",
+    "instructions",
+    "branches",
+    "branch-misses",
+    "cache-misses"
+  ],
+  "perf_task_clock_unit": "ms",
+  "completed_utc": "2026-11-26T22:29:30.206377+00:00"
+}

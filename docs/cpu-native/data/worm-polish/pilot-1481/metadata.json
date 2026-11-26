@@ -1,0 +1,23 @@
+{
+  "binary": "reference",
+  "sha256": "de54f07e4b0a77eef0818a464a952a68adf73cac023e1b5ea1667b94c98fdaca",
+  "source_revision": "0dd61832de4042773fa4db8f1b3307f8f0869b47",
+  "seed_start": 1481,
+  "reads": 16,
+  "sweeps": 4096,
+  "cases": [
+    "independent",
+    "independent-exchange4",
+    "exchange4",
+    "exchange1",
+    "archive-slots",
+    "archive-slots-exchange4",
+    "archive-slots-exchange1",
+    "archive-and-independent"
+  ],
+  "timing_scope": "Exploratory CPU cycles. Some same-core side-by-side work overlapped.",
+  "input_sha256": {
+    "tools/cpu-funnel/inputs/current-topology.spec.json": "a8e00f86543c45eb14a91f12725ff4dad42f5482451923d12d639a606bbd0e15",
+    "tools/cpu-funnel/inputs/current-family.params": "dcb359726b1efb2a453b6af7c158b163155855f63ada4b6a5ae6d0f9dab2081d"
+  }
+}

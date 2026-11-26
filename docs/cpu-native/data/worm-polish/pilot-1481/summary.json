@@ -1,0 +1,90 @@
+{
+  "independent": {
+    "median_gain_milli": -9755.0,
+    "mean_gain_milli": -9816.666666666666,
+    "range": [
+      -19890,
+      380
+    ],
+    "wins": 1,
+    "n": 6,
+    "median_cycle_ratio": 0.9332942262680732
+  },
+  "independent-exchange4": {
+    "median_gain_milli": -9660.0,
+    "mean_gain_milli": -8851.666666666666,
+    "range": [
+      -17600,
+      1510
+    ],
+    "wins": 1,
+    "n": 6,
+    "median_cycle_ratio": 0.8687484283356393
+  },
+  "exchange4": {
+    "median_gain_milli": -100.0,
+    "mean_gain_milli": 853.3333333333334,
+    "range": [
+      -2940,
+      5820
+    ],
+    "wins": 3,
+    "n": 6,
+    "median_cycle_ratio": 0.9959495488318142
+  },
+  "exchange1": {
+    "median_gain_milli": 1590.0,
+    "mean_gain_milli": 1343.3333333333333,
+    "range": [
+      -1500,
+      3890
+    ],
+    "wins": 4,
+    "n": 6,
+    "median_cycle_ratio": 0.9712472488263333
+  },
+  "archive-slots": {
+    "median_gain_milli": 55.0,
+    "mean_gain_milli": 130,
+    "range": [
+      -90,
+      560
+    ],
+    "wins": 3,
+    "n": 6,
+    "median_cycle_ratio": 1.0039799733727046
+  },
+  "archive-slots-exchange4": {
+    "median_gain_milli": -100.0,
+    "mean_gain_milli": 820,
+    "range": [
+      -2940,
+      5350
+    ],
+    "wins": 3,
+    "n": 6,
+    "median_cycle_ratio": 0.9977746058932881
+  },
+  "archive-slots-exchange1": {
+    "median_gain_milli": 1400.0,
+    "mean_gain_milli": 1436.6666666666667,
+    "range": [
+      -1120,
+      3890
+    ],
+    "wins": 4,
+    "n": 6,
+    "median_cycle_ratio": 0.9760928355655574
+  },
+  "archive-and-independent": {
+    "median_gain_milli": -9945.0,
+    "mean_gain_milli": -10090,
+    "range": [
+      -19960,
+      380
+    ],
+    "wins": 1,
+    "n": 6,
+    "median_cycle_ratio": 0.9301637785795605
+  }
+}

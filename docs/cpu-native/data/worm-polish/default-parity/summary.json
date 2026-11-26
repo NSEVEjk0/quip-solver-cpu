@@ -1,0 +1,21 @@
+{
+  "label": "schedule-default-parity",
+  "pairs": 4,
+  "median_speedup": 1.164035133411756,
+  "bootstrap95_median": [
+    0.6814217705859666,
+    1.4283569528342273
+  ],
+  "mean_reference_seconds": 1.49251859425,
+  "mean_candidate_seconds": 1.37813599375,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -4985.42,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.1100441012980369,
+    "cycles": 0.9995954972982626,
+    "instructions": 1.0016756139070542,
+    "branches": 1.0021169723628987,
+    "branch-misses": 1.0158623851317472,
+    "cache-misses": 1.042128058707316
+  }
+}

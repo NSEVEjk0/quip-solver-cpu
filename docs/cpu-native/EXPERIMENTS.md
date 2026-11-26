@@ -541,6 +541,100 @@ AVX2 cycle reduction and PGO
 timing are short-budget pilot results. The PGO comparison used two runs per
 build in ABBA or BAAB order on one CPU.
 
+## Pair-aware worm polishing
+
+The optional final pass reuses the repository's existing `PairWorm` descent
+for the eight lowest-energy candidates after the C41 archive pipeline. A
+walk starts by flipping a spin with its dimer partner when necessary, then
+repairs charged tiles touched by the walk. The pass checks the exact
+original-energy change of each move and keeps strictly downhill moves.
+Each read uses its own deterministic seed, at most eight passes, and a
+64-spin walk limit. Cancellation is checked between bounded batches of
+attempts. The harness rescores every returned candidate against the
+canonical instance.
+
+### Canonical energy and runtime comparisons
+
+All full-budget pairs used 16 replicas × 8,192 annealing sweeps on an EPYC
+7663 VPS. Each pair ran both builds on the same CPU and balanced the order
+across instances. The reference uses 256 regular polish sweeps. The matched
+worm build runs those sweeps and then the final descent. The measured region
+covers `tuned_reads`, including graph setup and polishing. Generation and
+network processing are outside the timer. Whole-process cycle counters are
+recorded alongside elapsed time.
+
+Gains equal reference minus candidate energy in milli units. Batch gain
+compares the medians of the 16 candidate energies for each instance. The
+table reports that paired gain's median over the instances.
+
+| Candidate vs reference | Seeds | Best energy lower / tied / higher | Median best gain | Best gain range | Median batch gain | Median wall ratio |
+|---|---|---:|---:|---:|---:|---:|
+| [C41 plus worm vs C41](data/worm-polish/full-worm/results.json) | 1521–1532 | 10/2/0 | 190 | 0 to 1390 | 245 | 0.980× |
+| [C41 plus worm vs C41, confirmation](data/worm-polish/confirm-worm/results.json) | 1581–1588 | 4/4/0 | 10 | 0 to 670 | 307.5 | 0.993× |
+| [C41 plus worm and 32 polish sweeps vs C41](data/worm-polish/full-worm-reduced/results.json) | 1561–1572 | 9/0/3 | 805 | -470 to 3120 | 425 | 0.989× |
+| [C41 plus worm vs earlier native](data/worm-polish/native-worm/results.json) | 1591–1598 | 7/1/0 | 245 | 0 to 1660 | 150 | 1.468× |
+
+With 256 polish sweeps on both arms, the two C41 comparisons improved the
+best candidate on 14 of 20 instances and tied on six. The pooled median
+best gain was 145 milli units. The median candidate improved on 18 of 20,
+with a pooled median gain of 245 milli units. Every sorted energy rank
+tied or improved. The wall ratios were 0.980× and 0.993×, with both timing
+intervals spanning parity. The whole-process median cycle increases were
+0.8% and 0.7%.
+[First summary](data/worm-polish/full-worm/summary.json),
+[repeat summary](data/worm-polish/confirm-worm/summary.json).
+
+The direct earlier-native comparison measured **1.468× median speedup**
+(31.9% lower wall time) and 32.7% fewer CPU cycles at the median. The
+new build ran faster on seven of eight instances. The paired bootstrap 95%
+median interval was 1.136–1.513×. This comparison includes C41's
+execution changes and the final worm pass.
+[Direct comparison summary](data/worm-polish/native-worm/summary.json).
+
+The shorter 32-sweep polish trial improved best energy in nine of 12
+full-budget pairs and regressed in three. Its wall interval spans parity.
+The 256-sweep configuration remains the measured default for the worm
+study. [Shorter-polish results](data/worm-polish/full-worm-reduced/summary.json).
+
+The 12,288-sweep arm used 50% more annealing sweeps than the native
+8,192-sweep arm. The four-pair pilot measured a 1.000× median wall ratio.
+Best-energy gains ranged from −390 to 14,020 milli units, with two
+improvements and two regressions. [Raw data](data/worm-polish/pilot-reinvested/results.json).
+
+The final native binary passed the family tests with exact original-energy
+rescoring and the native protocol suite with the worm flag enabled. The
+retained benchmark build matched the tested prototype's outputs on all
+four short-budget replay pairs. The worm is disabled by default.
+[Validation](data/worm-polish/validation.json),
+[replay pairs](data/worm-polish/retained-parity/results.json).
+
+## Schedule, replica histories, and probability cache
+
+- **Final-temperature holds.** Holding β=12 for the final half or three
+  quarters of a 2,048-sweep anneal raised the best energy on all eight
+  instances. Median regressions were 12,155 and 20,115 milli units. The
+  other tested endpoints, motif weights and weak scales failed to improve
+  the pilot median. [Schedule matrix](data/worm-polish/pilot-1451/summary.json).
+- **Replica histories.** With annealing and swap cadence held fixed, avoiding
+  ancestry copies worsened the best energy on five of six 4,096-sweep
+  instances. A separate archive of per-slot records showed a median gain
+  of 55 milli units on this pilot. Exchanging on every sweep improved four
+  of six, with a 1,590 milli-unit median gain and a 2.9% median cycle cost.
+  [Replica matrix](data/worm-polish/pilot-1481/summary.json).
+- **Strong-edge proposals.** Growing a disagreement component on strong
+  edges leaves the reverse proposal probability equal because the move
+  preserves the disagreement set and graph. A boundary edge contributes
+  to the joint energy change only when both endpoints are disagreements.
+  The Metropolis draw uses the exact sum from those boundary edges. Direct
+  rescoring checked all disagreement subsets on a four-spin fixture. All
+  three tested cadences had negative median best-energy gains.
+  [Strong-edge proposal matrix](data/worm-polish/pilot-1551/summary.json).
+- **Interleaved cache.** Storing each probability beside its epoch gave
+  exact outputs on six pairs and reduced median CPU cycles by 1.7%. The
+  0.946–1.108× timing interval spans parity. The candidate uses 16 bytes per
+  entry after alignment, up from 12 with separate arrays.
+  [Cache pilot](data/worm-polish/pilot-cache/summary.json).
+
 ## Correctness and protocol checks
 
 The release validation checks the actual native binary and its family adapter:
@@ -687,6 +781,18 @@ Metropolis sweep per cluster sweep. The harness records timings and
 canonical energy deltas with `--compare-energy`. In exact-output mode its
 existing digest check remains mandatory. `--serial --bracket` repeats both
 builds in ABBA or BAAB order on the same CPU and saves all four runs.
+
+### Reproduce pair-aware worm polishing
+
+Build the recorded binaries at the revisions in the
+[manifest](data/worm-polish/builds.json). Use the same flags for their
+respective commits. The original settings and CLI commands are retained
+in each pair's raw record.
+
+```sh
+python3 tools/cpu-native/compare_builds.py --serial --compare-energy --reference-binary "$study/reference" --candidate-binary "$study/worm" --label pair-worm-confirmation --cpus 3 4 --output "$study/confirm-worm" --seed-start 1581 --reads 16 --sweeps 8192 --mode pipeline --preset archive --perf
+python3 tools/cpu-native/compare_builds.py --serial --compare-energy --reference-binary "$study/earlier-native" --candidate-binary "$study/worm" --label worm-vs-earlier-native --cpus 2 5 --output "$study/native-worm" --seed-start 1591 --reads 16 --sweeps 8192 --mode pipeline --preset archive --perf
+```
 
 The evidence covers the specified Quip family, recipe, toolchain, and VPS.
 It establishes exact CPU execution improvements and measured candidate

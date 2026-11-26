@@ -1,0 +1,56 @@
+{
+  "label": "pair-worm-equal-budget",
+  "pairs": 6,
+  "median_speedup": 0.9472693511460988,
+  "bootstrap95_median": [
+    0.7377243155604485,
+    1.0863135317608585
+  ],
+  "mean_reference_seconds": 15.956315577333333,
+  "mean_candidate_seconds": 17.746520388666667,
+  "exact_output_pairs": 0,
+  "mean_best_original_energy": -5034.65,
+  "energy": {
+    "best_gain_milli": {
+      "median": 245.0,
+      "mean": 586.6666666666666,
+      "range": [
+        0,
+        1550
+      ],
+      "improved": 5,
+      "tied": 1,
+      "regressed": 0
+    },
+    "median_gain_milli": {
+      "median": 447.5,
+      "mean": 429.1666666666667,
+      "range": [
+        235.0,
+        640.0
+      ],
+      "improved": 6,
+      "tied": 0,
+      "regressed": 0
+    },
+    "worst_gain_milli": {
+      "median": 0.0,
+      "mean": 0,
+      "range": [
+        0,
+        0
+      ],
+      "improved": 0,
+      "tied": 6,
+      "regressed": 0
+    }
+  },
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.9542989945954967,
+    "cycles": 0.9672869795042998,
+    "instructions": 0.9701128668777621,
+    "branches": 0.9656644206217069,
+    "branch-misses": 0.9752899047398855,
+    "cache-misses": 0.9040890538006232
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "label": "worm-vs-earlier-native",
+  "pairs": 8,
+  "median_speedup": 1.4681354226921826,
+  "bootstrap95_median": [
+    1.1363394289189195,
+    1.5126337022795704
+  ],
+  "mean_reference_seconds": 45.4543500225,
+  "mean_candidate_seconds": 33.619822532,
+  "exact_output_pairs": 0,
+  "mean_best_original_energy": -5047.92375,
+  "energy": {
+    "best_gain_milli": {
+      "median": 245.0,
+      "mean": 470,
+      "range": [
+        0,
+        1660
+      ],
+      "improved": 7,
+      "tied": 1,
+      "regressed": 0
+    },
+    "median_gain_milli": {
+      "median": 150.0,
+      "mean": 278.125,
+      "range": [
+        0.0,
+        875.0
+      ],
+      "improved": 6,
+      "tied": 2,
+      "regressed": 0
+    },
+    "worst_gain_milli": {
+      "median": 0.0,
+      "mean": 0,
+      "range": [
+        0,
+        0
+      ],
+      "improved": 0,
+      "tied": 8,
+      "regressed": 0
+    }
+  },
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.4553561556746635,
+    "cycles": 1.4855374291063366,
+    "instructions": 1.22550181350709,
+    "branches": 1.4571581931403077,
+    "branch-misses": 2.1214616710655907,
+    "cache-misses": 0.7769637774972722
+  }
+}

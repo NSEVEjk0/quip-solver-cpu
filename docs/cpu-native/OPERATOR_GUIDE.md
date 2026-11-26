@@ -71,6 +71,16 @@ TOML or set `QUIP_CPU_NATIVE_TREE_POLISH=true`. The default is off. The
 cyclic-block variant uses the `cyclic-polish` build feature and the same
 runtime setting. [Candidate quality measurements](EXPERIMENTS.md#full-budget-candidate-quality).
 
+### Optional pair-aware worm polishing
+
+Build the native solver with `pair-worm-polish` and enable it with
+`native_pair_worm_polish = true` in backend TOML or
+`QUIP_CPU_NATIVE_PAIR_WORM_POLISH=true`. Set `native_polish_sweeps = 256`
+to use the evaluated regular polish before the final downhill pass. The
+reported study enables the worm by itself. Tree polishing can be enabled
+independently in binaries that include its feature.
+[Matched measurements](EXPERIMENTS.md#canonical-energy-and-runtime-comparisons).
+
 ## Reproduce the kernel and pipeline studies
 
 Run experiments on available CPUs, with the complete recorded inputs:
