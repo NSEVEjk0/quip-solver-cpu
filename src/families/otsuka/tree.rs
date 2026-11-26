@@ -336,6 +336,43 @@ impl<'a> TreePolish<'a> {
         Some(())
     }
 
+    #[cfg(feature = "tree-restart-polish")]
+    fn restart(&mut self, spins: &mut [i8], stopped: &impl Fn() -> bool) -> Option<()> {
+        let mut best = self.graph.energy(spins);
+        let mut trial = spins.to_vec();
+        for partition in &self.partitions {
+            // Flip a full induced tree before optimizing the other trees.
+            // Start with the largest group so the perturbation is collective.
+            let (start, end) = partition
+                .ends
+                .iter()
+                .copied()
+                .scan(0, |start, end| {
+                    let range = (*start, end);
+                    *start = end;
+                    Some(range)
+                })
+                .max_by_key(|&(start, end)| end - start)?;
+            if stopped() {
+                return None;
+            }
+            trial.copy_from_slice(spins);
+            for vertex in &partition.vertices[start..end] {
+                trial[vertex.node as usize] = -trial[vertex.node as usize];
+            }
+            self.scratch.reset(self.graph, &trial);
+            for neighbor in self.partitions.iter().rev() {
+                neighbor.descend(self.graph, &mut trial, &mut self.scratch, stopped)?;
+            }
+            let energy = self.graph.energy(&trial);
+            if energy < best {
+                spins.copy_from_slice(&trial);
+                best = energy;
+            }
+        }
+        self.descend(spins, stopped)
+    }
+
     /// A disagreement component can copy its donor spins independently.
     /// Other disagreement components have no edges into it.
     fn combine(&mut self, a: &mut [i8], b: &[i8], stopped: &impl Fn() -> bool) -> Option<()> {
@@ -406,6 +443,11 @@ impl<'a> TreePolish<'a> {
                     energy_milli,
                 };
             }
+        }
+        #[cfg(feature = "tree-restart-polish")]
+        {
+            self.restart(&mut reads[best].spins, stopped)?;
+            reads[best].energy_milli = self.graph.energy(&reads[best].spins);
         }
         Some(())
     }
