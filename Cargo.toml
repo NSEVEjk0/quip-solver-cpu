@@ -195,6 +195,8 @@ cluster-boundary-updates = []
 # Reuse the union-find array to keep component labels and spin signs together
 # during the residual-edge scan.
 packed-component-spins = []
+# Group residual edges by one endpoint during component-delta initialization.
+row-grouped-residual-deltas = []
 # Off by default. Adds per-spin-decision and per-flip spans INSIDE the hot loop.
 # These spans distort absolute timing (millions of enters per read), so they are
 # used only for the diagnostic cross-check pass, never for headline per-part JSON.

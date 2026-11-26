@@ -290,6 +290,8 @@ pub struct OtsukaGraph {
     /// each as one end and the [`Link`] to the other.
     pub(crate) weak_edges: Vec<(u32, Link)>,
     pub(crate) weak: Csr,
+    #[cfg(feature = "row-grouped-residual-deltas")]
+    weak_forward: OnceLock<Csr>,
     /// Every coupling, for single-spin moves.
     pub(crate) all: Csr,
     fused: OnceLock<FusedCsr>,
@@ -462,6 +464,8 @@ impl OtsukaGraph {
             pairs,
             weights,
             weak: Csr::build(n, &weak_edges),
+            #[cfg(feature = "row-grouped-residual-deltas")]
+            weak_forward: OnceLock::new(),
             all: Csr::build(n, &edges),
             fused: OnceLock::new(),
             weak_edges: weak_edges
@@ -480,6 +484,27 @@ impl OtsukaGraph {
 
     pub(crate) fn fused(&self) -> &FusedCsr {
         self.fused.get_or_init(|| FusedCsr::build(self))
+    }
+
+    /// Each residual edge appears only in the row of its lower endpoint.
+    #[cfg(feature = "row-grouped-residual-deltas")]
+    pub(crate) fn weak_forward(&self) -> &Csr {
+        self.weak_forward.get_or_init(|| {
+            let mut start = Vec::with_capacity(self.n + 1);
+            let mut adj = Vec::with_capacity(self.weak_edges.len());
+            start.push(0);
+            for u in 0..self.n {
+                adj.extend(
+                    self.weak
+                        .row(u)
+                        .iter()
+                        .copied()
+                        .filter(|link| link.node() > u),
+                );
+                start.push(adj.len());
+            }
+            Csr { start, adj }
+        })
     }
 
     /// The model energy of `s`, in milli.

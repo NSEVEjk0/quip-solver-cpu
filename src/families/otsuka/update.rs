@@ -64,7 +64,10 @@ type CacheEpoch = u16;
 #[cfg(not(feature = "compact-cache-stamps"))]
 type CacheEpoch = u32;
 
-#[cfg(feature = "packed-component-spins")]
+#[cfg(all(
+    feature = "packed-component-spins",
+    not(feature = "row-grouped-residual-deltas")
+))]
 const COMPONENT_SPIN_SIGN: u32 = 1 << 31;
 
 /// Bond probabilities at one inverse temperature.
@@ -462,7 +465,10 @@ impl Workspace {
             let at = &mut self.delta[c as usize];
             self.members[*at as usize] = u as u32;
             *at += 1;
-            #[cfg(feature = "packed-component-spins")]
+            #[cfg(all(
+                feature = "packed-component-spins",
+                not(feature = "row-grouped-residual-deltas")
+            ))]
             {
                 // Component labeling has finished reading the union tree.
                 let sign = u32::from(s[u] < 0) * COMPONENT_SPIN_SIGN;
@@ -497,7 +503,10 @@ impl Workspace {
         let fused = FUSED.then(|| graph.fused());
         // delta[c] = -2 * sum over the weak edges that leave c of J s_u s_v.
         self.delta.fill(0);
-        #[cfg(not(feature = "packed-component-spins"))]
+        #[cfg(not(any(
+            feature = "packed-component-spins",
+            feature = "row-grouped-residual-deltas"
+        )))]
         {
             let (label, delta) = (&self.label, &mut self.delta);
             for &(u, link) in &graph.weak_edges {
@@ -510,7 +519,10 @@ impl Workspace {
                 }
             }
         }
-        #[cfg(feature = "packed-component-spins")]
+        #[cfg(all(
+            feature = "packed-component-spins",
+            not(feature = "row-grouped-residual-deltas")
+        ))]
         {
             let (packed, delta) = (&self.parent, &mut self.delta);
             for &(u, link) in &graph.weak_edges {
@@ -526,6 +538,30 @@ impl Workspace {
                     delta[lu as usize] += t;
                     delta[lv as usize] += t;
                 }
+            }
+        }
+        #[cfg(feature = "row-grouped-residual-deltas")]
+        {
+            let rows = graph.weak_forward();
+            let (label, delta) = (&self.label, &mut self.delta);
+            for (u, &spin) in s.iter().enumerate() {
+                let row = rows.row(u);
+                if row.is_empty() {
+                    continue;
+                }
+                let lu = label[u] as usize;
+                let factor = -2 * i32::from(spin);
+                let mut row_delta = 0_i64;
+                for &link in row {
+                    let v = link.node();
+                    let lv = label[v] as usize;
+                    if lu != lv {
+                        let change = i64::from(factor * link.j() * i32::from(s[v]));
+                        row_delta += change;
+                        delta[lv] += change;
+                    }
+                }
+                delta[lu] += row_delta;
             }
         }
         let mut change = 0;
