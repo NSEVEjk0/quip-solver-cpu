@@ -227,7 +227,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         "shallow_union_roots":cfg!(feature="shallow-union-roots"),
         "linked_component_lists":cfg!(feature="linked-component-lists"),
         "packed_residual_fields":cfg!(feature="packed-residual-fields"),
-        "motif_residual_correction":cfg!(feature="motif-residual-correction"),
         "seconds":seconds,"best_energy_milli":best,
         "energies_milli":energies,"trajectory_digest":fingerprint.finalize().to_hex().to_string(),"metrics":metrics});
     println!("{row}");

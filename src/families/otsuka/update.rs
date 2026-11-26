@@ -846,9 +846,6 @@ impl Workspace {
     ) -> i64 {
         self.partition::<INLINE>(graph, s, p, rng);
         let rows = graph.fused();
-        #[cfg(feature = "motif-residual-correction")]
-        let motifs = graph.motif_residual();
-        #[cfg(not(feature = "motif-residual-correction"))]
         let forward = graph.weak_forward();
         let tile_energy = i64::from(graph.weights.tile_milli - super::graph::STRONG_MILLI);
         let pair_energy = i64::from(graph.weights.pair_milli - super::graph::STRONG_MILLI);
@@ -890,37 +887,10 @@ impl Workspace {
             while at != end {
                 let u = self.next_member(&mut at);
                 let mut interior = 0_i32;
-                #[cfg(feature = "motif-residual-correction")]
-                let forward_row = motifs.weak_row(u);
-                #[cfg(not(feature = "motif-residual-correction"))]
-                let forward_row = forward.row(u);
-                for &link in forward_row {
+                for &link in forward.row(u) {
                     let v = link.node();
                     let inside = -i32::from(self.label[v] as usize == c);
                     interior += (link.j() * i32::from(s[v])) & inside;
-                }
-                #[cfg(feature = "motif-residual-correction")]
-                {
-                    let mut charge = 0_i32;
-                    for tile in motifs.tile_row(u) {
-                        let mut neighbor_charge = 0_i32;
-                        for k in 0..usize::from(tile.count) {
-                            let v = tile.nodes[k] as usize;
-                            let inside = -i32::from(self.label[v] as usize == c);
-                            neighbor_charge += i32::from(tile.gauge[k + 1] * s[v]) & inside;
-                        }
-                        charge += i32::from(tile.gauge[0]) * neighbor_charge;
-                    }
-                    interior -= (tile_energy as i32) * charge;
-
-                    let partner = graph.pair_partner[u] as usize;
-                    if pair_energy != 0
-                        && partner > u
-                        && partner < s.len()
-                        && self.label[partner] as usize == c
-                    {
-                        interior += pair_energy as i32 * i32::from(s[partner]);
-                    }
                 }
                 delta +=
                     i64::from(s[u]) * (4 * i64::from(interior) - 2 * residual_field(self.field[u]));

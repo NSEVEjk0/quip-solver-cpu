@@ -146,14 +146,6 @@ pub(crate) struct Tile {
     pub(crate) gauge: [i8; 4],
 }
 
-#[cfg(feature = "motif-residual-correction")]
-#[derive(Clone, Copy, Debug)]
-pub(crate) struct ForwardTile {
-    pub(crate) nodes: [u32; 3],
-    pub(crate) count: u8,
-    pub(crate) gauge: [i8; 4],
-}
-
 /// The most nodes a graph may have: a [`Link`] holds the node in 21 bits.
 pub const MAX_NODES: usize = 1 << 21;
 
@@ -318,8 +310,6 @@ pub struct OtsukaGraph {
     pub(crate) pairs: Vec<(u32, u32)>,
     #[cfg(feature = "packed-residual-fields")]
     pub(crate) pair_partner: Vec<u32>,
-    #[cfg(feature = "motif-residual-correction")]
-    motif_residual: OnceLock<MotifResidual>,
     pub(crate) weights: Weights,
     /// Every coupling of the model.
     edges: Vec<Edge>,
@@ -327,109 +317,11 @@ pub struct OtsukaGraph {
     /// each as one end and the [`Link`] to the other.
     pub(crate) weak_edges: Vec<(u32, Link)>,
     pub(crate) weak: Csr,
-    #[cfg(feature = "motif-residual-correction")]
-    weak_degree: Vec<usize>,
-    #[cfg(all(
-        feature = "row-grouped-residual-deltas",
-        not(feature = "motif-residual-correction")
-    ))]
+    #[cfg(feature = "row-grouped-residual-deltas")]
     weak_forward: OnceLock<Csr>,
     /// Every coupling, for single-spin moves.
     pub(crate) all: Csr,
     fused: OnceLock<FusedCsr>,
-}
-
-#[cfg(feature = "motif-residual-correction")]
-#[derive(Debug)]
-pub(crate) struct MotifResidual {
-    weak_forward: Csr,
-    tile_start: Vec<usize>,
-    tile_forward: Vec<ForwardTile>,
-}
-
-#[cfg(feature = "motif-residual-correction")]
-impl MotifResidual {
-    fn build(graph: &OtsukaGraph) -> Self {
-        let mut weak_start = Vec::with_capacity(graph.n + 1);
-        let mut weak_links = Vec::with_capacity(graph.weak_edges.len());
-        weak_start.push(0);
-        for u in 0..graph.n {
-            let row = graph.weak.row(u);
-            weak_links.extend(
-                row[..graph.weak_degree[u]]
-                    .iter()
-                    .copied()
-                    .filter(|link| link.node() > u),
-            );
-            weak_start.push(weak_links.len());
-        }
-
-        let mut tile_start = vec![0; graph.n + 1];
-        if graph.weights.tile_milli != STRONG_MILLI {
-            for tile in &graph.tiles {
-                let maximum = *tile.nodes.iter().max().unwrap_or(&0);
-                for &u in &tile.nodes {
-                    tile_start[u as usize + 1] += usize::from(u != maximum);
-                }
-            }
-        }
-        for u in 0..graph.n {
-            tile_start[u + 1] += tile_start[u];
-        }
-        let mut fill = tile_start[..graph.n].to_vec();
-        let mut tile_forward = vec![
-            ForwardTile {
-                nodes: [0; 3],
-                count: 0,
-                gauge: [1; 4]
-            };
-            tile_start[graph.n]
-        ];
-        if graph.weights.tile_milli != STRONG_MILLI {
-            for tile in &graph.tiles {
-                for (slot, &u) in tile.nodes.iter().enumerate() {
-                    let mut entry = ForwardTile {
-                        nodes: [0; 3],
-                        count: 0,
-                        gauge: [1; 4],
-                    };
-                    entry.gauge[0] = tile.gauge[slot];
-                    for (v_slot, &v) in tile.nodes.iter().enumerate() {
-                        if v > u {
-                            let at = usize::from(entry.count);
-                            entry.nodes[at] = v;
-                            entry.gauge[at + 1] = tile.gauge[v_slot];
-                            entry.count += 1;
-                        }
-                    }
-                    if entry.count != 0 {
-                        let at = &mut fill[u as usize];
-                        tile_forward[*at] = entry;
-                        *at += 1;
-                    }
-                }
-            }
-        }
-
-        Self {
-            weak_forward: Csr {
-                start: weak_start,
-                adj: weak_links,
-            },
-            tile_start,
-            tile_forward,
-        }
-    }
-
-    #[inline]
-    pub(crate) fn weak_row(&self, u: usize) -> &[Link] {
-        self.weak_forward.row(u)
-    }
-
-    #[inline]
-    pub(crate) fn tile_row(&self, u: usize) -> &[ForwardTile] {
-        &self.tile_forward[self.tile_start[u]..self.tile_start[u + 1]]
-    }
 }
 
 /// An edge and its coupling in milli. Node positions fit `u32`, because the
@@ -587,15 +479,6 @@ impl OtsukaGraph {
             }
             weak_edges.push(edge);
         }
-        #[cfg(feature = "motif-residual-correction")]
-        let weak_degree = {
-            let mut degree = vec![0; n];
-            for &(u, v, _) in &weak_edges {
-                degree[u as usize] += 1;
-                degree[v as usize] += 1;
-            }
-            degree
-        };
         let pair_residual = weights.pair_milli - 1000;
         if pair_residual != 0 {
             weak_edges.extend(pairs.iter().map(|&(u, v)| (u, v, pair_residual)));
@@ -617,16 +500,9 @@ impl OtsukaGraph {
             pairs,
             #[cfg(feature = "packed-residual-fields")]
             pair_partner,
-            #[cfg(feature = "motif-residual-correction")]
-            motif_residual: OnceLock::new(),
             weights,
             weak: Csr::build(n, &weak_edges),
-            #[cfg(feature = "motif-residual-correction")]
-            weak_degree,
-            #[cfg(all(
-                feature = "row-grouped-residual-deltas",
-                not(feature = "motif-residual-correction")
-            ))]
+            #[cfg(feature = "row-grouped-residual-deltas")]
             weak_forward: OnceLock::new(),
             all: Csr::build(n, &edges),
             fused: OnceLock::new(),
@@ -648,17 +524,8 @@ impl OtsukaGraph {
         self.fused.get_or_init(|| FusedCsr::build(self))
     }
 
-    #[cfg(feature = "motif-residual-correction")]
-    pub(crate) fn motif_residual(&self) -> &MotifResidual {
-        self.motif_residual
-            .get_or_init(|| MotifResidual::build(self))
-    }
-
     /// Each residual edge appears only in the row of its lower endpoint.
-    #[cfg(all(
-        feature = "row-grouped-residual-deltas",
-        not(feature = "motif-residual-correction")
-    ))]
+    #[cfg(feature = "row-grouped-residual-deltas")]
     pub(crate) fn weak_forward(&self) -> &Csr {
         self.weak_forward.get_or_init(|| {
             let mut start = Vec::with_capacity(self.n + 1);
