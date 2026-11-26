@@ -215,6 +215,8 @@ cyclic-polish = ["tree-polish"]
 dictionary-field-links = ["packed-residual-fields"]
 # Batch the residual interior scan on x86-64 CPUs with AVX2.
 avx2-interior-correction = ["packed-residual-fields", "linked-component-lists"]
+# Track short bitsets for larger components that have interleaved members.
+bitset-interior-correction = ["packed-residual-fields", "linked-component-lists"]
 # Off by default. Adds per-spin-decision and per-flip spans INSIDE the hot loop.
 # These spans distort absolute timing (millions of enters per read), so they are
 # used only for the diagnostic cross-check pass, never for headline per-part JSON.

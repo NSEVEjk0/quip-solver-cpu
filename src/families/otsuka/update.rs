@@ -311,6 +311,8 @@ struct Workspace {
     members: Vec<u32>,
     /// The weak-energy change of flipping each component.
     delta: Vec<i64>,
+    #[cfg(feature = "bitset-interior-correction")]
+    active_nodes: Vec<bool>,
     #[cfg(all(feature = "avx2-interior-correction", target_arch = "x86_64"))]
     avx2_interior: bool,
     /// Boltzmann factors of the current Metropolis sweep.
@@ -364,6 +366,8 @@ impl Workspace {
             start: Vec::with_capacity(n + 1),
             members: vec![0; n],
             delta: Vec::with_capacity(n),
+            #[cfg(feature = "bitset-interior-correction")]
+            active_nodes: vec![false; n],
             #[cfg(all(feature = "avx2-interior-correction", target_arch = "x86_64"))]
             avx2_interior: std::arch::is_x86_feature_detected!("avx2"),
             boltzmann: Boltzmann::new(),
@@ -944,6 +948,14 @@ impl Workspace {
 
             // Summed residual fields count each interior edge twice. Restore
             // that contribution once per interior edge using the forward rows.
+            #[cfg(feature = "bitset-interior-correction")]
+            {
+                let mut at = start;
+                while at != end {
+                    let u = self.next_member(&mut at);
+                    self.active_nodes[u] = true;
+                }
+            }
             let mut delta = 0;
             let mut at = start;
             while at != end {
@@ -955,17 +967,27 @@ impl Workspace {
                 let mut interior = 0_i32;
                 for &link in row {
                     let v = link.node();
+                    #[cfg(feature = "bitset-interior-correction")]
+                    let inside = -i32::from(self.active_nodes[v]);
+                    #[cfg(not(feature = "bitset-interior-correction"))]
                     let inside = -i32::from(self.label[v] as usize == c);
                     interior += (link.j() * i32::from(s[v])) & inside;
                 }
                 delta +=
                     i64::from(s[u]) * (4 * i64::from(interior) - 2 * residual_field(self.field[u]));
             }
-            if draw(delta, rng) {
+            let flip = draw(delta, rng);
+            if flip || cfg!(feature = "bitset-interior-correction") {
                 let mut at = start;
                 while at != end {
                     let u = self.next_member(&mut at);
-                    change += self.flip_cluster_node(rows, s, u);
+                    #[cfg(feature = "bitset-interior-correction")]
+                    {
+                        self.active_nodes[u] = false;
+                    }
+                    if flip {
+                        change += self.flip_cluster_node(rows, s, u);
+                    }
                 }
             }
         }

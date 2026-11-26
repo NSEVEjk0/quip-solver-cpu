@@ -1,5 +1,6 @@
 //! Exact conditional ground states on induced trees.
 
+use quip_solver_core::SamplerResult;
 use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
 
 use super::graph::OtsukaGraph;
@@ -380,7 +381,7 @@ impl<'a> TreePolish<'a> {
 
     pub(crate) fn improve(
         &mut self,
-        reads: &mut [quip_solver_core::SamplerResult],
+        reads: &mut [SamplerResult],
         stopped: &impl Fn() -> bool,
     ) -> Option<()> {
         let mut order: Vec<_> = (0..reads.len()).collect();
@@ -400,7 +401,7 @@ impl<'a> TreePolish<'a> {
             if energy_milli < reads[best].energy_milli
                 && !reads.iter().any(|read| read.spins == candidate)
             {
-                reads[best] = quip_solver_core::SamplerResult {
+                reads[best] = SamplerResult {
                     spins: candidate,
                     energy_milli,
                 };

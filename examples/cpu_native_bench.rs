@@ -238,6 +238,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "tree_polish":cfg!(feature="tree-polish"),
         "cyclic_polish":cfg!(feature="cyclic-polish"),
         "avx2_interior_correction":cfg!(feature="avx2-interior-correction"),
+        "bitset_interior_correction":cfg!(feature="bitset-interior-correction"),
         "dictionary_field_links":cfg!(feature="dictionary-field-links"),
         "polish_sweeps":args.polish_sweeps,
         "single_every":args.single_every,
