@@ -271,6 +271,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "tree_polish":cfg!(feature="tree-polish"),
         "cyclic_polish":cfg!(feature="cyclic-polish"),
         "pair_worm_polish":cfg!(feature="pair-worm-polish"),
+        "interleaved_probability_cache":cfg!(feature="interleaved-probability-cache"),
         "polish_sweeps":args.polish_sweeps,
         "single_every":args.single_every,
         "beta_hold":args.beta_hold,"weak_scale":args.weak_scale,
