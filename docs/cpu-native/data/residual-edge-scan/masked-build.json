@@ -1,0 +1,39 @@
+{
+  "build_source_commit": "dd540d1b535ab6978ab0c8dc4efe8b259ebe2414",
+  "build_provenance": "The pilot compares the two row-grouped builds. The pipeline comparison uses the same masked executable and a baseline built after the source commit, with no intervening changes to the Rust targets.",
+  "build_command": [
+    "cargo",
+    "+1.97.1",
+    "build",
+    "--release",
+    "--locked",
+    "--features",
+    "<features>",
+    "--example",
+    "cpu_native_bench",
+    "-j",
+    "2"
+  ],
+  "binaries": {
+    "pilot_reference": {
+      "features": [
+        "experimental",
+        "row-grouped-residual-deltas"
+      ],
+      "sha256": "548f9208c5e47b76e73ce653b924a45bfa8c4e0a8a3322880df5fcc0c1a3608a"
+    },
+    "pipeline_reference": {
+      "features": [
+        "experimental"
+      ],
+      "sha256": "31f266d42f059d57a64a19a726c665d1b0e228de0595a81588cc9421ee55056a"
+    },
+    "candidate": {
+      "features": [
+        "experimental",
+        "masked-residual-deltas"
+      ],
+      "sha256": "3c4602bacf1717b152d3564ad3a8e373359742f02569102acef2943173cbafac"
+    }
+  }
+}

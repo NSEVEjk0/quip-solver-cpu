@@ -1,0 +1,21 @@
+{
+  "label": "masked-residual-deltas-pipeline",
+  "pairs": 8,
+  "median_speedup": 1.027894589665273,
+  "bootstrap95_median": [
+    1.0061242588013963,
+    1.0605823788287128
+  ],
+  "mean_reference_seconds": 40.89863898,
+  "mean_candidate_seconds": 39.3443112335,
+  "exact_output_pairs": 8,
+  "mean_best_original_energy": -5044.3075,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.0366376549524108,
+    "cycles": 1.0537138068740828,
+    "instructions": 0.9703706180444405,
+    "branches": 1.1497513928692438,
+    "branch-misses": 1.4049769695135015,
+    "cache-misses": 1.0364028070266904
+  }
+}

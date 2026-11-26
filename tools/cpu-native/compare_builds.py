@@ -35,11 +35,16 @@ def read_perf(path):
             value, _, event, _, measured = fields[:5]
             if event not in PERF_EVENTS:
                 continue
-            if float(measured) < 99.0:
+            try:
+                count = float(value) if event == "task-clock" else int(value)
+                measured_percent = float(measured)
+            except ValueError as error:
+                raise RuntimeError(f"perf did not report {event} in {path}") from error
+            if measured_percent < 99.0:
                 raise RuntimeError(
-                    f"{event} was multiplexed in {path}; rerun with fewer events"
+                    f"perf measured {event} for only {measured_percent}% of the run in {path}"
                 )
-            counters[event] = float(value) if event == "task-clock" else int(value)
+            counters[event] = count
     if set(counters) != set(PERF_EVENTS):
         raise RuntimeError(f"Missing performance counters in {path}")
     return counters
@@ -164,7 +169,7 @@ def main():
             cwd=REPO,
             text=True,
             capture_output=True,
-            env={**os.environ, "LC_ALL": "C"},
+            env={**os.environ, "LC_ALL": "C"} if args.perf else None,
             check=True,
         )
         row = json.loads(result.stdout)
@@ -229,13 +234,16 @@ def main():
         ),
     }
     if args.perf:
-        summary["perf_median_reference_over_candidate"] = {
-            event: statistics.median(
-                left["perf"][event] / right["perf"][event]
-                for left, right in zip(rows[::2], rows[1::2])
-            )
-            for event in PERF_EVENTS
-        }
+        counter_ratios = {}
+        for event in PERF_EVENTS:
+            candidates = [row["perf"][event] for row in rows[1::2]]
+            counter_ratios[event] = None
+            if all(count > 0 for count in candidates):
+                counter_ratios[event] = statistics.median(
+                    reference["perf"][event] / candidate
+                    for reference, candidate in zip(rows[::2], candidates)
+                )
+        summary["perf_median_reference_over_candidate"] = counter_ratios
     write_json(output / "summary.json", summary)
     metadata["completed_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
     write_json(output / "metadata.json", metadata)

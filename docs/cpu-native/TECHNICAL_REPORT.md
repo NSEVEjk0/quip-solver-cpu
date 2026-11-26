@@ -177,6 +177,24 @@ field transformations. The [paired study](EXPERIMENTS.md#cluster-boundary-field-
 measures their net effect on elapsed time. Enable the research path at build
 time with `cluster-boundary-updates` and use the fused update preset.
 
+## C37–C38. Residual component deltas
+
+The component heat bath starts with `-2 J_res s_u s_v` for each residual
+edge crossing between two components. Both endpoints receive the same
+contribution. The row-grouped layout visits each edge from its lower-numbered
+endpoint. Holding that endpoint's spin, label, and subtotal through the row
+reduces its component-delta stores from one per crossing edge to one per
+row. The opposite endpoint is updated immediately. All subtotals are posted
+before the first component draw.
+
+The masked variant multiplies the edge term by the component-boundary
+indicator using a bit mask. Across the boundary the mask is all ones, so
+both endpoints receive the original contribution. Inside a component it is
+zero, so adding the masked term leaves the delta untouched. This removes
+the component-membership branch from the inner loop. The residual adjacency
+representation and draw order are identical to the branching row scan.
+[Measurements](EXPERIMENTS.md#row-grouped-residual-energy-scan).
+
 ## Temperature and polish studies
 
 The geometric ladder and final original-objective polish have separate

@@ -40,6 +40,11 @@ units and preserved the best result on the others. Exact motif-domain scoring
 then reduced archive pipeline time by **1.085×** in a separate paired study.
 These are separate comparisons; their speedups are not multiplied.
 
+A later opt-in build groups residual edges by endpoint and masks the
+component-membership branch in the scan. In eight held-out full-pipeline
+pairs it achieved **1.028× median speedup** over the native path with identical
+candidate outputs. [Finding C38 and paired measurements](docs/cpu-native/FINDINGS.md#c38).
+
 ![CPU execution ablation](docs/cpu-native/figures/kernel-ablation.svg)
 
 The [experiment report](docs/cpu-native/EXPERIMENTS.md) contains the complete

@@ -1,0 +1,52 @@
+{
+  "source_commit": "dd540d1b535ab6978ab0c8dc4efe8b259ebe2414",
+  "masked_native_sha256": "5c0b5c42538e5df8596ec6ee12c6aa5c536fa0ac8b4997fc4b7a3310fb7bd34c",
+  "masked_features": [
+    "experimental",
+    "masked-residual-deltas"
+  ],
+  "masked_release_tests": [
+    {
+      "check": "compile-otsuka_kernel",
+      "exit_code": 0,
+      "summary": []
+    },
+    {
+      "check": "otsuka_kernel",
+      "exit_code": 0,
+      "summary": [
+        "test result: ok. 23 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 7.63s"
+      ]
+    },
+    {
+      "check": "compile-native_conformance",
+      "exit_code": 0,
+      "summary": []
+    },
+    {
+      "check": "native_conformance",
+      "exit_code": 0,
+      "summary": [
+        "test result: ok. 1 passed; 0 failed; 0 ignored; 0 measured; 0 filtered out; finished in 0.19s"
+      ]
+    },
+    {
+      "check": "format",
+      "exit_code": 0,
+      "summary": []
+    }
+  ],
+  "combined_features": [
+    "experimental",
+    "compact-local-fields",
+    "compact-cache-stamps",
+    "cluster-boundary-updates",
+    "packed-component-spins",
+    "masked-residual-deltas"
+  ],
+  "combined_checks": {
+    "family_library": "test result: ok. 32 passed; 0 failed; 0 ignored; 0 measured; 427 filtered out; finished in 0.77s",
+    "clippy_warnings_denied": "passed",
+    "format": "passed"
+  }
+}

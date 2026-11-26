@@ -53,6 +53,7 @@ with block eligibility checked separately by the coordinator and runtime.
 | [C35](#c35) | Cluster-boundary field updates | 1.129× in the kernel pilot; full-pipeline speedup unconfirmed |
 | [C36](#c36) | Packed component labels and spin signs | Exact outputs; 4.9% more instructions on fresh seeds |
 | [C37](#c37) | Group residual edges by endpoint | 10.6% fewer instructions; full-pipeline time near parity |
+| [C38](#c38) | Mask interior edges in the residual scan | 1.028× median full-pipeline speedup; eight exact output matches |
 
 <a id="c01"></a>
 ## C01. Packed adjacency fusion
@@ -477,3 +478,16 @@ At 16 × 8,192, the grouped build retired 10.6% fewer instructions and incurred
 0.997× and all eight candidate digests matched. The instruction reduction is
 consistent across the kernel pilot and full-pipeline runs.
 [Paired timings and counters](EXPERIMENTS.md#row-grouped-residual-energy-scan).
+
+<a id="c38"></a>
+## C38. Mask interior edges in the residual scan
+
+The grouped scan can replace the component-membership branch with an integer
+mask. An edge inside a component adds zero. Across components it contributes
+the same integer energy to both endpoints before the first heat-bath draw.
+
+On eight held-out instances at 16 × 8,192, the masked build ran **1.028× faster
+at the median** than the standard native build and returned identical candidate
+spins and energies in every pair. The whole process recorded 28.8% fewer
+branch misses and 5.1% fewer cycles at the median. The build is opt-in and has
+been measured on one EPYC VPS. [Results and reproduction](EXPERIMENTS.md#mask-the-interior-edge-term).

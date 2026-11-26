@@ -1,0 +1,21 @@
+{
+  "label": "masked-residual-deltas",
+  "pairs": 8,
+  "median_speedup": 1.1286256270684603,
+  "bootstrap95_median": [
+    0.9854945097813341,
+    1.2502850716175304
+  ],
+  "mean_reference_seconds": 10.44009228175,
+  "mean_candidate_seconds": 9.405870286375,
+  "exact_output_pairs": 8,
+  "mean_best_original_energy": -5027.80125,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.1348965176629031,
+    "cycles": 1.0733515864558187,
+    "instructions": 0.8896481239950567,
+    "branches": 1.0630292302800863,
+    "branch-misses": 1.696888653889281,
+    "cache-misses": 1.0524197279903142
+  }
+}

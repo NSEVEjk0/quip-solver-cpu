@@ -266,6 +266,33 @@ In the full pipeline, the median changes in whole-process counters were
 instruction count fell on every seed. The elapsed-time interval spans parity,
 so the feature remains experimental. [Full-pipeline counter summary](data/residual-edge-scan/confirm-row/summary.json).
 
+### Mask the interior-edge term
+
+The `masked-residual-deltas` build keeps the grouped layout and adds the
+edge term after masking it by component membership. Same-component edges
+add zero. This tests whether removing the branch helps even though the
+loop performs arithmetic and a delta update for every edge.
+
+The [kernel pilot](data/residual-edge-scan/pilot-masked/results.json) compares
+the two row-grouped builds at 16 × 2,048 on seeds 1101–1108. All eight output
+digests matched. The median speed ratio was 1.129×, with a paired bootstrap
+95% median interval of 0.985–1.250×. The masked build recorded 41.1% fewer
+branch misses and 6.8% fewer cycles, with 12.4% more retired instructions at
+the median. [Counter summary](data/residual-edge-scan/pilot-masked/summary.json).
+
+The [full-pipeline comparison](data/residual-edge-scan/confirm-masked/results.json)
+uses the existing native build as the reference and the archive preset in both
+arms. At 16 × 8,192 on seeds 1111–1118, mean elapsed time was 40.899 s for the
+reference and 39.344 s for the masked build. The median speed ratio was
+**1.028×**, with a paired bootstrap 95% median interval of **1.006–1.061×**.
+Seven of eight pairs ran faster, and all eight candidate digests matched.
+
+Whole-process median counts showed 28.8% fewer branch misses, 5.1% fewer cycles,
+and 3.1% more retired instructions. Cycle and branch-miss counts fell in every
+pair. The measurements cover the specified recipe and one EPYC 7663 VPS. The
+masked path is an opt-in build. [Counter summary](data/residual-edge-scan/confirm-masked/summary.json),
+[build and hashes](data/residual-edge-scan/masked-build.json).
+
 ## Correctness and protocol checks
 
 The release validation checks the actual native binary and its family adapter:
@@ -287,6 +314,10 @@ The release validation checks the actual native binary and its family adapter:
 
 The [operator guide](OPERATOR_GUIDE.md#checks-and-operation) provides standard
 Cargo commands. The final test logs and command records are in `data/validation/`.
+For the masked build, 23 kernel tests and one native session conformance test
+passed. With the storage, cluster, and residual-scan features selected together,
+32 family-library tests, Clippy with warnings denied, and formatting passed.
+See the [validation record](data/residual-edge-scan/masked-validation.json).
 Native deployment observations are recorded separately in
 [live operation](LIVE_OPERATION.md); coordinator candidate validation is a
 different event from inclusion of a winning proof in a block.
@@ -344,6 +375,16 @@ branch and cache events, and task-clock milliseconds.
 
 ```sh
 python3 tools/cpu-native/compare_builds.py --reference-binary "$study/wide" --candidate-binary "$study/rows" --label row-grouped-residual-deltas-pipeline --cpus 3 4 --output "$study/row-pipeline" --seed-start 1091 --sweeps 8192 --mode pipeline --preset archive --perf
+```
+
+To evaluate masking, build with `experimental,masked-residual-deltas` and
+save the example as `"$study/masked"`. The feature selects the row-grouped
+layout automatically. Compare it with the branching row build at the kernel
+budget and the standard native build at the operational budget.
+
+```sh
+python3 tools/cpu-native/compare_builds.py --reference-binary "$study/rows" --candidate-binary "$study/masked" --label masked-residual-deltas --cpus 3 4 --output "$study/masked-kernel" --seed-start 1101 --sweeps 2048 --mode kernel --preset core --perf
+python3 tools/cpu-native/compare_builds.py --reference-binary "$study/wide" --candidate-binary "$study/masked" --label masked-residual-deltas-pipeline --cpus 3 4 --output "$study/masked-pipeline" --seed-start 1111 --sweeps 8192 --mode pipeline --preset archive --perf
 ```
 
 The evidence covers the specified Quip family, recipe, toolchain, and VPS.
