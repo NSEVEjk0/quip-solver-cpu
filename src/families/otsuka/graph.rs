@@ -217,28 +217,53 @@ impl Csr {
 }
 
 /// A neighbor, its full coupling, and its residual coupling in one word.
-/// Node positions use 21 bits; each coupling uses 11 biased signed bits.
+/// Node positions use 21 bits. The couplings use either two 11-bit lanes
+/// or a single signed field adjustment in the remaining 43 bits.
 #[derive(Clone, Copy, Debug)]
 pub(crate) struct FusedLink(u64);
 
 impl FusedLink {
+    const PACKED_FIELD_BITS: u32 = 43;
+
     fn new(node: u32, full: i32, residual: i32) -> Self {
-        Self((u64::from(node) << 22) | (((full + 1024) as u64) << 11) | (residual + 1024) as u64)
+        if cfg!(feature = "packed-residual-fields") {
+            let adjustment = (i64::from(full) << 32) + i64::from(residual);
+            let payload = adjustment as u64 & ((1 << Self::PACKED_FIELD_BITS) - 1);
+            Self((u64::from(node) << Self::PACKED_FIELD_BITS) | payload)
+        } else {
+            Self(
+                (u64::from(node) << 22) | (((full + 1024) as u64) << 11) | (residual + 1024) as u64,
+            )
+        }
     }
 
     #[inline]
     pub(crate) fn node(self) -> usize {
-        (self.0 >> 22) as usize
+        let shift = if cfg!(feature = "packed-residual-fields") {
+            Self::PACKED_FIELD_BITS
+        } else {
+            22
+        };
+        (self.0 >> shift) as usize
     }
 
+    #[cfg(not(feature = "packed-residual-fields"))]
     #[inline]
     pub(crate) fn full(self) -> i32 {
         ((self.0 >> 11) & 2047) as i32 - 1024
     }
 
+    #[cfg(not(feature = "packed-residual-fields"))]
     #[inline]
     pub(crate) fn residual(self) -> i32 {
         (self.0 & 2047) as i32 - 1024
+    }
+
+    #[cfg(feature = "packed-residual-fields")]
+    #[inline]
+    pub(crate) fn field_adjustment(self) -> i64 {
+        let shift = u64::BITS - Self::PACKED_FIELD_BITS;
+        ((self.0 << shift) as i64) >> shift
     }
 }
 

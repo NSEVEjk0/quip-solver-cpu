@@ -9,20 +9,29 @@ use rand::rngs::SmallRng;
 use rand::Rng;
 use std::fmt;
 
+#[cfg(feature = "packed-residual-fields")]
+use super::graph::FusedCsr;
 use super::graph::{OtsukaGraph, Weights};
 
 // Unique, non-self edges, |J| <= 1000, zero fields, and at most 2^21 nodes
 // bound every local field by (2^21 - 1) * 1000 = 2,097,151,000. Partial sums
 // and fields after each flip satisfy the same bound. Energy deltas stay i64.
-#[cfg(feature = "compact-local-fields")]
+#[cfg(all(
+    feature = "compact-local-fields",
+    not(feature = "packed-residual-fields")
+))]
 pub(super) type LocalField = i32;
-#[cfg(not(feature = "compact-local-fields"))]
+#[cfg(any(
+    not(feature = "compact-local-fields"),
+    feature = "packed-residual-fields"
+))]
 pub(super) type LocalField = i64;
-#[cfg(feature = "compact-local-fields")]
+#[cfg(any(feature = "compact-local-fields", feature = "packed-residual-fields"))]
 const _: () = assert!(
     (super::graph::MAX_NODES as i64 - 1) * super::graph::STRONG_MILLI as i64 <= i32::MAX as i64
 );
 
+#[cfg(not(feature = "packed-residual-fields"))]
 #[inline(always)]
 fn field_coupling(value: i32) -> LocalField {
     #[cfg(feature = "compact-local-fields")]
@@ -37,16 +46,24 @@ fn field_coupling(value: i32) -> LocalField {
 
 #[inline(always)]
 fn field_energy(value: LocalField) -> i64 {
-    #[cfg(feature = "compact-local-fields")]
+    #[cfg(feature = "packed-residual-fields")]
+    {
+        value >> 32
+    }
+    #[cfg(all(
+        feature = "compact-local-fields",
+        not(feature = "packed-residual-fields")
+    ))]
     {
         i64::from(value)
     }
-    #[cfg(not(feature = "compact-local-fields"))]
+    #[cfg(not(any(feature = "compact-local-fields", feature = "packed-residual-fields")))]
     {
         value
     }
 }
 
+#[cfg(not(feature = "packed-residual-fields"))]
 #[inline(always)]
 fn stored_field(value: i64) -> LocalField {
     #[cfg(feature = "compact-local-fields")]
@@ -59,6 +76,15 @@ fn stored_field(value: i64) -> LocalField {
     }
 }
 
+#[cfg(feature = "packed-residual-fields")]
+const RESIDUAL_FIELD_BIAS: i64 = 1 << 31;
+
+#[cfg(feature = "packed-residual-fields")]
+#[inline]
+fn residual_field(value: LocalField) -> i64 {
+    i64::from(value as u32) - RESIDUAL_FIELD_BIAS
+}
+
 #[cfg(feature = "compact-cache-stamps")]
 type CacheEpoch = u16;
 #[cfg(not(feature = "compact-cache-stamps"))]
@@ -69,6 +95,8 @@ type CacheEpoch = u32;
     not(feature = "row-grouped-residual-deltas")
 ))]
 const COMPONENT_SPIN_SIGN: u32 = 1 << 31;
+
+const END_OF_COMPONENT: u32 = u32::MAX;
 
 /// Bond probabilities at one inverse temperature.
 #[derive(Clone, Copy, Debug)]
@@ -272,15 +300,15 @@ struct Workspace {
     parent: Vec<u32>,
     /// The component of each node.
     label: Vec<u32>,
-    /// The nodes of component `c` are `members[start[c]..start[c + 1]]`.
+    /// Offsets into `members`, or heads with `linked-component-lists`.
     start: Vec<u32>,
+    /// Consecutive nodes, or a next-node index for each node with linked lists.
     members: Vec<u32>,
     /// The weak-energy change of flipping each component.
     delta: Vec<i64>,
     /// Boltzmann factors of the current Metropolis sweep.
     boltzmann: Boltzmann,
-    /// The local field of each node over every coupling, `sum J s_v`,
-    /// patched at each flip.
+    /// The full local field, or full and residual fields in one word.
     field: Vec<LocalField>,
     /// Accepted nodes, boundary neighbor updates, and interior updates avoided.
     boundary_work: [usize; 3],
@@ -337,6 +365,18 @@ impl Workspace {
 
     /// Recompute every local field from `s`.
     fn set_fields(&mut self, graph: &OtsukaGraph, s: &[i8]) {
+        #[cfg(feature = "packed-residual-fields")]
+        {
+            let rows = graph.fused();
+            for (u, field) in self.field.iter_mut().enumerate() {
+                *field = rows
+                    .row(u)
+                    .iter()
+                    .map(|&link| link.field_adjustment() * i64::from(s[link.node()]))
+                    .fold(RESIDUAL_FIELD_BIAS, i64::wrapping_add);
+            }
+        }
+        #[cfg(not(feature = "packed-residual-fields"))]
         for (u, field) in self.field.iter_mut().enumerate() {
             *field = graph
                 .all
@@ -351,12 +391,33 @@ impl Workspace {
     /// the model energy change in milli.
     #[inline]
     fn flip(&mut self, graph: &OtsukaGraph, s: &mut [i8], u: usize) -> i64 {
-        let twice = 2 * LocalField::from(s[u]);
-        for &link in graph.all.row(u) {
-            self.field[link.node()] -= twice * field_coupling(link.j());
+        #[cfg(feature = "packed-residual-fields")]
+        {
+            Self::flip_packed(graph.fused(), &mut self.field, s, u)
+        }
+        #[cfg(not(feature = "packed-residual-fields"))]
+        {
+            let twice = 2 * LocalField::from(s[u]);
+            for &link in graph.all.row(u) {
+                self.field[link.node()] -= twice * field_coupling(link.j());
+            }
+            s[u] = -s[u];
+            -field_energy(twice) * field_energy(self.field[u])
+        }
+    }
+
+    #[cfg(feature = "packed-residual-fields")]
+    #[inline]
+    fn flip_packed(rows: &FusedCsr, fields: &mut [LocalField], s: &mut [i8], u: usize) -> i64 {
+        let twice = 2 * i64::from(s[u]);
+        for &link in rows.row(u) {
+            let field = &mut fields[link.node()];
+            // The completed residual field fits i32, so its biased value
+            // fits the low lane and never carries into the full field.
+            *field = field.wrapping_sub(twice * link.field_adjustment());
         }
         s[u] = -s[u];
-        -field_energy(twice) * field_energy(self.field[u])
+        -twice * field_energy(fields[u])
     }
 
     fn find(&mut self, mut u: u32) -> u32 {
@@ -388,10 +449,13 @@ impl Workspace {
     fn find_inline(&mut self, mut u: u32) -> u32 {
         loop {
             let up = self.parent[u as usize];
-            if up == u {
+            if !cfg!(feature = "shallow-union-roots") && up == u {
                 return u;
             }
             let grand = self.parent[up as usize];
+            if cfg!(feature = "shallow-union-roots") && grand == up {
+                return up;
+            }
             self.parent[u as usize] = grand;
             u = grand;
         }
@@ -405,7 +469,10 @@ impl Workspace {
         }
         let a = self.find_inline(a);
         let b = self.find_inline(b);
-        if a < b {
+        if cfg!(feature = "shallow-union-roots") {
+            // A repeated root writes its own index back unchanged.
+            self.parent[a.max(b) as usize] = a.min(b);
+        } else if a < b {
             self.parent[b as usize] = a;
         } else if b < a {
             self.parent[a as usize] = b;
@@ -504,18 +571,48 @@ impl Workspace {
         // and every root is the smallest node of its component. One pass in
         // node order then numbers the components by their smallest node and
         // finds each label at the parent, which the pass has already seen.
+        // Linked lists prepend later members and preserve the component order.
+        let linked = cfg!(feature = "linked-component-lists");
         self.start.clear();
-        self.start.push(0);
+        if !linked {
+            self.start.push(0);
+        }
         for u in 0..self.parent.len() {
             let up = self.parent[u] as usize;
             let c = if up == u {
-                self.start.push(0);
-                (self.start.len() - 2) as u32
+                if linked {
+                    let c = self.start.len() as u32;
+                    self.start.push(u as u32);
+                    self.members[u] = END_OF_COMPONENT;
+                    c
+                } else {
+                    self.start.push(0);
+                    (self.start.len() - 2) as u32
+                }
             } else {
-                self.label[up]
+                let c = self.label[up];
+                if linked {
+                    self.members[u] = std::mem::replace(&mut self.start[c as usize], u as u32);
+                }
+                c
             };
             self.label[u] = c;
-            self.start[c as usize + 1] += 1;
+            if !linked {
+                self.start[c as usize + 1] += 1;
+            }
+            #[cfg(all(
+                feature = "packed-component-spins",
+                not(feature = "row-grouped-residual-deltas")
+            ))]
+            if linked {
+                let sign = u32::from(s[u] < 0) * COMPONENT_SPIN_SIGN;
+                self.parent[u] = c | sign;
+            }
+        }
+        if linked {
+            self.delta.clear();
+            self.delta.resize(self.start.len(), 0);
+            return;
         }
         for c in 1..self.start.len() {
             self.start[c] += self.start[c - 1];
@@ -541,6 +638,29 @@ impl Workspace {
         }
     }
 
+    #[inline]
+    fn component_range(&self, c: usize) -> (u32, u32) {
+        let end = if cfg!(feature = "linked-component-lists") {
+            END_OF_COMPONENT
+        } else {
+            self.start[c + 1]
+        };
+        (self.start[c], end)
+    }
+
+    #[inline]
+    fn next_member(&self, at: &mut u32) -> usize {
+        if cfg!(feature = "linked-component-lists") {
+            let node = *at as usize;
+            *at = self.members[node];
+            node
+        } else {
+            let node = self.members[*at as usize] as usize;
+            *at += 1;
+            node
+        }
+    }
+
     /// One cluster sweep. Returns the model energy change in milli.
     fn cluster_sweep(
         &mut self,
@@ -555,6 +675,7 @@ impl Workspace {
         })
     }
 
+    #[cfg(not(feature = "packed-residual-fields"))]
     fn cluster_sweep_using<const INLINE: bool, const FUSED: bool>(
         &mut self,
         graph: &OtsukaGraph,
@@ -566,7 +687,9 @@ impl Workspace {
         self.partition::<INLINE>(graph, s, p, rng);
         let fused = FUSED.then(|| graph.fused());
         // delta[c] = -2 * sum over the weak edges that leave c of J s_u s_v.
-        self.delta.fill(0);
+        if !cfg!(feature = "linked-component-lists") {
+            self.delta.fill(0);
+        }
         #[cfg(not(any(
             feature = "packed-component-spins",
             feature = "row-grouped-residual-deltas"
@@ -644,8 +767,9 @@ impl Workspace {
             if !draw(d, rng) {
                 continue;
             }
-            for at in self.start[c] as usize..self.start[c + 1] as usize {
-                let u = self.members[at] as usize;
+            let (mut at, end) = self.component_range(c);
+            while at != end {
+                let u = self.next_member(&mut at);
                 let su = i64::from(s[u]);
                 if let Some(rows) = fused {
                     if cfg!(feature = "cluster-boundary-updates") {
@@ -707,6 +831,61 @@ impl Workspace {
                 }
             }
             self.delta[c] = -d;
+        }
+        change
+    }
+
+    #[cfg(feature = "packed-residual-fields")]
+    fn cluster_sweep_using<const INLINE: bool, const FUSED: bool>(
+        &mut self,
+        graph: &OtsukaGraph,
+        s: &mut [i8],
+        p: &Breakup,
+        rng: &mut SmallRng,
+        mut draw: impl FnMut(i64, &mut SmallRng) -> bool,
+    ) -> i64 {
+        self.partition::<INLINE>(graph, s, p, rng);
+        let rows = graph.fused();
+        let forward = graph.weak_forward();
+        let mut change = 0;
+        for c in 0..self.delta.len() {
+            let (start, end) = self.component_range(c);
+            let mut at = start;
+            let first = self.next_member(&mut at);
+            if at == end {
+                let delta = -2 * i64::from(s[first]) * residual_field(self.field[first]);
+                if draw(delta, rng) {
+                    change += Self::flip_packed(rows, &mut self.field, s, first);
+                }
+                continue;
+            }
+
+            // Summed residual fields count each interior edge twice. Restore
+            // that contribution once per interior edge using the forward rows.
+            let mut delta = 0;
+            let mut u = first;
+            loop {
+                let mut interior = 0_i32;
+                for &link in forward.row(u) {
+                    let v = link.node();
+                    if self.label[v] as usize == c {
+                        interior += link.j() * i32::from(s[v]);
+                    }
+                }
+                delta +=
+                    i64::from(s[u]) * (4 * i64::from(interior) - 2 * residual_field(self.field[u]));
+                if at == end {
+                    break;
+                }
+                u = self.next_member(&mut at);
+            }
+            if draw(delta, rng) {
+                let mut at = start;
+                while at != end {
+                    let u = self.next_member(&mut at);
+                    change += Self::flip_packed(rows, &mut self.field, s, u);
+                }
+            }
         }
         change
     }
@@ -951,6 +1130,48 @@ fn tile_table_preserves_position_order_for_every_pattern() {
         assert_eq!(usize::from(pattern.ups), up.len());
         assert_eq!(&pattern.up[..up.len()], up.as_slice());
         assert_eq!(&pattern.down[..down.len()], down.as_slice());
+    }
+}
+
+#[cfg(all(test, feature = "packed-residual-fields"))]
+#[test]
+fn packed_fields_preserve_both_signed_sums_through_flips() {
+    use super::graph::{Csr, Model, Motifs};
+
+    let graph = OtsukaGraph::new(
+        &Model {
+            h_milli: &[0; 3],
+            edges: &[(0, 1), (0, 2)],
+            j_milli: &[-1000, 999],
+        },
+        &Motifs {
+            tiles: &[],
+            gauges: &[],
+            pairs: &[(0, 1)],
+        },
+        Weights {
+            pair_milli: 999,
+            tile_milli: 1000,
+        },
+    )
+    .unwrap();
+    let mut spins = [1; 3];
+    let mut work = Workspace::new(graph.n);
+    work.set_fields(&graph, &spins);
+    for flip in [1, 2, 0, 1, 2, 0] {
+        for (u, &packed) in work.field.iter().enumerate() {
+            let sum = |rows: &Csr| {
+                rows.row(u)
+                    .iter()
+                    .map(|&link| i64::from(link.j()) * i64::from(spins[link.node()]))
+                    .sum::<i64>()
+            };
+            assert_eq!(field_energy(packed), sum(&graph.all));
+            assert_eq!(residual_field(packed), sum(&graph.weak));
+        }
+        let before = graph.energy(&spins);
+        let change = work.flip(&graph, &mut spins, flip);
+        assert_eq!(change, graph.energy(&spins) - before);
     }
 }
 

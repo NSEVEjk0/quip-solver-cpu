@@ -224,6 +224,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         "row_grouped_residual_deltas":cfg!(feature="row-grouped-residual-deltas"),
         "masked_residual_deltas":cfg!(feature="masked-residual-deltas"),
         "table_tile_bonds":cfg!(feature="table-tile-bonds"),
+        "shallow_union_roots":cfg!(feature="shallow-union-roots"),
+        "linked_component_lists":cfg!(feature="linked-component-lists"),
+        "packed_residual_fields":cfg!(feature="packed-residual-fields"),
         "seconds":seconds,"best_energy_milli":best,
         "energies_milli":energies,"trajectory_digest":fingerprint.finalize().to_hex().to_string(),"metrics":metrics});
     println!("{row}");
