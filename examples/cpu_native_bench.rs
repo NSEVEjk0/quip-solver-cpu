@@ -132,6 +132,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         slot_archive: args.slot_archive,
         #[cfg(feature = "tree-polish")]
         tree_polish: true,
+        #[cfg(feature = "pair-worm-polish")]
+        pair_worm_polish: true,
         cache_slots: args.cache_slots,
         motif_score: !args.disable_motif_score,
         ..FunnelConfig::default()
@@ -268,6 +270,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "packed_residual_fields":cfg!(feature="packed-residual-fields"),
         "tree_polish":cfg!(feature="tree-polish"),
         "cyclic_polish":cfg!(feature="cyclic-polish"),
+        "pair_worm_polish":cfg!(feature="pair-worm-polish"),
         "polish_sweeps":args.polish_sweeps,
         "single_every":args.single_every,
         "beta_hold":args.beta_hold,"weak_scale":args.weak_scale,

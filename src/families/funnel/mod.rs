@@ -25,6 +25,11 @@ use super::otsuka::{
     PopulationOptions, Schedule, SweepCache, Weights,
 };
 use super::otsuka_sampler::{parse_pairs, section, PAIRS_SECTION};
+#[cfg(feature = "pair-worm-polish")]
+use crate::postprocess::{
+    greedy::{DescentError, Ising},
+    pair_worm::{PairWorm, WormOptions},
+};
 use crate::sampler_core::{
     build_beta_schedule, effective_sweeps_per_beta, sample_ising_cancellable,
 };
@@ -92,6 +97,9 @@ pub struct FunnelConfig {
     /// Enable conditional tree descent on the completed candidate batch.
     #[cfg(feature = "tree-polish")]
     pub tree_polish: bool,
+    /// Finish the best reads with downhill, pair-aware collective moves.
+    #[cfg(feature = "pair-worm-polish")]
+    pub pair_worm_polish: bool,
     /// Share temperature-local probabilities across replicas.
     pub shared_cache: bool,
     /// Positive half-delta capacity of the shared probability table.
@@ -136,6 +144,8 @@ impl Default for FunnelConfig {
             beta_hold: 0.0,
             #[cfg(feature = "tree-polish")]
             tree_polish: false,
+            #[cfg(feature = "pair-worm-polish")]
+            pair_worm_polish: false,
             shared_cache: false,
             cache_slots: 8192,
             copy_resampling: false,
@@ -261,6 +271,12 @@ impl FunnelConfig {
         if let Some(v) = table.get("funnel_tree_polish") {
             self.tree_polish = v.as_bool().ok_or("funnel_tree_polish must be a boolean")?;
         }
+        #[cfg(feature = "pair-worm-polish")]
+        if let Some(v) = table.get("funnel_pair_worm_polish") {
+            self.pair_worm_polish = v
+                .as_bool()
+                .ok_or("funnel_pair_worm_polish must be a boolean")?;
+        }
         if let Some(v) = table.get("funnel_weak_scale") {
             self.weak_scale = v
                 .as_float()
@@ -297,6 +313,8 @@ impl FunnelConfig {
             "beta_hold",
             #[cfg(feature = "tree-polish")]
             "tree_polish",
+            #[cfg(feature = "pair-worm-polish")]
+            "pair_worm_polish",
             "shared_cache",
             "cache_slots",
             "copy_resampling",
@@ -314,6 +332,8 @@ impl FunnelConfig {
             let value = match key {
                 #[cfg(feature = "tree-polish")]
                 "tree_polish" => raw.parse::<bool>().ok().map(toml::Value::Boolean),
+                #[cfg(feature = "pair-worm-polish")]
+                "pair_worm_polish" => raw.parse::<bool>().ok().map(toml::Value::Boolean),
                 "screen"
                 | "shared_cache"
                 | "copy_resampling"
@@ -802,7 +822,45 @@ pub fn tuned_reads(
     if config.tree_polish && !polish_trees(&truth, &mut reads, params.seed, &stopped) {
         return Ok(None);
     }
+    #[cfg(feature = "pair-worm-polish")]
+    if config.pair_worm_polish && !polish_pair_worm(instance, &mut reads, params.seed, &stopped)? {
+        return Ok(None);
+    }
     Ok(Some(reads))
+}
+
+#[cfg(feature = "pair-worm-polish")]
+fn polish_pair_worm(
+    instance: &Instance,
+    reads: &mut [SamplerResult],
+    seed: u64,
+    stopped: &impl Fn() -> bool,
+) -> Result<bool, SampleError> {
+    let (tiles, _) = local_gauges(instance).ok_or(SampleError::Capacity)?;
+    let pairs =
+        parse_pairs(section(instance.metadata(), PAIRS_SECTION).ok_or(SampleError::Capacity)?)
+            .ok_or(SampleError::Capacity)?;
+    let h: Vec<_> = instance.h().iter().map(|&value| i64::from(value)).collect();
+    let j: Vec<_> = instance.j().iter().map(|&value| i64::from(value)).collect();
+    let ising = Ising::new(&h, instance.edges(), &j).map_err(|_| SampleError::Capacity)?;
+    let worm = PairWorm::new(&ising, &tiles, &pairs).map_err(|_| SampleError::Capacity)?;
+    let mut order: Vec<_> = (0..reads.len()).collect();
+    order.sort_by_key(|&index| reads[index].energy_milli);
+    let settings = WormOptions {
+        max_sweeps: 8,
+        max_len: 64,
+        ..WormOptions::default()
+    };
+    for index in order.into_iter().take(8) {
+        let read = &mut reads[index];
+        let local_seed = seed ^ 0xa076_1d64_78bd_642f_u64.wrapping_mul(index as u64 + 1);
+        match worm.descend_cancellable(&ising, &mut read.spins, &settings, local_seed, stopped) {
+            Ok(_) => read.energy_milli = ising.energy(&read.spins),
+            Err(DescentError::Cancelled) => return Ok(false),
+            Err(_) => return Err(SampleError::Capacity),
+        }
+    }
+    Ok(true)
 }
 
 #[cfg(feature = "tree-polish")]
