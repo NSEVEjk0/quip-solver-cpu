@@ -51,6 +51,7 @@ with block eligibility checked separately by the coordinator and runtime.
 | [C33](#c33) | Skip identity copies at resampling | 86% fewer field restores at the pilot budget |
 | [C34](#c34) | Combined storage and resampling | All outputs matched; no speedup established |
 | [C35](#c35) | Cluster-boundary field updates | 1.129× in the kernel pilot; full-pipeline speedup unconfirmed |
+| [C36](#c36) | Packed component labels and spin signs | Exact outputs; 4.9% more instructions on fresh seeds |
 
 <a id="c01"></a>
 ## C01. Packed adjacency fusion
@@ -447,3 +448,17 @@ operational budget on eight fresh instances, the full pipeline gave 0.996×.
 All 16 pairs returned the same candidate spins and energies. Keep this
 alternative as an experimental build. [Derivation](TECHNICAL_REPORT.md#c35-cluster-boundary-field-updates),
 [paired study](EXPERIMENTS.md#cluster-boundary-field-updates).
+
+<a id="c36"></a>
+## C36. Packed component labels and spin signs
+
+After component labeling, the residual-edge pass reads the spin signs and
+component IDs of both endpoints. This experiment writes each sign into an
+unused high bit of the component ID in the union-find buffer. The pass
+loads the two packed endpoints and recovers the spin product from their
+sign bits.
+
+All 16 pairs matched. The initial pilot's 1.124× median ratio had a wide
+interval. Eight fresh instrumented pairs gave 0.939× with 4.9% more retired
+instructions at the median. The feature stays opt-in.
+[Paired timings and counters](EXPERIMENTS.md#packed-component-labels-and-spin-signs).

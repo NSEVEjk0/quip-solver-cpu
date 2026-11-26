@@ -227,6 +227,26 @@ full-pipeline performance is near parity, with exact output agreement.
 The feature is off by default. [Derivation](TECHNICAL_REPORT.md#c35-cluster-boundary-field-updates),
 [binary and source hashes](data/cluster-boundary/build.json).
 
+## Packed component labels and spin signs
+
+The `packed-component-spins` feature reuses the completed union-find buffer
+to store a component ID and one sign bit per node. Both studies use the
+`core` preset, 16 replicas × 2,048 sweeps, and the native comparison build
+with ordinary field and stamp widths. Each pair returns the same candidate
+spins and original energies.
+
+| Comparison | Seeds | Median speed ratio | Paired bootstrap 95% median interval | Matches |
+|---|---:|---:|---:|---:|
+| [Initial kernel pilot](data/packed-component-spins/pilot-packed/results.json) | 1061–1068 | 1.124× | 0.826–1.231× | 8/8 |
+| [Kernel with hardware counters](data/packed-component-spins/perf-packed/results.json) | 1071–1078 | 0.939× | 0.892–0.990× | 8/8 |
+
+In the instrumented pairs, the median candidate retired 4.9% more
+instructions and used 4.5% more process CPU time. Perf counts cover the
+whole benchmark process, including preparation and verification outside
+the harness timer. The total instruction count establishes an increase
+for this build, without attributing it to individual operations.
+[Counter summary](data/packed-component-spins/perf-packed/summary.json).
+
 ## Correctness and protocol checks
 
 The release validation checks the actual native binary and its family adapter:

@@ -3,16 +3,46 @@
 
 import argparse
 import concurrent.futures
+import csv
 import datetime
 import hashlib
 import json
 import os
 from pathlib import Path
 import platform
+import shutil
 import statistics
 import subprocess
 
 from run_study import REPO, bootstrap_median, capture, write_json
+
+PERF_EVENTS = (
+    "task-clock",
+    "cycles",
+    "instructions",
+    "branches",
+    "branch-misses",
+    "cache-misses",
+)
+
+
+def read_perf(path):
+    counters = {}
+    with path.open(newline="") as stream:
+        for fields in csv.reader(stream):
+            if len(fields) < 5:
+                continue
+            value, _, event, _, measured = fields[:5]
+            if event not in PERF_EVENTS:
+                continue
+            if float(measured) < 99.0:
+                raise RuntimeError(
+                    f"{event} was multiplexed in {path}; rerun with fewer events"
+                )
+            counters[event] = float(value) if event == "task-clock" else int(value)
+    if set(counters) != set(PERF_EVENTS):
+        raise RuntimeError(f"Missing performance counters in {path}")
+    return counters
 
 
 def main():
@@ -31,6 +61,11 @@ def main():
     parser.add_argument("--selective-resampling", action="store_true")
     parser.add_argument("--cache-slots", type=int, default=8192)
     parser.add_argument("--reference-cache-slots", type=int, default=8192)
+    parser.add_argument(
+        "--perf",
+        action="store_true",
+        help="record Linux perf counters for each process",
+    )
     args = parser.parse_args()
     if min(args.instances, args.reads, args.sweeps) < 1 or args.seed_start < 0:
         parser.error("positive budgets and a nonnegative seed are required")
@@ -44,6 +79,8 @@ def main():
         path.is_file() for path in (args.reference_binary, args.candidate_binary)
     ):
         parser.error("both benchmark executables must exist")
+    if args.perf and shutil.which("perf") is None:
+        parser.error("--perf requires Linux perf")
     output = args.output.resolve()
     output.mkdir(parents=True, exist_ok=True)
     if (output / "results.json").exists():
@@ -82,18 +119,15 @@ def main():
             )
         },
     }
+    if args.perf:
+        metadata["perf_events"] = PERF_EVENTS
+        metadata["perf_task_clock_unit"] = "ms"
     write_json(output / "metadata.json", metadata)
     rows, ratios = [], []
 
     def run(role, seed, cpu):
         slots = args.reference_cache_slots if role == "reference" else args.cache_slots
         command = [
-            "taskset",
-            "-c",
-            str(cpu),
-            "nice",
-            "-n",
-            "10",
             str(binaries[role]),
             "--mode",
             args.mode,
@@ -110,11 +144,33 @@ def main():
         ]
         if role == "candidate" and args.selective_resampling:
             command.append("--selective-resampling")
+        if args.perf:
+            perf_path = output / f"{seed}-{role}.perf.csv"
+            command = [
+                "perf",
+                "stat",
+                "-x",
+                ",",
+                "-e",
+                ",".join(PERF_EVENTS),
+                "--output",
+                str(perf_path),
+                "--",
+                *command,
+            ]
+        command = ["taskset", "-c", str(cpu), "nice", "-n", "10", *command]
         result = subprocess.run(
-            command, cwd=REPO, text=True, capture_output=True, check=True
+            command,
+            cwd=REPO,
+            text=True,
+            capture_output=True,
+            env={**os.environ, "LC_ALL": "C"},
+            check=True,
         )
         row = json.loads(result.stdout)
         row.update(role=role, label=args.label, cpu=cpu, command=command)
+        if args.perf:
+            row["perf"] = read_perf(perf_path)
         if result.stderr:
             (output / f"{seed}-{role}.log").write_text(result.stderr)
         return row
@@ -172,6 +228,14 @@ def main():
             if row["role"] == "candidate"
         ),
     }
+    if args.perf:
+        summary["perf_median_reference_over_candidate"] = {
+            event: statistics.median(
+                left["perf"][event] / right["perf"][event]
+                for left, right in zip(rows[::2], rows[1::2])
+            )
+            for event in PERF_EVENTS
+        }
     write_json(output / "summary.json", summary)
     metadata["completed_utc"] = datetime.datetime.now(datetime.timezone.utc).isoformat()
     write_json(output / "metadata.json", metadata)

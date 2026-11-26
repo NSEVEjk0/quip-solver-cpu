@@ -1,0 +1,13 @@
+{
+  "label": "packed-component-spins",
+  "pairs": 8,
+  "median_speedup": 1.1236648477882856,
+  "bootstrap95_median": [
+    0.8258771802139426,
+    1.231275615477504
+  ],
+  "mean_reference_seconds": 10.403620172,
+  "mean_candidate_seconds": 9.864461708624999,
+  "exact_output_pairs": 8,
+  "mean_best_original_energy": -5028.98625
+}

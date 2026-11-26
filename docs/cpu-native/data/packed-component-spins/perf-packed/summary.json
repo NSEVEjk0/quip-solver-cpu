@@ -1,0 +1,21 @@
+{
+  "label": "packed-component-spins-perf",
+  "pairs": 8,
+  "median_speedup": 0.9394573107795927,
+  "bootstrap95_median": [
+    0.8924861531083549,
+    0.9902660657468269
+  ],
+  "mean_reference_seconds": 12.33568498175,
+  "mean_candidate_seconds": 13.209524248625,
+  "exact_output_pairs": 8,
+  "mean_best_original_energy": -5027.06625,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.9566321445977378,
+    "cycles": 1.0098963044528693,
+    "instructions": 0.9536874633058392,
+    "branches": 1.0684523634037095,
+    "branch-misses": 0.9690480903648488,
+    "cache-misses": 0.9561347856859279
+  }
+}
