@@ -282,6 +282,57 @@ impl FusedLink {
 pub(crate) struct FusedCsr {
     start: Vec<usize>,
     adj: Vec<FusedLink>,
+    #[cfg(feature = "dictionary-field-links")]
+    compact: Option<FieldLinkDictionary>,
+}
+
+#[cfg(feature = "dictionary-field-links")]
+#[derive(Debug)]
+struct FieldLinkDictionary {
+    links: Vec<u16>,
+    adjustments: [i64; Self::SLOTS],
+    flip_adjustments: [[i64; Self::SLOTS]; 2],
+}
+
+#[cfg(feature = "dictionary-field-links")]
+impl FieldLinkDictionary {
+    const NODE_BITS: u32 = 13;
+    const NODES: usize = 1 << Self::NODE_BITS;
+    const SLOTS: usize = 1 << (u16::BITS - Self::NODE_BITS);
+
+    fn compress(links: &[FusedLink], nodes: usize) -> Option<Self> {
+        if nodes > Self::NODES {
+            return None;
+        }
+        let mut adjustments = [0; Self::SLOTS];
+        let mut used = 0;
+        let mut compact = Vec::with_capacity(links.len());
+        for &link in links {
+            let adjustment = link.field_adjustment();
+            let slot = if let Some(slot) = adjustments[..used].iter().position(|&x| x == adjustment)
+            {
+                slot
+            } else {
+                *adjustments.get_mut(used)? = adjustment;
+                used += 1;
+                used - 1
+            };
+            compact.push(((slot as u16) << Self::NODE_BITS) | link.node() as u16);
+        }
+        Some(Self {
+            links: compact,
+            adjustments,
+            flip_adjustments: [adjustments.map(|x| 2 * x), adjustments.map(|x| -2 * x)],
+        })
+    }
+
+    #[inline]
+    fn decode(link: u16) -> (usize, usize) {
+        (
+            usize::from(link) & (Self::NODES - 1),
+            usize::from(link >> Self::NODE_BITS),
+        )
+    }
 }
 
 impl FusedCsr {
@@ -304,11 +355,58 @@ impl FusedCsr {
                 fill[from as usize] += 1;
             }
         }
-        Self { start, adj }
+        #[cfg(feature = "dictionary-field-links")]
+        let compact = FieldLinkDictionary::compress(&adj, graph.n);
+        #[cfg(feature = "dictionary-field-links")]
+        if compact.is_some() {
+            adj = Vec::new();
+        }
+        Self {
+            start,
+            adj,
+            #[cfg(feature = "dictionary-field-links")]
+            compact,
+        }
     }
 
     pub(crate) fn row(&self, u: usize) -> &[FusedLink] {
         &self.adj[self.start[u]..self.start[u + 1]]
+    }
+
+    #[cfg(feature = "dictionary-field-links")]
+    #[inline]
+    pub(crate) fn field_sum(&self, u: usize, spins: &[i8], bias: i64) -> i64 {
+        if let Some(compact) = &self.compact {
+            let mut sum = bias;
+            for &link in &compact.links[self.start[u]..self.start[u + 1]] {
+                let (v, slot) = FieldLinkDictionary::decode(link);
+                sum = sum.wrapping_add(compact.adjustments[slot] * i64::from(spins[v]));
+            }
+            sum
+        } else {
+            self.row(u)
+                .iter()
+                .map(|&link| link.field_adjustment() * i64::from(spins[link.node()]))
+                .fold(bias, i64::wrapping_add)
+        }
+    }
+
+    #[cfg(feature = "dictionary-field-links")]
+    #[inline]
+    pub(crate) fn patch_fields(&self, u: usize, fields: &mut [i64], spin: i8) {
+        if let Some(compact) = &self.compact {
+            let change = &compact.flip_adjustments[usize::from(spin > 0)];
+            for &link in &compact.links[self.start[u]..self.start[u + 1]] {
+                let (v, slot) = FieldLinkDictionary::decode(link);
+                fields[v] = fields[v].wrapping_add(change[slot]);
+            }
+        } else {
+            let twice = 2 * i64::from(spin);
+            for &link in self.row(u) {
+                let v = link.node();
+                fields[v] = fields[v].wrapping_sub(twice * link.field_adjustment());
+            }
+        }
     }
 }
 

@@ -371,11 +371,15 @@ impl Workspace {
         {
             let rows = graph.fused();
             for (u, field) in self.field.iter_mut().enumerate() {
-                *field = rows
+                #[cfg(feature = "dictionary-field-links")]
+                let packed = rows.field_sum(u, s, RESIDUAL_FIELD_BIAS);
+                #[cfg(not(feature = "dictionary-field-links"))]
+                let packed = rows
                     .row(u)
                     .iter()
                     .map(|&link| link.field_adjustment() * i64::from(s[link.node()]))
                     .fold(RESIDUAL_FIELD_BIAS, i64::wrapping_add);
+                *field = packed;
             }
         }
         #[cfg(not(feature = "packed-residual-fields"))]
@@ -412,6 +416,9 @@ impl Workspace {
     #[inline]
     fn flip_packed(rows: &FusedCsr, fields: &mut [LocalField], s: &mut [i8], u: usize) -> i64 {
         let twice = 2 * i64::from(s[u]);
+        #[cfg(feature = "dictionary-field-links")]
+        rows.patch_fields(u, fields, s[u]);
+        #[cfg(not(feature = "dictionary-field-links"))]
         for &link in rows.row(u) {
             let field = &mut fields[link.node()];
             // The completed residual field fits i32, so its biased value

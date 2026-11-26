@@ -232,6 +232,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "packed_residual_fields":cfg!(feature="packed-residual-fields"),
         "tree_polish":cfg!(feature="tree-polish"),
         "internal_edge_lists":cfg!(feature="internal-edge-lists"),
+        "dictionary_field_links":cfg!(feature="dictionary-field-links"),
         "polish_sweeps":args.polish_sweeps,
         "seconds":seconds,"best_energy_milli":best,
         "energies_milli":energies,"trajectory_digest":fingerprint.finalize().to_hex().to_string(),"metrics":metrics});

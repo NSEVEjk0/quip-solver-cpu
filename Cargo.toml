@@ -211,6 +211,8 @@ packed-residual-fields = ["row-grouped-residual-deltas"]
 tree-polish = []
 # Cache exact residual contributions on internal edges during partitioning.
 internal-edge-lists = ["packed-residual-fields", "linked-component-lists"]
+# Use 16-bit links when the node count and coupling dictionary fit.
+dictionary-field-links = ["packed-residual-fields"]
 # Off by default. Adds per-spin-decision and per-flip spans INSIDE the hot loop.
 # These spans distort absolute timing (millions of enters per read), so they are
 # used only for the diagnostic cross-check pass, never for headline per-part JSON.
