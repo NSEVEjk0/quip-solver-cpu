@@ -237,7 +237,6 @@ fn main() -> Result<(), Box<dyn Error>> {
         "packed_residual_fields":cfg!(feature="packed-residual-fields"),
         "tree_polish":cfg!(feature="tree-polish"),
         "cyclic_polish":cfg!(feature="cyclic-polish"),
-        "tree_restart_polish":cfg!(feature="tree-restart-polish"),
         "polish_sweeps":args.polish_sweeps,
         "single_every":args.single_every,
         "seconds":seconds,"best_energy_milli":best,
