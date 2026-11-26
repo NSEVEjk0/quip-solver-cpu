@@ -73,6 +73,7 @@ def main():
     )
     parser.add_argument("--reference-sweeps", type=int)
     parser.add_argument("--candidate-polish-sweeps", type=int)
+    parser.add_argument("--candidate-single-every", type=int)
     parser.add_argument(
         "--serial",
         action="store_true",
@@ -92,7 +93,12 @@ def main():
         parser.error("candidate polish sweeps must be nonnegative")
     if args.compare_energy and args.mode != "pipeline":
         parser.error("--compare-energy requires the pipeline's original-energy verification")
-    if not args.compare_energy and (args.reference_sweeps is not None or args.candidate_polish_sweeps is not None):
+    if args.candidate_single_every is not None and args.candidate_single_every < 0:
+        parser.error("Metropolis cadence must be nonnegative")
+    if not args.compare_energy and any(
+        option is not None
+        for option in (args.reference_sweeps, args.candidate_polish_sweeps, args.candidate_single_every)
+    ):
         parser.error("different solve budgets require --compare-energy")
     if len(set(args.cpus)) != 2 or min(args.cpus) < 0:
         parser.error("select two different available CPU IDs")
@@ -149,6 +155,7 @@ def main():
             comparison="energy",
             reference_sweeps=args.reference_sweeps or args.sweeps,
             candidate_polish_sweeps=args.candidate_polish_sweeps,
+            candidate_single_every=args.candidate_single_every,
         )
     if args.perf:
         metadata["perf_events"] = PERF_EVENTS
@@ -179,6 +186,8 @@ def main():
             command.append("--selective-resampling")
         if role == "candidate" and args.candidate_polish_sweeps is not None:
             command.extend(("--polish-sweeps", str(args.candidate_polish_sweeps)))
+        if role == "candidate" and args.candidate_single_every is not None:
+            command.extend(("--single-every", str(args.candidate_single_every)))
         if args.perf:
             perf_path = output / f"{seed}-{role}.perf.csv"
             command = [
