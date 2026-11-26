@@ -192,6 +192,9 @@ compact-cache-stamps = []
 # Exact cluster-field transformation using only contributions across the
 # component boundary. Research build; the default update remains available.
 cluster-boundary-updates = []
+# Reuse the union-find array to keep component labels and spin signs together
+# during the residual-edge scan.
+packed-component-spins = []
 # Off by default. Adds per-spin-decision and per-flip spans INSIDE the hot loop.
 # These spans distort absolute timing (millions of enters per read), so they are
 # used only for the diagnostic cross-check pass, never for headline per-part JSON.

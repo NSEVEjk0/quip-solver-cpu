@@ -64,6 +64,9 @@ type CacheEpoch = u16;
 #[cfg(not(feature = "compact-cache-stamps"))]
 type CacheEpoch = u32;
 
+#[cfg(feature = "packed-component-spins")]
+const COMPONENT_SPIN_SIGN: u32 = 1 << 31;
+
 /// Bond probabilities at one inverse temperature.
 #[derive(Clone, Copy, Debug)]
 struct Breakup {
@@ -459,6 +462,12 @@ impl Workspace {
             let at = &mut self.delta[c as usize];
             self.members[*at as usize] = u as u32;
             *at += 1;
+            #[cfg(feature = "packed-component-spins")]
+            {
+                // Component labeling has finished reading the union tree.
+                let sign = u32::from(s[u] < 0) * COMPONENT_SPIN_SIGN;
+                self.parent[u] = c | sign;
+            }
         }
     }
 
@@ -488,14 +497,35 @@ impl Workspace {
         let fused = FUSED.then(|| graph.fused());
         // delta[c] = -2 * sum over the weak edges that leave c of J s_u s_v.
         self.delta.fill(0);
-        let (label, delta) = (&self.label, &mut self.delta);
-        for &(u, link) in &graph.weak_edges {
-            let v = link.node();
-            let (lu, lv) = (label[u as usize], label[v]);
-            if lu != lv {
-                let t = -2 * i64::from(link.j()) * i64::from(s[u as usize] * s[v]);
-                delta[lu as usize] += t;
-                delta[lv as usize] += t;
+        #[cfg(not(feature = "packed-component-spins"))]
+        {
+            let (label, delta) = (&self.label, &mut self.delta);
+            for &(u, link) in &graph.weak_edges {
+                let v = link.node();
+                let (lu, lv) = (label[u as usize], label[v]);
+                if lu != lv {
+                    let t = -2 * i64::from(link.j()) * i64::from(s[u as usize] * s[v]);
+                    delta[lu as usize] += t;
+                    delta[lv as usize] += t;
+                }
+            }
+        }
+        #[cfg(feature = "packed-component-spins")]
+        {
+            let (packed, delta) = (&self.parent, &mut self.delta);
+            for &(u, link) in &graph.weak_edges {
+                let left = packed[u as usize];
+                let right = packed[link.node()];
+                let lu = left & !COMPONENT_SPIN_SIGN;
+                let lv = right & !COMPONENT_SPIN_SIGN;
+                if lu != lv {
+                    // Different signs produce a mask of -1, which negates j.
+                    let mask = (left ^ right) as i32 >> 31;
+                    let j = (link.j() ^ mask) - mask;
+                    let t = -2 * i64::from(j);
+                    delta[lu as usize] += t;
+                    delta[lv as usize] += t;
+                }
             }
         }
         let mut change = 0;

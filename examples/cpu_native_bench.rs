@@ -220,6 +220,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "compact_local_fields":cfg!(feature="compact-local-fields"),
         "compact_cache_stamps":cfg!(feature="compact-cache-stamps"),
         "cluster_boundary_updates":cfg!(feature="cluster-boundary-updates"),
+        "packed_component_spins":cfg!(feature="packed-component-spins"),
         "seconds":seconds,"best_energy_milli":best,
         "energies_milli":energies,"trajectory_digest":fingerprint.finalize().to_hex().to_string(),"metrics":metrics});
     println!("{row}");
