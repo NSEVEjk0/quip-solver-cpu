@@ -98,6 +98,43 @@ impl Breakup {
     }
 }
 
+#[cfg(feature = "table-tile-bonds")]
+#[derive(Clone, Copy)]
+struct TilePattern {
+    up: [u8; 4],
+    down: [u8; 4],
+    ups: u8,
+}
+
+/// Positions within the tile in the same order as the scalar scan.
+#[cfg(feature = "table-tile-bonds")]
+const TILE_PATTERNS: [TilePattern; 16] = {
+    let mut patterns = [TilePattern {
+        up: [0; 4],
+        down: [0; 4],
+        ups: 0,
+    }; 16];
+    let mut mask = 0;
+    while mask < patterns.len() {
+        let mut ups = 0;
+        let mut downs = 0;
+        let mut slot = 0;
+        while slot < 4 {
+            if mask & (1 << slot) != 0 {
+                patterns[mask].up[ups] = slot;
+                ups += 1;
+            } else {
+                patterns[mask].down[downs] = slot;
+                downs += 1;
+            }
+            slot += 1;
+        }
+        patterns[mask].ups = ups as u8;
+        mask += 1;
+    }
+    patterns
+};
+
 /// Counters for the temperature-local transition cache.
 #[derive(Clone, Copy, Debug, Default)]
 pub struct CacheStats {
@@ -387,18 +424,45 @@ impl Workspace {
             *parent = u as u32;
         }
         for tile in &graph.tiles {
-            let mut up = [0; 4];
-            let mut down = [0; 4];
-            let (mut ups, mut downs) = (0, 0);
-            for k in 0..4 {
-                if s[tile.nodes[k] as usize] * tile.gauge[k] > 0 {
-                    up[ups] = tile.nodes[k];
-                    ups += 1;
-                } else {
-                    down[downs] = tile.nodes[k];
-                    downs += 1;
+            #[cfg(not(feature = "table-tile-bonds"))]
+            let (up, down, ups, downs) = {
+                let mut up = [0; 4];
+                let mut down = [0; 4];
+                let (mut ups, mut downs) = (0, 0);
+                for k in 0..4 {
+                    if s[tile.nodes[k] as usize] * tile.gauge[k] > 0 {
+                        up[ups] = tile.nodes[k];
+                        ups += 1;
+                    } else {
+                        down[downs] = tile.nodes[k];
+                        downs += 1;
+                    }
                 }
-            }
+                (
+                    move |slot: usize| up[slot],
+                    move |slot: usize| down[slot],
+                    ups,
+                    downs,
+                )
+            };
+            #[cfg(feature = "table-tile-bonds")]
+            let (up, down, ups, downs) = {
+                let [a, b, c, d] = tile.nodes.map(|node| s[node as usize]);
+                let [ga, gb, gc, gd] = tile.gauge;
+                // Spins and gauges are validated signs. Matching signs are up.
+                let mask = usize::from(a == ga)
+                    | (usize::from(b == gb) << 1)
+                    | (usize::from(c == gc) << 2)
+                    | (usize::from(d == gd) << 3);
+                let pattern = &TILE_PATTERNS[mask];
+                let ups = usize::from(pattern.ups);
+                (
+                    move |slot: usize| tile.nodes[usize::from(pattern.up[slot])],
+                    move |slot: usize| tile.nodes[usize::from(pattern.down[slot])],
+                    ups,
+                    4 - ups,
+                )
+            };
             if ups == 0 || ups == 4 {
                 continue;
             }
@@ -412,20 +476,20 @@ impl Workspace {
                 }
                 if r < p.single_ice {
                     self.join_selected::<INLINE>(
-                        up[(x & 1) as usize],
-                        down[((x >> 1) & 1) as usize],
+                        up((x & 1) as usize),
+                        down(((x >> 1) & 1) as usize),
                     );
                 } else {
                     let c = (x & 1) as usize;
-                    self.join_selected::<INLINE>(up[0], down[c]);
-                    self.join_selected::<INLINE>(up[1], down[1 - c]);
+                    self.join_selected::<INLINE>(up(0), down(c));
+                    self.join_selected::<INLINE>(up(1), down(1 - c));
                 }
             } else if r >= p.zero_defect {
                 // The source took the partner from the low bits modulo three,
                 // which favours the first. A separate range draw is uniform.
                 self.join_selected::<INLINE>(
-                    up[rng.gen_range(0..ups)],
-                    down[rng.gen_range(0..downs)],
+                    up(rng.gen_range(0..ups)),
+                    down(rng.gen_range(0..downs)),
                 );
             }
         }
@@ -876,6 +940,17 @@ impl<'g> Chain<'g> {
             }
         }
         change
+    }
+}
+
+#[cfg(all(test, feature = "table-tile-bonds"))]
+#[test]
+fn tile_table_preserves_position_order_for_every_pattern() {
+    for (mask, pattern) in TILE_PATTERNS.iter().enumerate() {
+        let (up, down): (Vec<_>, Vec<_>) = (0_u8..4).partition(|&slot| mask & (1 << slot) != 0);
+        assert_eq!(usize::from(pattern.ups), up.len());
+        assert_eq!(&pattern.up[..up.len()], up.as_slice());
+        assert_eq!(&pattern.down[..down.len()], down.as_slice());
     }
 }
 

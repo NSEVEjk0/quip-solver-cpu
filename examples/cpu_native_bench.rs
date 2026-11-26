@@ -223,6 +223,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "packed_component_spins":cfg!(feature="packed-component-spins"),
         "row_grouped_residual_deltas":cfg!(feature="row-grouped-residual-deltas"),
         "masked_residual_deltas":cfg!(feature="masked-residual-deltas"),
+        "table_tile_bonds":cfg!(feature="table-tile-bonds"),
         "seconds":seconds,"best_energy_milli":best,
         "energies_milli":energies,"trajectory_digest":fingerprint.finalize().to_hex().to_string(),"metrics":metrics});
     println!("{row}");

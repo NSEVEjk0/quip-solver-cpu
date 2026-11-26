@@ -199,6 +199,8 @@ packed-component-spins = []
 row-grouped-residual-deltas = []
 # Mask out interior edges in the row-grouped scan.
 masked-residual-deltas = ["row-grouped-residual-deltas"]
+# Classify the four gauged spin signs through a small table.
+table-tile-bonds = []
 # Off by default. Adds per-spin-decision and per-flip spans INSIDE the hot loop.
 # These spans distort absolute timing (millions of enters per read), so they are
 # used only for the diagnostic cross-check pass, never for headline per-part JSON.
