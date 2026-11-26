@@ -497,4 +497,33 @@ mod tests {
             }
         }
     }
+
+    #[cfg(feature = "cyclic-polish")]
+    #[test]
+    fn a_cyclic_block_matches_all_assignments_with_fixed_outside_spins() {
+        let graph = graph();
+        let block = Block::new(&graph, [0, 1, 2, 3]);
+        assert!(block.nodes.len() >= 4);
+        for bits in 0..64 {
+            let before = spins(bits);
+            let expected = (0..1 << block.nodes.len())
+                .map(|mask| {
+                    let mut candidate = before;
+                    for (i, &u) in block.nodes.iter().enumerate() {
+                        if mask & (1 << i) != 0 {
+                            candidate[u] = -candidate[u];
+                        }
+                    }
+                    graph.energy(&candidate)
+                })
+                .min()
+                .unwrap();
+            let mut actual = before;
+            let mut scratch = Scratch::new(graph.n);
+            scratch.reset(&graph, &actual);
+            let changed = block.descend(&graph, &mut actual, &mut scratch);
+            assert_eq!(graph.energy(&actual), expected);
+            assert_eq!(changed, expected < graph.energy(&before));
+        }
+    }
 }
