@@ -18,8 +18,6 @@
 //! with the declared parameters, before preparation.
 
 mod graph;
-#[cfg(all(feature = "avx2-interior-correction", target_arch = "x86_64"))]
-mod simd;
 #[cfg(feature = "tree-polish")]
 mod tree;
 mod update;
