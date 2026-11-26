@@ -11,7 +11,7 @@ use std::fmt;
 
 #[cfg(feature = "packed-residual-fields")]
 use super::graph::FusedCsr;
-#[cfg(feature = "internal-edge-lists")]
+#[cfg(all(feature = "avx2-interior-correction", target_arch = "x86_64"))]
 use super::graph::Link;
 use super::graph::{OtsukaGraph, Weights};
 
@@ -99,6 +99,9 @@ type CacheEpoch = u32;
 const COMPONENT_SPIN_SIGN: u32 = 1 << 31;
 
 const END_OF_COMPONENT: u32 = u32::MAX;
+
+#[cfg(feature = "avx2-interior-correction")]
+const PACKED_SPIN_SIGN: u32 = 1 << 31;
 
 /// Bond probabilities at one inverse temperature.
 #[derive(Clone, Copy, Debug)]
@@ -306,8 +309,10 @@ struct Workspace {
     start: Vec<u32>,
     /// Consecutive nodes, or a next-node index for each node with linked lists.
     members: Vec<u32>,
-    /// Component energy deltas, or packed interior-edge links.
+    /// The weak-energy change of flipping each component.
     delta: Vec<i64>,
+    #[cfg(all(feature = "avx2-interior-correction", target_arch = "x86_64"))]
+    avx2_interior: bool,
     /// Boltzmann factors of the current Metropolis sweep.
     boltzmann: Boltzmann,
     /// The full local field, or full and residual fields in one word.
@@ -359,6 +364,8 @@ impl Workspace {
             start: Vec::with_capacity(n + 1),
             members: vec![0; n],
             delta: Vec::with_capacity(n),
+            #[cfg(all(feature = "avx2-interior-correction", target_arch = "x86_64"))]
+            avx2_interior: std::arch::is_x86_feature_detected!("avx2"),
             boltzmann: Boltzmann::new(),
             field: vec![0; n],
             boundary_work: [0; 3],
@@ -606,6 +613,12 @@ impl Workspace {
                 c
             };
             self.label[u] = c;
+            #[cfg(feature = "avx2-interior-correction")]
+            {
+                // The label pass reads the parent entry for the current node
+                // only. Later nodes read the already-computed label array.
+                self.parent[u] = c | (u32::from(s[u] < 0) * PACKED_SPIN_SIGN);
+            }
             if !linked {
                 self.start[c as usize + 1] += 1;
             }
@@ -620,9 +633,7 @@ impl Workspace {
         }
         if linked {
             self.delta.clear();
-            if !cfg!(feature = "internal-edge-lists") {
-                self.delta.resize(self.start.len(), 0);
-            }
+            self.delta.resize(self.start.len(), 0);
             return;
         }
         for c in 1..self.start.len() {
@@ -679,6 +690,37 @@ impl Workspace {
             *at += 1;
             node
         }
+    }
+
+    #[cfg(feature = "avx2-interior-correction")]
+    fn flip_cluster_node(&mut self, rows: &FusedCsr, s: &mut [i8], u: usize) -> i64 {
+        #[cfg(target_arch = "x86_64")]
+        if self.avx2_interior {
+            self.parent[u] ^= PACKED_SPIN_SIGN;
+        }
+        Self::flip_packed(rows, &mut self.field, s, u)
+    }
+
+    #[cfg(not(feature = "avx2-interior-correction"))]
+    #[cfg(feature = "packed-residual-fields")]
+    fn flip_cluster_node(&mut self, rows: &FusedCsr, s: &mut [i8], u: usize) -> i64 {
+        Self::flip_packed(rows, &mut self.field, s, u)
+    }
+
+    #[cfg(all(feature = "avx2-interior-correction", target_arch = "x86_64"))]
+    #[expect(
+        unsafe_code,
+        reason = "AVX2 and gather bounds checked by the workspace and graph"
+    )]
+    fn interior_prefix<'a>(&self, row: &'a [Link], label: u32) -> (&'a [Link], i32) {
+        if !self.avx2_interior || row.len() < 8 {
+            return (row, 0);
+        }
+        let (head, tail) = row.split_at(row.len() - row.len() % 8);
+        // AVX2 was detected when creating the workspace. `row` comes from
+        // the validated graph, and `parent` has an entry for every node.
+        let sum = unsafe { super::simd::interior_avx2(head, &self.parent, label) };
+        (tail, sum)
     }
 
     /// One cluster sweep. Returns the model energy change in milli.
@@ -877,7 +919,7 @@ impl Workspace {
             if at == end {
                 let delta = -2 * i64::from(s[first]) * residual_field(self.field[first]);
                 if draw(delta, rng) {
-                    change += Self::flip_packed(rows, &mut self.field, s, first);
+                    change += self.flip_cluster_node(rows, s, first);
                 }
                 continue;
             }
@@ -894,8 +936,8 @@ impl Workspace {
                 let field_sum = i64::from(s[first]) * residual_field(self.field[first])
                     + i64::from(s[second]) * residual_field(self.field[second]);
                 if draw(4 * bond_energy - 2 * field_sum, rng) {
-                    change += Self::flip_packed(rows, &mut self.field, s, first);
-                    change += Self::flip_packed(rows, &mut self.field, s, second);
+                    change += self.flip_cluster_node(rows, s, first);
+                    change += self.flip_cluster_node(rows, s, second);
                 }
                 continue;
             }
@@ -904,30 +946,14 @@ impl Workspace {
             // that contribution once per interior edge using the forward rows.
             let mut delta = 0;
             let mut at = start;
-            #[cfg(feature = "internal-edge-lists")]
-            {
-                // Collect the induced edges before loading their spin values.
-                // The hot scan then resolves membership with one indirect load.
-                self.delta.clear();
-                while at != end {
-                    let u = self.next_member(&mut at);
-                    delta -= 2 * i64::from(s[u]) * residual_field(self.field[u]);
-                    for &link in forward.row(u) {
-                        if self.label[link.node()] as usize == c {
-                            self.delta.push(link.with_source(u) as i64);
-                        }
-                    }
-                }
-                for &word in &self.delta {
-                    let (u, link) = Link::source_and_link(word as u64);
-                    delta += 4 * i64::from(link.j()) * i64::from(s[u] * s[link.node()]);
-                }
-            }
-            #[cfg(not(feature = "internal-edge-lists"))]
             while at != end {
                 let u = self.next_member(&mut at);
+                let row = forward.row(u);
+                #[cfg(all(feature = "avx2-interior-correction", target_arch = "x86_64"))]
+                let (row, mut interior) = self.interior_prefix(row, c as u32);
+                #[cfg(not(all(feature = "avx2-interior-correction", target_arch = "x86_64")))]
                 let mut interior = 0_i32;
-                for &link in forward.row(u) {
+                for &link in row {
                     let v = link.node();
                     let inside = -i32::from(self.label[v] as usize == c);
                     interior += (link.j() * i32::from(s[v])) & inside;
@@ -939,7 +965,7 @@ impl Workspace {
                 let mut at = start;
                 while at != end {
                     let u = self.next_member(&mut at);
-                    change += Self::flip_packed(rows, &mut self.field, s, u);
+                    change += self.flip_cluster_node(rows, s, u);
                 }
             }
         }
