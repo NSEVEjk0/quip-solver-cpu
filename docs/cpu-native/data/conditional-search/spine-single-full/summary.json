@@ -1,0 +1,56 @@
+{
+  "label": "zephyr-spine-single-full",
+  "pairs": 4,
+  "median_speedup": 1.040325680107557,
+  "bootstrap95_median": [
+    0.926200365685852,
+    1.1151463459592692
+  ],
+  "mean_reference_seconds": 27.924408193,
+  "mean_candidate_seconds": 27.15272987025,
+  "exact_output_pairs": 0,
+  "mean_best_original_energy": -5042.9725,
+  "energy": {
+    "best_gain_milli": {
+      "median": 0.0,
+      "mean": 5,
+      "range": [
+        0,
+        20
+      ],
+      "improved": 1,
+      "tied": 3,
+      "regressed": 0
+    },
+    "median_gain_milli": {
+      "median": 135.0,
+      "mean": 196.25,
+      "range": [
+        100.0,
+        415.0
+      ],
+      "improved": 4,
+      "tied": 0,
+      "regressed": 0
+    },
+    "worst_gain_milli": {
+      "median": 90.0,
+      "mean": 90,
+      "range": [
+        0,
+        180
+      ],
+      "improved": 3,
+      "tied": 1,
+      "regressed": 0
+    }
+  },
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.044370538737196,
+    "cycles": 0.995543164014576,
+    "instructions": 0.995471887266935,
+    "branches": 0.9954675146067504,
+    "branch-misses": 0.9990196412626597,
+    "cache-misses": 0.9608497541282428
+  }
+}

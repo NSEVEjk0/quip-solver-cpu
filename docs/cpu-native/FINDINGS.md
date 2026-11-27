@@ -66,6 +66,11 @@ with block eligibility checked separately by the coordinator and runtime.
 | [C48](#c48) | Direct earlier-native comparison | 1.468× median wall ratio for C41 plus worm with 16 × 8,192 |
 | [C49](#c49) | Smaller polish budgets and anneal changes | Shorter polish caused three full-budget regressions |
 | [C50](#c50) | Replica exchanges and probability-cache locality | Strong-edge proposals regressed at the pilot median |
+| [C51](#c51) | Exact cuts on balanced signed neighborhoods | Lower best energy on three of six short-budget instances |
+| [C52](#c52) | Standalone discrete simulated bifurcation | Higher best energy on all four tested instances |
+| [C53](#c53) | Exact conditional Zephyr neighborhoods | Up to 2,385 spins free at an elimination width of nine |
+| [C54](#c54) | Zephyr search from random starts and across plateaus | Random starts fell short of the incumbent's energy |
+| [C55](#c55) | Eight-read batched conditional optimization | 1.440× median for the Zephyr stage with 12/12 exact matches |
 
 <a id="c01"></a>
 ## C01. Packed adjacency fusion
@@ -615,3 +620,53 @@ Independent ancestry and strong-edge exchange proposals worsened median
 best energy in the tested configurations. Interleaving cache epochs and
 values kept all six output digests while the timing interval spanned parity.
 [Study](EXPERIMENTS.md#schedule-replica-histories-and-probability-cache).
+
+<a id="c51"></a>
+## C51. Exact cuts on balanced signed neighborhoods
+
+With boundary spins fixed, an induced neighborhood whose internal couplings
+can all be gauged ferromagnetic has an exact minimum cut. The pass grows
+connected neighborhoods of up to 128 spins, solves them against the original
+coefficients, and applies strictly downhill moves. It improved the best
+energy on three of six 16 × 2,048 instances against C41 plus the worm. The
+median gain was 45 milli units. The timing interval covered parity.
+[Study](EXPERIMENTS.md#conditional-graph-cuts).
+
+<a id="c52"></a>
+## C52. Standalone discrete simulated bifurcation
+
+The existing single-worker discrete simulated bifurcation backend ran 16
+trajectories with 8,192 integration steps each. The best canonical energy
+was higher on all four instances against C41 plus the worm, with a median
+regression of 103,970 milli units. [Study](EXPERIMENTS.md#discrete-simulated-bifurcation).
+
+<a id="c53"></a>
+## C53. Exact conditional Zephyr neighborhoods
+
+Fixing spins outside one Zephyr spine and its perpendicular neighbors leaves
+an induced problem with up to 2,313 free spins and an elimination width of
+three on this graph. Freeing all four spines in one row expands the
+neighborhood to 2,385 spins at width nine. An independent integer
+implementation verified ten conditional optima and the fixed boundaries,
+including the largest block.
+[Method and evidence](EXPERIMENTS.md#exact-conditional-zephyr-neighborhoods).
+
+<a id="c54"></a>
+## C54. Zephyr search from random starts and across plateaus
+
+Wide-block search from random spins was 129,700 milli units worse at the
+median best energy across four instances. With incumbent candidates, wide
+blocks that explored equal-energy assignments gave the same best energies
+as the strict version on the six matched pilot instances. Exploratory
+fields sometimes moved uphill before the search restored each candidate's
+best canonical state. [Study](EXPERIMENTS.md#random-starts-plateaus-and-perturbations).
+
+<a id="c55"></a>
+## C55. Eight-read batched conditional optimization
+
+Sharing elimination tables across eight reads produced the same candidate
+spins and energies in all 12 repeated pairs. The conditional Zephyr stage
+took **30.6% less elapsed time** at the median, a **1.440×** ratio on one
+EPYC 7663 VPS. Whole-process cycles fell 28.0% and retired instructions fell
+43.8%. The test used 200 exact four-spine blocks per read and the same 16
+random starts in both arms. [Study](EXPERIMENTS.md#batched-zephyr-conditional-optimization).

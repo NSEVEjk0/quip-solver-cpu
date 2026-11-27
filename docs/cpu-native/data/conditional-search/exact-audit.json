@@ -1,0 +1,233 @@
+{
+  "benchmark_binary_sha256": "be92c426993ee29858c9229baacc3908a5400d340cb50045d0ad343c170686d3",
+  "solver": "integer factor elimination, plus a generic SciPy 1.18.1 MILP where recorded",
+  "checks": [
+    "fixed boundary spins",
+    "free-spin count",
+    "canonical integer scores",
+    "conditional optimum",
+    "elimination width"
+  ],
+  "cases": [
+    {
+      "seed": 1781,
+      "spines": [
+        172,
+        173,
+        174,
+        175
+      ],
+      "free_spins": 2374,
+      "internal_edges": 5485,
+      "width": 9,
+      "before_energy_milli": -5008215,
+      "exact_optimum_milli": -5009655,
+      "rust_stage_seconds": 0.021717377,
+      "audit_seconds": 0.6616631895303726,
+      "milp": {
+        "status": 1,
+        "seconds": 20.04967024922371,
+        "time_limit": 20.0,
+        "energy_milli": -4981315,
+        "bound_milli": -5056595.0
+      },
+      "snapshot_sha256": "9716296e1974e1674f12f962ab6a1e4fac65dc1c278d08ceaa662eb5dabaec91",
+      "initial_anneal_sweeps": 2048,
+      "initial_reads": 1,
+      "cpu": 5,
+      "span": 4
+    },
+    {
+      "seed": 1782,
+      "spines": [
+        165
+      ],
+      "free_spins": 2312,
+      "internal_edges": 4478,
+      "width": 3,
+      "before_energy_milli": -5027355,
+      "exact_optimum_milli": -5027355,
+      "rust_stage_seconds": 0.006441211,
+      "audit_seconds": 0.05874551832675934,
+      "snapshot_sha256": "efde9bbb30d4e4216003c79bbc71c3473f5b6d68560d2ab9b59102a3dcc529b0",
+      "initial_anneal_sweeps": 8192,
+      "initial_reads": 1,
+      "cpu": 4,
+      "span": 1
+    },
+    {
+      "seed": 1783,
+      "spines": [
+        20,
+        21,
+        22,
+        23
+      ],
+      "free_spins": 2340,
+      "internal_edges": 5395,
+      "width": 9,
+      "before_energy_milli": -5031375,
+      "exact_optimum_milli": -5031465,
+      "rust_stage_seconds": 0.012913838,
+      "audit_seconds": 0.6204158589243889,
+      "milp": {
+        "status": 1,
+        "seconds": 20.047277964651585,
+        "time_limit": 20.0,
+        "energy_milli": -4988475,
+        "bound_milli": -5070265.0
+      },
+      "snapshot_sha256": "bbc903b17a0c3b65dcbe1989847e15794306e4e937d229ad4c706af89dab8b99",
+      "initial_anneal_sweeps": 8192,
+      "initial_reads": 1,
+      "cpu": 4,
+      "span": 4
+    },
+    {
+      "seed": 1784,
+      "spines": [
+        86
+      ],
+      "free_spins": 2294,
+      "internal_edges": 4438,
+      "width": 3,
+      "before_energy_milli": -5023985,
+      "exact_optimum_milli": -5023985,
+      "rust_stage_seconds": 0.007162422,
+      "audit_seconds": 0.060823917388916016,
+      "snapshot_sha256": "3b1ec7123692efbb81ed40f1d01fb7363c3f9caae8c6095d0ff018a0b8aa5b5c",
+      "initial_anneal_sweeps": 8192,
+      "initial_reads": 1,
+      "cpu": 4,
+      "span": 1
+    },
+    {
+      "seed": 1785,
+      "spines": [
+        108,
+        109,
+        110,
+        111
+      ],
+      "free_spins": 2315,
+      "internal_edges": 5454,
+      "width": 9,
+      "before_energy_milli": -5027725,
+      "exact_optimum_milli": -5027725,
+      "rust_stage_seconds": 0.009036627,
+      "audit_seconds": 0.6421848125755787,
+      "snapshot_sha256": "a2fa3205d98879f0117ab8c8fcc8aab1255bba121130512e15182d9f302266d8",
+      "initial_anneal_sweeps": 8192,
+      "initial_reads": 1,
+      "cpu": 4,
+      "span": 4
+    },
+    {
+      "seed": 1786,
+      "spines": [
+        125
+      ],
+      "free_spins": 2313,
+      "internal_edges": 4493,
+      "width": 3,
+      "before_energy_milli": -5026415,
+      "exact_optimum_milli": -5026415,
+      "rust_stage_seconds": 0.006845719,
+      "audit_seconds": 0.05943138524889946,
+      "snapshot_sha256": "316689f39afb35c57d8e10b0d0707fc1db1aa474776bc72d1f0857bf6047a99c",
+      "initial_anneal_sweeps": 8192,
+      "initial_reads": 1,
+      "cpu": 4,
+      "span": 1
+    },
+    {
+      "seed": 1787,
+      "spines": [
+        64,
+        65,
+        66,
+        67
+      ],
+      "free_spins": 2363,
+      "internal_edges": 5633,
+      "width": 9,
+      "before_energy_milli": -5027545,
+      "exact_optimum_milli": -5027545,
+      "rust_stage_seconds": 0.008988757,
+      "audit_seconds": 0.7942329235374928,
+      "milp": {
+        "status": 1,
+        "seconds": 20.05060113221407,
+        "time_limit": 20.0,
+        "energy_milli": -5003545,
+        "bound_milli": -5060125.0
+      },
+      "snapshot_sha256": "23570d9cda38904302c0a5aef791576e9a1bcfa15dbe9dc5e552b8e783c63940",
+      "initial_anneal_sweeps": 8192,
+      "initial_reads": 1,
+      "cpu": 4,
+      "span": 4
+    },
+    {
+      "seed": 1788,
+      "spines": [
+        120
+      ],
+      "free_spins": 2313,
+      "internal_edges": 4494,
+      "width": 3,
+      "before_energy_milli": -5024675,
+      "exact_optimum_milli": -5024675,
+      "rust_stage_seconds": 0.008124627,
+      "audit_seconds": 0.0608559176325798,
+      "snapshot_sha256": "49269cb570dc24b80a8508b61370ca9460d502f410aa150184b2d7f8a296edab",
+      "initial_anneal_sweeps": 8192,
+      "initial_reads": 1,
+      "cpu": 4,
+      "span": 1
+    },
+    {
+      "seed": 1789,
+      "spines": [
+        128,
+        129,
+        130,
+        131
+      ],
+      "free_spins": 2381,
+      "internal_edges": 5644,
+      "width": 9,
+      "before_energy_milli": -5038875,
+      "exact_optimum_milli": -5038875,
+      "rust_stage_seconds": 0.009324246,
+      "audit_seconds": 0.7657859586179256,
+      "snapshot_sha256": "bd2d102bfbc426f1df099d85c1dfe6a827f5b2a480943f498b055d88917b2127",
+      "initial_anneal_sweeps": 8192,
+      "initial_reads": 1,
+      "cpu": 4,
+      "span": 4
+    },
+    {
+      "seed": 1852,
+      "spines": [
+        148,
+        149,
+        150,
+        151
+      ],
+      "free_spins": 2385,
+      "internal_edges": 5701,
+      "width": 9,
+      "before_energy_milli": -5025735,
+      "exact_optimum_milli": -5025735,
+      "rust_stage_seconds": 0.011413414,
+      "audit_seconds": 0.9976515099406242,
+      "snapshot_sha256": "02379c08aff1090ac59a2d52c34153a8518dcabed70159e1c804b23c60c7dedf",
+      "initial_anneal_sweeps": 8192,
+      "initial_reads": 1,
+      "cpu": 4,
+      "span": 4,
+      "benchmark_binary_sha256": "0b9d2b48a84d4100bb5bcd6777e5dcada2ddd03ab8fa40dee236e6f822865dd5"
+    }
+  ]
+}

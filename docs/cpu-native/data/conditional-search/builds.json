@@ -1,0 +1,155 @@
+{
+  "host": "AMD EPYC 7663 VPS",
+  "command": [
+    "cargo",
+    "+1.97.1",
+    "build",
+    "--release",
+    "--locked",
+    "--features",
+    "<flags>",
+    "--example",
+    "cpu_native_bench"
+  ],
+  "retained_source": "57d63c1e68d2935657b5335f3cd10e48c2391111",
+  "binaries": {
+    "backend-bench": {
+      "sha256": "d39d79cebbe2387037c48e4433dab5346ee0e14161c419156a27f60751b09879",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "pair-worm-polish"
+      ],
+      "tree": "working-tree pilot"
+    },
+    "min-cut-bench": {
+      "sha256": "e43a41dd9384c8f3433aebf0d3a311a6fec5aa68d1089f92535bc024981924fa",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "pair-worm-polish",
+        "min-cut-polish"
+      ],
+      "tree": "working-tree pilot"
+    },
+    "spine-pilot-bench": {
+      "sha256": "d5b4af08c36dc5a3b1de17ce938b572a9c14c811667e5bd87e7880e411e1fdd6",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "pair-worm-polish",
+        "zephyr-spine-polish"
+      ],
+      "tree": "working-tree pilot"
+    },
+    "spine-wide-bench": {
+      "sha256": "9de7c05332d162735e2e412c0b172946996726a08ef791c84de342623e4b88b4",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "pair-worm-polish",
+        "zephyr-spine-polish"
+      ],
+      "tree": "working-tree pilot"
+    },
+    "spine-plateau-bench": {
+      "sha256": "95734a587888eb5f39f2d13859b21acc2fba7de88ebe6f85e03802fccd6a5f69",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "pair-worm-polish",
+        "zephyr-spine-polish"
+      ],
+      "tree": "working-tree pilot"
+    },
+    "spine-noise-bench": {
+      "sha256": "02d8a271352bddb7b739852d100d86a67fd0ca1063206b32785657701b125bbb",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "pair-worm-polish",
+        "zephyr-spine-polish"
+      ],
+      "tree": "working-tree pilot"
+    },
+    "spine-audit-bench": {
+      "sha256": "be92c426993ee29858c9229baacc3908a5400d340cb50045d0ad343c170686d3",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "pair-worm-polish",
+        "zephyr-spine-polish"
+      ],
+      "tree": "working-tree pilot"
+    },
+    "spine-batch-bench": {
+      "sha256": "0b9d2b48a84d4100bb5bcd6777e5dcada2ddd03ab8fa40dee236e6f822865dd5",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "pair-worm-polish",
+        "zephyr-spine-polish"
+      ],
+      "tree": "working-tree pilot"
+    },
+    "spine-confirm-bench": {
+      "sha256": "0b9d2b48a84d4100bb5bcd6777e5dcada2ddd03ab8fa40dee236e6f822865dd5",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "pair-worm-polish",
+        "zephyr-spine-polish"
+      ],
+      "tree": "clean retained source"
+    },
+    "retained-worm-bench": {
+      "sha256": "018cc6e7f3bd5c40289c5303075a934643803e5cc0bc6e762bc6f57bd7993af8",
+      "features": [
+        "experimental",
+        "masked-residual-deltas",
+        "table-tile-bonds",
+        "linked-component-lists",
+        "shallow-union-roots",
+        "packed-residual-fields",
+        "pair-worm-polish"
+      ],
+      "tree": "705ab300aab3fbcdd2936866bc593a67562d41e7"
+    }
+  }
+}

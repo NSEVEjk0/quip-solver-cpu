@@ -1,0 +1,30 @@
+{
+  "label": "zephyr-spine-batch-confirm",
+  "pairs": 12,
+  "median_speedup": 1.4398351047337399,
+  "bootstrap95_median": [
+    1.2258057484516498,
+    1.5364684918327494
+  ],
+  "mean_reference_seconds": 2.1317207182916666,
+  "mean_candidate_seconds": 1.5143191840416668,
+  "exact_output_pairs": 12,
+  "mean_best_original_energy": -4905.0325,
+  "spine_stage_median_speedup": 1.4400751132964151,
+  "spine_stage_bootstrap95": [
+    1.2260203645490584,
+    1.5366046404566207
+  ],
+  "spine_stage_speedup_range": [
+    1.1174467574576712,
+    1.9167244459362662
+  ],
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.427970514786239,
+    "cycles": 1.3880846852654907,
+    "instructions": 1.7788805850277194,
+    "branches": 3.6728876464172253,
+    "branch-misses": 1.0593030672404504,
+    "cache-misses": 1.3577581123918678
+  }
+}

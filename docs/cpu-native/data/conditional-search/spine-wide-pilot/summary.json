@@ -1,0 +1,56 @@
+{
+  "label": "zephyr-spine-wide",
+  "pairs": 6,
+  "median_speedup": 0.8963829589691006,
+  "bootstrap95_median": [
+    0.7902131357683913,
+    0.9675017560328049
+  ],
+  "mean_reference_seconds": 7.585333536666667,
+  "mean_candidate_seconds": 8.641319121,
+  "exact_output_pairs": 0,
+  "mean_best_original_energy": -5031.28,
+  "energy": {
+    "best_gain_milli": {
+      "median": 135.0,
+      "mean": 161.66666666666666,
+      "range": [
+        0,
+        360
+      ],
+      "improved": 5,
+      "tied": 1,
+      "regressed": 0
+    },
+    "median_gain_milli": {
+      "median": 622.5,
+      "mean": 565.0,
+      "range": [
+        225.0,
+        820.0
+      ],
+      "improved": 6,
+      "tied": 0,
+      "regressed": 0
+    },
+    "worst_gain_milli": {
+      "median": 550.0,
+      "mean": 628.3333333333334,
+      "range": [
+        180,
+        1210
+      ],
+      "improved": 6,
+      "tied": 0,
+      "regressed": 0
+    }
+  },
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.9657998658299878,
+    "cycles": 0.9408471433913921,
+    "instructions": 0.9249079788808601,
+    "branches": 0.9191176022119272,
+    "branch-misses": 0.9711285816758732,
+    "cache-misses": 0.9406514512046786
+  }
+}

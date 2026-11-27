@@ -635,6 +635,155 @@ four short-budget replay pairs. The worm is disabled by default.
   entry after alignment, up from 12 with separate arrays.
   [Cache pilot](data/worm-polish/pilot-cache/summary.json).
 
+## Conditional graph cuts
+
+The `min-cut-polish` build adds 16 randomized partitions after the regular
+polish and worm. A connected block grows while the signs of all its induced
+edges admit a gauge with negative transformed couplings. Each block has at
+most 128 spins. All nonzero edges that cross the block boundary contribute
+to fixed unary fields.
+
+After the gauge change, an internal edge of magnitude `j` costs `2j` when
+its spins differ. Terminal capacities express the corresponding unary
+penalty. The solver checks the exact integer change before applying the
+cut. Exhaustive assignment checks cover signed edges, cycles, fixed external
+spins and equal-energy assignments.
+
+Six 16 × 2,048 pairs used C41 plus worm as the reference. Best canonical
+energy improved on three and tied on three, with a median gain of 45
+milli units and a maximum gain of 360. The median elapsed ratio was 1.074×
+with a paired bootstrap interval of 0.903–1.152×. Whole-process cycles were
+1.7% higher at the median. [Raw pairs](data/conditional-search/min-cut-pilot/results.json).
+
+## Discrete simulated bifurcation
+
+The benchmark also calls the existing single-worker discrete simulated
+bifurcation kernel on the same canonical model. It ran 16 trajectories at
+8,192 integration steps, compared with 16 replicas at 8,192 sweeps for C41
+plus worm. Both arms have independent original-energy scores. The steps
+are algorithm-specific.
+
+The four candidate runs averaged 12.4 seconds and the reference averaged
+27.8 seconds. The candidate's best energy was higher on every instance,
+by 91,550 to 106,470 milli units. [Raw pairs](data/conditional-search/dsb-pilot/results.json).
+
+## Exact conditional Zephyr neighborhoods
+
+For Zephyr `z(12,4)`, a spine groups the nodes with the same orientation,
+row and lane index. Each spine has two chains with connections between the
+chains. Parallel spines have no edges to each other. A free block comprises
+one or more center spines in a row and the perpendicular spines adjacent to
+them. All other variables are fixed, and their couplings become unary fields
+on the free spins. All coefficients from the induced problem participate,
+including frustrated edges.
+
+Eliminate the perpendicular spines first, choosing a minimum-degree
+variable within each stage and adding fill edges between its surviving
+neighbors. At each elimination, tabulate the smaller of the two costs for
+every assignment of those neighbors. Reconstruct the minimizing spins in
+reverse order. The largest table has eight entries for a one-spine block
+and 512 entries for a four-spine row on the recorded topology.
+
+The topology has 200 center spines. A single center frees 1,772–2,313 of the
+4,560 spins at width at most three. A four-spine row frees up to 2,385 spins
+at width at most nine. The independent audit rebuilds the fixed-boundary
+objective from canonical edges and minimizes it using separate integer
+factor tables. It checks both energy scores, all fixed boundary spins and
+the elimination width. All ten cases matched, including the 2,385-spin
+block at seed 1852. Three generic SciPy/HiGHS MILP runs hit their
+20-second limit without establishing the optimum. Their incumbents and
+dual bounds are recorded separately.
+[Conditional optimum audits](data/conditional-search/exact-audit.json).
+
+| Added stage vs C41 plus worm | Anneal budget | Best lower / tied / higher | Median best gain | Median batch gain |
+|---|---:|---:|---:|---:|
+| [40 one-spine blocks](data/conditional-search/spine-pilot/results.json) | 16 × 2,048 | 5/1/0 | 90 | 225 |
+| [40 one-spine blocks](data/conditional-search/spine-single-full/results.json) | 16 × 8,192 | 1/3/0 | 0 | 135 |
+| [50 four-spine rows](data/conditional-search/spine-wide-pilot/results.json) | 16 × 2,048 | 5/1/0 | 135 | 622.5 |
+
+Gains are reference minus candidate in milli units. Batch gain uses the
+median of the 16 candidates for each instance before taking the median over
+instances. The benchmark records the protocol's integer flip-invariant
+diversity metric for each complete batch.
+
+## Random starts, plateaus and perturbations
+
+The plateau policy breaks energy ties by maximizing distance from the
+current assignment. It multiplies the primary integer energy by one more
+than the number of free spins, then minimizes the number of retained spins
+as a secondary penalty. This permits same-energy moves. The 100-block
+plateau pass reached the same best energies as the strict 50-block pass on
+all six 2,048-sweep pilot instances.
+
+The perturbation trials added bounded signed unary fields to the center
+spins on alternating blocks in the first half of a 200-block pass. Every
+trajectory retained its best unperturbed score, including its input.
+Amplitudes 120 and 300 gave the same best-energy gains on the same four
+pilot instances, with two improvements and two ties. The median best gain
+was 90 milli units for each amplitude.
+[Plateau pairs](data/conditional-search/spine-plateau-pilot/results.json),
+[120-milli perturbations](data/conditional-search/spine-jitter-120/results.json),
+[300-milli perturbations](data/conditional-search/spine-jitter-300/results.json).
+
+The standalone exact-descent trial used 200 four-spine blocks with plateau
+moves from each of 16 random starts. It regressed on all four instances
+against the full-budget incumbent. The median increase in best energy was
+129,700 milli units. [Random-start pairs](data/conditional-search/spine-standalone/results.json).
+
+## Batched Zephyr conditional optimization
+
+The batched kernel stores the same factor-table entry for eight candidate
+reads together. A width-nine plan and its projection indices are shared
+across the candidates. Its integer sums and tie rule match the scalar
+kernel. Before using 32-bit lanes, the routine checks the total absolute
+weight, which bounds each sum because each original coefficient enters a
+factor once.
+
+On 12 fresh canonical instances on the EPYC 7663 VPS, both arms optimized
+the same 16 random starts using 200 strictly downhill four-spine blocks
+per read. The same binary ran twice per arm in balanced ABBA/BAAB order on
+the same pinned CPU within each instance. Every pair matched all output
+spins, canonical energies and accepted-move counts. The median paired
+elapsed ratio for the conditional stage was **1.440×**, or **30.6% less
+elapsed time**, with a paired bootstrap 95% interval of 1.226–1.537×.
+Individual instance ratios were 1.117–1.917×. Whole-process cycles fell
+28.0% and retired instructions fell 43.8% at the median, with reductions
+on all 12 instances. The timed stage includes building the conditional plans.
+[Pilot](data/conditional-search/spine-batch-pilot/results.json),
+[confirmation pairs](data/conditional-search/spine-batch-confirm/results.json),
+[confirmation summary](data/conditional-search/spine-batch-confirm/summary.json).
+
+### Reproduce the Zephyr tests
+
+Build revision `57d63c1` with Rust 1.97.1 and the recorded topology and
+family parameters. These commands select the measured C41 and worm flags
+and the experimental Zephyr implementation. Pilot and confirmation builds
+have separate executable hashes. [Build manifest](data/conditional-search/builds.json).
+
+```sh
+quip_spine_flags=experimental,masked-residual-deltas,table-tile-bonds,linked-component-lists,shallow-union-roots,packed-residual-fields,pair-worm-polish,zephyr-spine-polish
+cargo build --release --locked --features "$quip_spine_flags" --example cpu_native_bench
+quip_spine_bench=target/release/examples/cpu_native_bench
+python3 tools/cpu-native/compare_builds.py \
+  --reference-binary "$quip_spine_bench" --candidate-binary "$quip_spine_bench" \
+  --mode pipeline --preset archive --candidate-backend zephyr-spine \
+  --candidate-spine-blocks 200 --candidate-spine-span 4 --compare-spine-batch \
+  --seed-start 1801 --instances 12 --reads 16 --sweeps 1 \
+  --serial --bracket --perf --cpus 2 5 --label zephyr-spine-batch-confirm \
+  --output /tmp/quip-spine-batch-confirm
+
+"$quip_spine_bench" --mode pipeline --preset archive --seed 1783 --reads 1 \
+  --sweeps 8192 --spine-blocks 1 --spine-span 4 --spine-snapshot /tmp/quip-spine-audit.json
+python3 tools/cpu-native/audit_spine_snapshot.py /tmp/quip-spine-audit.json
+```
+
+In the batch comparison `--sweeps 1` is the shared harness argument. The
+`zephyr-spine` backend starts from random spins and uses only the specified
+conditional blocks. To compare the strict pass against the incumbent, omit
+`--candidate-backend zephyr-spine` and `--compare-spine-batch`, pass
+`--compare-energy`, and set `--sweeps 8192 --candidate-spine-blocks 50`.
+The audit takes an optional `--milp-seconds 20` argument with SciPy installed.
+
 ## Correctness and protocol checks
 
 The release validation checks the actual native binary and its family adapter:

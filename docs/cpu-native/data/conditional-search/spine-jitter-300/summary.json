@@ -1,0 +1,56 @@
+{
+  "label": "zephyr-spine-jitter-300",
+  "pairs": 4,
+  "median_speedup": 0.7444775867855408,
+  "bootstrap95_median": [
+    0.6835050626928643,
+    0.8140419754975233
+  ],
+  "mean_reference_seconds": 7.2236890225,
+  "mean_candidate_seconds": 9.72697811475,
+  "exact_output_pairs": 0,
+  "mean_best_original_energy": -5032.0875,
+  "energy": {
+    "best_gain_milli": {
+      "median": 90.0,
+      "mean": 180,
+      "range": [
+        0,
+        540
+      ],
+      "improved": 2,
+      "tied": 2,
+      "regressed": 0
+    },
+    "median_gain_milli": {
+      "median": 637.5,
+      "mean": 630.0,
+      "range": [
+        415.0,
+        830.0
+      ],
+      "improved": 4,
+      "tied": 0,
+      "regressed": 0
+    },
+    "worst_gain_milli": {
+      "median": 730.0,
+      "mean": 740,
+      "range": [
+        0,
+        1500
+      ],
+      "improved": 3,
+      "tied": 1,
+      "regressed": 0
+    }
+  },
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.7493383616756008,
+    "cycles": 0.7944434399846478,
+    "instructions": 0.7388110246748958,
+    "branches": 0.7332807601361986,
+    "branch-misses": 0.9134784476967899,
+    "cache-misses": 0.8217694164700176
+  }
+}

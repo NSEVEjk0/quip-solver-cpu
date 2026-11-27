@@ -1,0 +1,56 @@
+{
+  "label": "dsb-pilot",
+  "pairs": 4,
+  "median_speedup": 2.2057636013783997,
+  "bootstrap95_median": [
+    1.9700702430711041,
+    2.638609920785695
+  ],
+  "mean_reference_seconds": 27.830219859,
+  "mean_candidate_seconds": 12.437601605,
+  "exact_output_pairs": 0,
+  "mean_best_original_energy": -4941.4425,
+  "energy": {
+    "best_gain_milli": {
+      "median": -103970.0,
+      "mean": -101490,
+      "range": [
+        -106470,
+        -91550
+      ],
+      "improved": 0,
+      "tied": 0,
+      "regressed": 4
+    },
+    "median_gain_milli": {
+      "median": -114540.0,
+      "mean": -114787.5,
+      "range": [
+        -116505.0,
+        -113565.0
+      ],
+      "improved": 0,
+      "tied": 0,
+      "regressed": 4
+    },
+    "worst_gain_milli": {
+      "median": -132420.0,
+      "mean": -132240,
+      "range": [
+        -135890,
+        -128230
+      ],
+      "improved": 0,
+      "tied": 0,
+      "regressed": 4
+    }
+  },
+  "perf_median_reference_over_candidate": {
+    "task-clock": 2.2140853233716755,
+    "cycles": 2.366480014875421,
+    "instructions": 1.8034116108907887,
+    "branches": 1.2838707062477546,
+    "branch-misses": 1.776812877576947,
+    "cache-misses": 7.567784797155785
+  }
+}

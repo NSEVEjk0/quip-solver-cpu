@@ -1,0 +1,56 @@
+{
+  "label": "zephyr-spine-plateaus",
+  "pairs": 6,
+  "median_speedup": 0.9507416254527472,
+  "bootstrap95_median": [
+    0.8389042499226097,
+    1.0287296514905118
+  ],
+  "mean_reference_seconds": 7.678844391,
+  "mean_candidate_seconds": 8.210310829,
+  "exact_output_pairs": 0,
+  "mean_best_original_energy": -5031.28,
+  "energy": {
+    "best_gain_milli": {
+      "median": 135.0,
+      "mean": 161.66666666666666,
+      "range": [
+        0,
+        360
+      ],
+      "improved": 5,
+      "tied": 1,
+      "regressed": 0
+    },
+    "median_gain_milli": {
+      "median": 622.5,
+      "mean": 587.5,
+      "range": [
+        225.0,
+        865.0
+      ],
+      "improved": 6,
+      "tied": 0,
+      "regressed": 0
+    },
+    "worst_gain_milli": {
+      "median": 595.0,
+      "mean": 643.3333333333334,
+      "range": [
+        180,
+        1210
+      ],
+      "improved": 6,
+      "tied": 0,
+      "regressed": 0
+    }
+  },
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.9377982261489023,
+    "cycles": 0.891805008403571,
+    "instructions": 0.8538160386240814,
+    "branches": 0.8482481025236992,
+    "branch-misses": 0.9540070824327154,
+    "cache-misses": 0.8736920062750504
+  }
+}

@@ -1,0 +1,56 @@
+{
+  "label": "min-cut-pilot",
+  "pairs": 6,
+  "median_speedup": 1.0739386459842557,
+  "bootstrap95_median": [
+    0.9033549433890752,
+    1.1521465714969938
+  ],
+  "mean_reference_seconds": 7.696545774166666,
+  "mean_candidate_seconds": 7.4062816235,
+  "exact_output_pairs": 0,
+  "mean_best_original_energy": -5033.195,
+  "energy": {
+    "best_gain_milli": {
+      "median": 45.0,
+      "mean": 120,
+      "range": [
+        0,
+        360
+      ],
+      "improved": 3,
+      "tied": 3,
+      "regressed": 0
+    },
+    "median_gain_milli": {
+      "median": 22.5,
+      "mean": 60.0,
+      "range": [
+        0.0,
+        270.0
+      ],
+      "improved": 3,
+      "tied": 3,
+      "regressed": 0
+    },
+    "worst_gain_milli": {
+      "median": 0.0,
+      "mean": 0,
+      "range": [
+        0,
+        0
+      ],
+      "improved": 0,
+      "tied": 6,
+      "regressed": 0
+    }
+  },
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.0621591173305496,
+    "cycles": 0.9833139600118943,
+    "instructions": 0.9879491215080543,
+    "branches": 0.986320982941036,
+    "branch-misses": 0.9723123629751698,
+    "cache-misses": 1.0040309513944672
+  }
+}

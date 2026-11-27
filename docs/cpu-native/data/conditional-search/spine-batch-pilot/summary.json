@@ -1,0 +1,30 @@
+{
+  "label": "zephyr-spine-batch-pilot",
+  "pairs": 4,
+  "median_speedup": 1.2962059839060571,
+  "bootstrap95_median": [
+    1.0932174411442712,
+    1.724884874729242
+  ],
+  "mean_reference_seconds": 1.0758960325,
+  "mean_candidate_seconds": 0.809773062,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -4887.9125,
+  "spine_stage_median_speedup": 1.2966358066931396,
+  "spine_stage_bootstrap95": [
+    1.0931621786827765,
+    1.7256710062643337
+  ],
+  "spine_stage_speedup_range": [
+    1.0931621786827765,
+    1.7256710062643337
+  ],
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.2818740125142511,
+    "cycles": 1.2304111832048212,
+    "instructions": 1.740778727112808,
+    "branches": 3.4476479443909493,
+    "branch-misses": 0.888757199020408,
+    "cache-misses": 1.2257646739238126
+  }
+}
