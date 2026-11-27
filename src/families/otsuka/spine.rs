@@ -2,7 +2,7 @@
 
 mod batch;
 
-use std::{cmp::Reverse, collections::BinaryHeap, ops::Range};
+use std::{cmp::Reverse, collections::BinaryHeap, ops::Range, sync::OnceLock};
 
 use quip_solver_core::ising_generators::ice::zephyr_coordinates;
 use quip_solver_core::SamplerResult;
@@ -12,7 +12,9 @@ use super::{graph::Link, OtsukaGraph};
 use batch::{Batch, LANES};
 
 const MAX_WIDTH: usize = 9;
+const MAX_ASSIGNMENTS: usize = 1 << MAX_WIDTH;
 const OUTSIDE: usize = usize::MAX;
+const PLAN_CACHE_BYTES: usize = 64 << 20;
 
 /// A collection of conditional neighborhoods on a validated Zephyr instance.
 ///
@@ -23,6 +25,7 @@ pub struct ZephyrSpinePolish<'a> {
     spines: Vec<Vec<usize>>,
     adjacent_spines: Vec<Vec<usize>>,
     lanes: usize,
+    cache_plans: bool,
 }
 
 /// Budget and move policy for conditional Zephyr search.
@@ -46,6 +49,10 @@ pub struct SpinePolishOptions {
 pub struct SpinePolishStats {
     /// Number of exact move plans used.
     pub blocks: usize,
+    /// Number of plans built during this pass.
+    pub plans_built: usize,
+    /// Allocated bytes retained in the plans' buffers for reuse.
+    pub cached_plan_bytes: usize,
     /// Minimum number of free spins among the plans used.
     pub min_free: usize,
     /// Maximum number of free spins among the plans used.
@@ -106,7 +113,16 @@ impl<'a> ZephyrSpinePolish<'a> {
             spines,
             adjacent_spines,
             lanes: usize::from(t),
+            cache_plans: false,
         })
+    }
+
+    /// Retain up to 64 MiB of immutable plan buffers within a pass that
+    /// revisits neighborhoods.
+    #[must_use]
+    pub fn with_plan_cache(mut self, enabled: bool) -> Self {
+        self.cache_plans = enabled;
+        self
     }
 
     fn centers(&self, span: usize) -> Vec<Vec<usize>> {
@@ -135,6 +151,26 @@ impl<'a> ZephyrSpinePolish<'a> {
             }
         }
         centers
+    }
+
+    fn plan_for(&self, group: &[usize], stopped: &impl Fn() -> bool) -> Option<Plan> {
+        let mut nodes: Vec<_> = group
+            .iter()
+            .flat_map(|&i| &self.spines[i])
+            .copied()
+            .collect();
+        let central = nodes.len();
+        let mut neighbors: Vec<_> = group
+            .iter()
+            .flat_map(|&i| &self.adjacent_spines[i])
+            .copied()
+            .collect();
+        neighbors.sort_unstable();
+        neighbors.dedup();
+        for spine in neighbors {
+            nodes.extend_from_slice(&self.spines[spine]);
+        }
+        Plan::new(self.graph, &nodes, central, stopped)
     }
 
     /// Try a bounded sequence of exact conditional moves on every supplied
@@ -171,6 +207,10 @@ impl<'a> ZephyrSpinePolish<'a> {
         }
         let centers = self.centers(span);
         let mut order: Vec<_> = (0..centers.len()).collect();
+        let mut cache = Vec::<Option<Plan>>::new();
+        if self.cache_plans && blocks > centers.len() {
+            cache.resize_with(centers.len(), || None);
+        }
         let mut rng = SmallRng::seed_from_u64(seed ^ 0x5a45_5048_5952_4450);
         let mut noise = SmallRng::seed_from_u64(seed ^ 0x9439_2400_51d0_5811);
         let mut best = (perturbation_milli > 0).then(|| reads.to_vec());
@@ -192,34 +232,40 @@ impl<'a> ZephyrSpinePolish<'a> {
                     return None;
                 }
                 let group = &centers[index];
-                let mut nodes: Vec<_> = group
-                    .iter()
-                    .flat_map(|&i| &self.spines[i])
-                    .copied()
-                    .collect();
-                let central = nodes.len();
-                let mut neighbors: Vec<_> = group
-                    .iter()
-                    .flat_map(|&i| &self.adjacent_spines[i])
-                    .copied()
-                    .collect();
-                neighbors.sort_unstable();
-                neighbors.dedup();
-                for spine in neighbors {
-                    nodes.extend_from_slice(&self.spines[spine]);
+                let slot = cache.get_mut(index);
+                let mut temporary = None;
+                if slot.as_ref().is_none_or(|plan| plan.is_none()) {
+                    let plan = self.plan_for(group, &stopped)?;
+                    stats.plans_built += 1;
+                    temporary = Some(plan);
                 }
-                let plan = Plan::new(self.graph, &nodes, central, &stopped)?;
+                let uncached;
+                let plan = match (slot, temporary) {
+                    (Some(slot), Some(new))
+                        if new.heap_bytes() <= PLAN_CACHE_BYTES - stats.cached_plan_bytes =>
+                    {
+                        stats.cached_plan_bytes += new.heap_bytes();
+                        slot.insert(new)
+                    }
+                    (Some(slot), None) => slot.as_ref()?,
+                    (_, Some(plan)) => {
+                        uncached = plan;
+                        &uncached
+                    }
+                    (None, None) => return None,
+                };
+                let free = plan.steps.len();
                 if stats.blocks == 0 {
-                    stats.min_free = nodes.len();
+                    stats.min_free = free;
                     stats.first_spines.clone_from(group);
                 }
                 stats.blocks += 1;
-                stats.min_free = stats.min_free.min(nodes.len());
-                stats.max_free = stats.max_free.max(nodes.len());
+                stats.min_free = stats.min_free.min(free);
+                stats.max_free = stats.max_free.max(free);
                 stats.max_width = stats.max_width.max(plan.width);
                 if let Some(batches) = &mut batches {
                     for (batch, chunk) in batches.iter_mut().zip(reads.chunks_mut(LANES)) {
-                        let gains = batch.descend(&plan, &stopped)?;
+                        let gains = batch.descend(plan, &stopped)?;
                         for (read, gain) in chunk.iter_mut().zip(gains) {
                             read.energy_milli -= gain;
                             stats.accepted += usize::from(gain > 0);
@@ -233,7 +279,9 @@ impl<'a> ZephyrSpinePolish<'a> {
                     bias.clear();
                     if perturb {
                         let amplitude = i64::from(perturbation_milli);
-                        bias.extend((0..central).map(|_| noise.gen_range(-amplitude..=amplitude)));
+                        bias.extend(
+                            (0..plan.central).map(|_| noise.gen_range(-amplitude..=amplitude)),
+                        );
                     }
                     let old = read.energy_milli;
                     let (gain, moved) = plan.descend(
@@ -289,10 +337,40 @@ struct Step {
 struct Plan {
     steps: Vec<Step>,
     links: Vec<Link>,
-    messages: Vec<usize>,
-    assignments: Vec<usize>,
-    direct: Vec<i64>,
+    messages: Vec<Message>,
+    direct: Vec<i16>,
     width: usize,
+    central: usize,
+}
+
+struct Message {
+    base: u32,
+    projection: u16,
+}
+
+impl Message {
+    fn index(&self, projections: &[[u8; MAX_ASSIGNMENTS]], assignment: usize) -> usize {
+        self.base as usize + 2 * usize::from(projections[self.projection as usize][assignment])
+    }
+}
+
+/// Pack the selected bits of each assignment in ascending order. An incoming
+/// message always uses one bit for the spin being eliminated, so at most
+/// eight bits are projected from the surviving assignment. The topology and
+/// the coupling signs do not affect these tables.
+fn projection_tables() -> &'static [[u8; MAX_ASSIGNMENTS]] {
+    static TABLES: OnceLock<Box<[[u8; MAX_ASSIGNMENTS]]>> = OnceLock::new();
+    TABLES.get_or_init(|| {
+        let mut rows = vec![[0; MAX_ASSIGNMENTS]; MAX_ASSIGNMENTS - 1];
+        for mask in 1..rows.len() {
+            let rest = rows[mask & (mask - 1)];
+            let lowest = mask.trailing_zeros();
+            for (assignment, value) in rows[mask].iter_mut().enumerate() {
+                *value = (rest[assignment] << 1) | ((assignment >> lowest) & 1) as u8;
+            }
+        }
+        rows.into_boxed_slice()
+    })
 }
 
 /// Eliminate the perpendicular spines first. Keep the original edges and all
@@ -374,9 +452,9 @@ impl Plan {
             steps: Vec::with_capacity(nodes.len()),
             links: Vec::new(),
             messages: Vec::new(),
-            assignments: Vec::new(),
             direct: Vec::new(),
             width: 0,
+            central,
         };
         let mut buckets = vec![Vec::<usize>::new(); nodes.len()];
         for mut scope in order {
@@ -385,20 +463,23 @@ impl Plan {
             let width = scope.len() - 1;
             let here = plan.steps.len();
             let boundary_start = plan.links.len();
-            let mut coeff = [0_i64; MAX_WIDTH];
+            // At most nine original couplings, each bounded by 1,000 milli,
+            // contribute to this table. Boundary fields and incoming
+            // factors are accumulated separately in the wider score type.
+            let mut coeff = [0_i16; MAX_WIDTH];
             for &link in graph.all.row(u) {
                 let v = local[link.node()];
                 if v == OUTSIDE {
                     plan.links.push(link);
                 } else if let Some(p) = scope[1..].iter().position(|&p| p == v) {
-                    coeff[p] = i64::from(link.j());
+                    coeff[p] = link.j() as i16;
                 }
             }
             let mut later = [0; MAX_WIDTH];
             let table = plan.direct.len()..plan.direct.len() + (1 << width);
             plan.direct.resize(table.end, 0);
             let direct = &mut plan.direct[table.clone()];
-            direct[0] = -coeff[..width].iter().sum::<i64>();
+            direct[0] = -coeff[..width].iter().sum::<i16>();
             for (i, &v) in scope[1..].iter().enumerate() {
                 later[i] = nodes[v];
                 let bit = 1 << i;
@@ -410,19 +491,17 @@ impl Plan {
             let incoming_start = plan.messages.len();
             for &from in &buckets[here] {
                 let source = &plan.steps[from];
-                let start = plan.assignments.len();
-                plan.assignments.resize(start + (1 << width), 0);
-                let assignment = &mut plan.assignments[start..];
-                for (i, &v) in source.later[..source.width].iter().enumerate().skip(1) {
+                let mut projection = 0;
+                // Both scopes are sorted by elimination rank. The first
+                // source bit is this step's spin, with its two costs adjacent.
+                for &v in &source.later[1..source.width] {
                     let to = later[..width].iter().position(|&p| p == v)?;
-                    for (mask, projected) in assignment.iter_mut().enumerate() {
-                        *projected |= ((mask >> to) & 1) << i;
-                    }
+                    projection |= 1 << to;
                 }
-                for index in assignment {
-                    *index += source.table.start;
-                }
-                plan.messages.push(start);
+                plan.messages.push(Message {
+                    base: u32::try_from(source.table.start).ok()?,
+                    projection,
+                });
             }
             if let Some(&first) = scope.get(1) {
                 buckets[rank[first]].push(here);
@@ -445,6 +524,13 @@ impl Plan {
         Some(plan)
     }
 
+    fn heap_bytes(&self) -> usize {
+        self.steps.capacity() * size_of::<Step>()
+            + self.links.capacity() * size_of::<Link>()
+            + self.messages.capacity() * size_of::<Message>()
+            + self.direct.capacity() * size_of::<i16>()
+    }
+
     fn descend(
         &self,
         spins: &mut [i8],
@@ -453,6 +539,7 @@ impl Plan {
         bias: &[i64],
         stopped: &impl Fn() -> bool,
     ) -> Option<(i64, bool)> {
+        let projections = projection_tables();
         scratch.cost.resize(self.direct.len(), 0);
         scratch.choice.resize(self.direct.len(), false);
         // One unit of physical energy outweighs all secondary penalties.
@@ -475,14 +562,14 @@ impl Plan {
                 + bias.get(step.center).copied().unwrap_or(0);
             let prev = spins[step.node];
             let direct = &self.direct[step.table.clone()];
-            old += i64::from(prev) * (boundary + direct[step.mask(spins)]);
+            old += i64::from(prev) * (boundary + i64::from(direct[step.mask(spins)]));
             let keep_lo = i64::from(explore_plateaus && prev == -1);
             let keep_hi = i64::from(explore_plateaus && prev == 1);
             for (k, &field) in direct.iter().enumerate() {
-                let h = scale * (boundary + field);
+                let h = scale * (boundary + i64::from(field));
                 let (mut lo, mut hi) = (-h + keep_lo, h + keep_hi);
-                for &message in &self.messages[step.incoming.clone()] {
-                    let index = self.assignments[message + k];
+                for message in &self.messages[step.incoming.clone()] {
+                    let index = message.index(projections, k);
                     lo += scratch.cost[index];
                     hi += scratch.cost[index + 1];
                 }
@@ -533,10 +620,24 @@ struct Scratch {
 
 #[cfg(test)]
 mod tests {
-    use super::{Batch, Plan, Scratch};
+    use super::{projection_tables, Batch, Plan, Scratch, MAX_WIDTH};
     use crate::families::otsuka::{Model, Motifs, OtsukaGraph, Weights};
     use quip_solver_core::SamplerResult;
     use rand::{rngs::SmallRng, Rng, SeedableRng};
+
+    #[test]
+    fn projection_tables_match_all_explicit_bit_gathers() {
+        for (mask, row) in projection_tables().iter().enumerate() {
+            for (assignment, &packed) in row.iter().enumerate() {
+                let reference = (0..MAX_WIDTH)
+                    .filter(|bit| mask & (1 << bit) != 0)
+                    .enumerate()
+                    .map(|(target, source)| ((assignment >> source) & 1) << target)
+                    .sum::<usize>();
+                assert_eq!(usize::from(packed), reference);
+            }
+        }
+    }
 
     #[test]
     fn elimination_matches_every_assignment_with_boundary_spins_fixed() {

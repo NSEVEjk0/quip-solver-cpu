@@ -7,6 +7,7 @@ import csv
 import datetime
 import hashlib
 import json
+import math
 import os
 from pathlib import Path
 import platform
@@ -59,10 +60,21 @@ def main():
     parser.add_argument("--candidate-spine-span", type=int, choices=range(1, 5))
     parser.add_argument("--candidate-spine-plateaus", action="store_true")
     parser.add_argument("--candidate-spine-perturbation", type=int)
-    parser.add_argument(
+    spine_comparison = parser.add_mutually_exclusive_group()
+    spine_comparison.add_argument(
         "--compare-spine-batch",
         action="store_true",
         help="use the same spine search on both arms and batch the candidate's tables",
+    )
+    spine_comparison.add_argument(
+        "--compare-spine-plan-cache",
+        action="store_true",
+        help="batch both arms and retain repeated neighborhood plans in the candidate",
+    )
+    spine_comparison.add_argument(
+        "--compare-spine-batched-builds",
+        action="store_true",
+        help="use the same batched spine search on both arms while comparing two builds",
     )
     parser.add_argument("--label", required=True)
     parser.add_argument("--cpus", nargs=2, type=int, required=True)
@@ -82,6 +94,8 @@ def main():
         help="compare original candidate energies when the solver may return different spins",
     )
     parser.add_argument("--reference-sweeps", type=int)
+    parser.add_argument("--candidate-beta-min", type=float)
+    parser.add_argument("--candidate-resamples", type=int)
     parser.add_argument("--candidate-polish-sweeps", type=int)
     parser.add_argument("--candidate-single-every", type=int)
     parser.add_argument(
@@ -100,10 +114,21 @@ def main():
         help="record Linux perf counters for each process",
     )
     args = parser.parse_args()
+    spine_parity = (
+        args.compare_spine_batch
+        or args.compare_spine_plan_cache
+        or args.compare_spine_batched_builds
+    )
     if min(args.instances, args.reads, args.sweeps) < 1 or args.seed_start < 0:
         parser.error("positive budgets and a nonnegative seed are required")
     if args.reference_sweeps is not None and args.reference_sweeps < 1:
         parser.error("reference sweeps must be positive")
+    if args.candidate_beta_min is not None and (
+        not math.isfinite(args.candidate_beta_min) or args.candidate_beta_min <= 0.0
+    ):
+        parser.error("candidate initial beta must be finite and positive")
+    if args.candidate_resamples is not None and args.candidate_resamples < 0:
+        parser.error("candidate resampling count must be nonnegative")
     if args.candidate_polish_sweeps is not None and args.candidate_polish_sweeps < 0:
         parser.error("candidate polish sweeps must be nonnegative")
     if args.candidate_spine_blocks is not None and args.candidate_spine_blocks < 1:
@@ -121,14 +146,14 @@ def main():
         parser.error("candidate perturbation must be in 0..=65535 milli units")
     if args.compare_energy and args.mode != "pipeline":
         parser.error("--compare-energy requires the pipeline's original-energy verification")
-    if args.compare_spine_batch and (
+    if spine_parity and (
         args.mode != "pipeline"
         or args.compare_energy
         or args.candidate_spine_blocks is None
         or args.candidate_spine_plateaus
         or args.candidate_spine_perturbation is not None
     ):
-        parser.error("batch comparison requires the same strictly downhill spine search in pipeline mode")
+        parser.error("spine parity comparisons require the same strictly downhill search in pipeline mode")
     if args.bracket and not args.serial:
         parser.error("--bracket requires --serial")
     if args.candidate_single_every is not None and args.candidate_single_every < 0:
@@ -137,10 +162,12 @@ def main():
         option is not None
         for option in (
             args.reference_sweeps,
+            args.candidate_beta_min,
+            args.candidate_resamples,
             args.candidate_polish_sweeps,
             args.candidate_single_every,
-            None if args.compare_spine_batch else args.candidate_backend,
-            None if args.compare_spine_batch else args.candidate_spine_blocks,
+            None if spine_parity else args.candidate_backend,
+            None if spine_parity else args.candidate_spine_blocks,
         )
     ):
         parser.error("different solve budgets require --compare-energy")
@@ -198,6 +225,8 @@ def main():
         metadata.update(
             comparison="energy",
             reference_sweeps=args.reference_sweeps or args.sweeps,
+            candidate_beta_min=args.candidate_beta_min,
+            candidate_resamples=args.candidate_resamples,
             candidate_polish_sweeps=args.candidate_polish_sweeps,
             candidate_single_every=args.candidate_single_every,
         )
@@ -210,6 +239,10 @@ def main():
         metadata["candidate_spine_perturbation_milli"] = args.candidate_spine_perturbation or 0
     if args.compare_spine_batch:
         metadata["comparison"] = "exact-spine-batch"
+    if args.compare_spine_plan_cache:
+        metadata["comparison"] = "exact-spine-plan-cache"
+    if args.compare_spine_batched_builds:
+        metadata["comparison"] = "exact-spine-batched-builds"
     if args.bracket:
         metadata["repeats_per_build"] = 2
     if args.perf:
@@ -239,8 +272,9 @@ def main():
         ]
         if role == "candidate" and args.selective_resampling:
             command.append("--selective-resampling")
-        use_spine_options = args.compare_spine_batch or role == "candidate"
-        batched = args.compare_spine_batch and role == "candidate"
+        use_spine_options = spine_parity or role == "candidate"
+        batched = spine_parity and (not args.compare_spine_batch or role == "candidate")
+        cached = args.compare_spine_plan_cache and role == "candidate"
         if use_spine_options and args.candidate_backend:
             command.extend(("--backend", args.candidate_backend))
         if use_spine_options and args.candidate_spine_blocks:
@@ -253,8 +287,14 @@ def main():
                 command.extend(("--spine-perturbation", str(args.candidate_spine_perturbation)))
             if batched:
                 command.append("--spine-batch")
+            if cached:
+                command.append("--spine-cache-plans")
         if role == "candidate" and args.candidate_polish_sweeps is not None:
             command.extend(("--polish-sweeps", str(args.candidate_polish_sweeps)))
+        if role == "candidate" and args.candidate_beta_min is not None:
+            command.extend(("--beta-min", repr(args.candidate_beta_min)))
+        if role == "candidate" and args.candidate_resamples is not None:
+            command.extend(("--resamples", str(args.candidate_resamples)))
         if role == "candidate" and args.candidate_single_every is not None:
             command.extend(("--single-every", str(args.candidate_single_every)))
         stem = f"{seed}-{role}" if repetition is None else f"{seed}-{role}-{repetition}"
@@ -297,9 +337,14 @@ def main():
                     or metrics.get("spine_plateaus") != args.candidate_spine_plateaus
                     or metrics.get("spine_perturbation_milli") != (args.candidate_spine_perturbation or 0)
                     or metrics.get("spine_batch") != batched
+                    or metrics.get("spine_cache_plans", False) != cached
                 ):
                     raise RuntimeError(f"reported spine budget differs at seed {seed}")
         if role == "candidate":
+            if args.candidate_beta_min is not None and row.get("beta_min") != args.candidate_beta_min:
+                raise RuntimeError(f"reported candidate initial beta differs at seed {seed}")
+            if args.candidate_resamples is not None and row.get("resamples") != args.candidate_resamples:
+                raise RuntimeError(f"reported candidate resampling count differs at seed {seed}")
             if args.candidate_polish_sweeps is not None and row.get("polish_sweeps") != args.candidate_polish_sweeps:
                 raise RuntimeError(f"reported candidate polishing budget differs at seed {seed}")
             if args.candidate_single_every is not None and row.get("single_every") != args.candidate_single_every:
@@ -373,18 +418,20 @@ def main():
                 ):
                     raise RuntimeError(f"conditional spine energy audit failed at seed {seed}")
                 if (
-                    not args.compare_spine_batch
+                    not spine_parity
                     and args.candidate_backend is None
                     and (args.reference_sweeps or args.sweeps) == args.sweeps
                     and not args.selective_resampling
                     and args.candidate_single_every is None
                     and args.candidate_polish_sweeps is None
+                    and args.candidate_beta_min is None
+                    and args.candidate_resamples is None
                     and args.cache_slots == args.reference_cache_slots
                     and binaries["candidate"] == binaries["reference"]
                     and before != pair[0]["energies_milli"]
                 ):
                     raise RuntimeError(f"conditional spine starts differ at seed {seed}")
-            if args.compare_spine_batch:
+            if spine_parity:
                 reference, candidate = (row["metrics"] for row in pair)
                 if reference["spine_initial_energies_milli"] != candidate["spine_initial_energies_milli"]:
                     raise RuntimeError(f"batched spine starts differ at seed {seed}")
@@ -456,7 +503,7 @@ def main():
                 "tied": values.count(0),
                 "regressed": sum(value < 0 for value in values),
             }
-    if args.compare_spine_batch:
+    if spine_parity:
         summary["spine_stage_median_speedup"] = statistics.median(spine_ratios)
         summary["spine_stage_bootstrap95"] = bootstrap_median(spine_ratios)
         summary["spine_stage_speedup_range"] = [min(spine_ratios), max(spine_ratios)]

@@ -89,6 +89,9 @@ struct Args {
     spine_batch: bool,
     #[cfg(feature = "zephyr-spine-polish")]
     #[arg(long, requires = "spine_blocks")]
+    spine_cache_plans: bool,
+    #[cfg(feature = "zephyr-spine-polish")]
+    #[arg(long, requires = "spine_blocks")]
     spine_snapshot: Option<PathBuf>,
     #[arg(long, default_value_t = 1001)]
     seed: u64,
@@ -96,6 +99,8 @@ struct Args {
     reads: usize,
     #[arg(long, default_value_t = 1024)]
     sweeps: usize,
+    #[arg(long, default_value_t = 1.0, conflicts_with = "weak_theta")]
+    beta_min: f64,
     #[arg(long, default_value_t = 12.0)]
     beta_max: f64,
     #[arg(long)]
@@ -135,6 +140,9 @@ struct Topology {
 #[expect(clippy::print_stdout, reason = "benchmark emits one JSON result")]
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
+    if !args.beta_min.is_finite() || args.beta_min <= 0.0 {
+        return Err("initial beta must be finite and positive".into());
+    }
     if matches!(args.mode, Mode::Kernel) && !matches!(args.backend, Backend::Native) {
         return Err("the alternate backend requires pipeline mode".into());
     }
@@ -202,7 +210,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         num_reads: args.reads,
         num_sweeps: args.sweeps,
         seed: args.seed ^ 0x4350_5542_454e_4348,
-        beta_range: args.weak_theta.is_none().then_some((1.0, args.beta_max)),
+        beta_range: args
+            .weak_theta
+            .is_none()
+            .then_some((args.beta_min, args.beta_max)),
         ..SampleParams::default()
     };
     let effective_beta_max = if let Some(theta) = args.weak_theta {
@@ -232,7 +243,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     } else {
                         1.0
                     };
-                    effective_beta_max.powf(x)
+                    args.beta_min * (effective_beta_max / args.beta_min).powf(x)
                 })
                 .collect();
             let schedule = Schedule::new(&betas, args.single_every)?;
@@ -359,7 +370,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         u8::try_from(t)?,
                     )
                     .and_then(|polish| {
-                        polish.improve(
+                        polish.with_plan_cache(args.spine_cache_plans).improve(
                             &mut reads,
                             SpinePolishOptions {
                                 blocks,
@@ -421,6 +432,9 @@ fn main() -> Result<(), Box<dyn Error>> {
                         "spine_uphill_moves": s.uphill_moves,
                         "spine_perturbation_milli": args.spine_perturbation.unwrap_or(0),
                         "spine_batch": args.spine_batch,
+                        "spine_cache_plans": args.spine_cache_plans,
+                        "spine_plans_built": s.plans_built,
+                        "spine_cached_plan_bytes": s.cached_plan_bytes,
                         "spine_seconds": spine_seconds,
                         "spine_initial_energies_milli": initial,
                         "spine_min_free": s.min_free,
@@ -439,7 +453,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut row = serde_json::json!({"mode":format!("{:?}",args.mode),"preset":format!("{:?}",args.preset),
         "backend":args.backend.name(),
         "seed":args.seed,"nonce":blake3::Hash::from(nonce).to_hex().to_string(),
-        "reads":args.reads,"sweeps":args.sweeps,"beta_max":effective_beta_max,
+        "reads":args.reads,"sweeps":args.sweeps,"beta_min":args.beta_min,"beta_max":effective_beta_max,
         "weak_theta":args.weak_theta,"polish_beta":args.polish_beta,"cache_slots":args.cache_slots,
         "cache_disabled":args.disable_cache,"motif_score_disabled":args.disable_motif_score,
         "selective_resampling":args.selective_resampling,

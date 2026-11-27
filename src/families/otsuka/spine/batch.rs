@@ -2,7 +2,7 @@
 
 use quip_solver_core::SamplerResult;
 
-use super::{OtsukaGraph, Plan, Step};
+use super::{projection_tables, OtsukaGraph, Plan, Step};
 
 pub(super) const LANES: usize = 8;
 type Lanes = [i32; LANES];
@@ -52,6 +52,7 @@ impl Batch {
         plan: &Plan,
         stopped: &impl Fn() -> bool,
     ) -> Option<[i64; LANES]> {
+        let projections = projection_tables();
         self.costs.resize(plan.direct.len(), [0; LANES]);
         self.choices.resize(plan.direct.len(), [0; LANES]);
         let (mut old, mut optimum) = ([0; LANES], [0; LANES]);
@@ -71,14 +72,15 @@ impl Batch {
             let direct = &plan.direct[step.table.clone()];
             let masks = step.batch_masks(&self.spins);
             for lane in 0..LANES {
-                old[lane] += prev[lane] * (boundary[lane] + direct[masks[lane] as usize] as i32);
+                old[lane] +=
+                    prev[lane] * (boundary[lane] + i32::from(direct[masks[lane] as usize]));
             }
             for (k, &coupling) in direct.iter().enumerate() {
-                let coupling = coupling as i32;
+                let coupling = i32::from(coupling);
                 let mut hi: Lanes = boundary.map(|h| h + coupling);
                 let mut lo = hi.map(|h| -h);
-                for &message in &plan.messages[step.incoming.clone()] {
-                    let index = plan.assignments[message + k];
+                for message in &plan.messages[step.incoming.clone()] {
+                    let index = message.index(projections, k);
                     for lane in 0..LANES {
                         lo[lane] += self.costs[index][lane];
                         hi[lane] += self.costs[index + 1][lane];
