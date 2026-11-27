@@ -18,6 +18,8 @@ mod stage0;
 )]
 mod stage0v2;
 
+#[cfg(feature = "min-cut-polish")]
+use super::otsuka::cut;
 #[cfg(feature = "tree-polish")]
 use super::otsuka::TreePolish;
 use super::otsuka::{
@@ -91,6 +93,9 @@ pub struct FunnelConfig {
     /// Enable conditional tree descent on the completed candidate batch.
     #[cfg(feature = "tree-polish")]
     pub tree_polish: bool,
+    /// Reoptimize balanced, induced neighborhoods via exact conditional cuts.
+    #[cfg(feature = "min-cut-polish")]
+    pub min_cut_polish: bool,
     /// Finish the best reads with downhill, pair-aware collective moves.
     #[cfg(feature = "pair-worm-polish")]
     pub pair_worm_polish: bool,
@@ -135,6 +140,8 @@ impl Default for FunnelConfig {
             single_every: 1,
             #[cfg(feature = "tree-polish")]
             tree_polish: false,
+            #[cfg(feature = "min-cut-polish")]
+            min_cut_polish: false,
             #[cfg(feature = "pair-worm-polish")]
             pair_worm_polish: false,
             shared_cache: false,
@@ -250,6 +257,12 @@ impl FunnelConfig {
         if let Some(v) = table.get("funnel_tree_polish") {
             self.tree_polish = v.as_bool().ok_or("funnel_tree_polish must be a boolean")?;
         }
+        #[cfg(feature = "min-cut-polish")]
+        if let Some(v) = table.get("funnel_min_cut_polish") {
+            self.min_cut_polish = v
+                .as_bool()
+                .ok_or("funnel_min_cut_polish must be a boolean")?;
+        }
         #[cfg(feature = "pair-worm-polish")]
         if let Some(v) = table.get("funnel_pair_worm_polish") {
             self.pair_worm_polish = v
@@ -289,6 +302,8 @@ impl FunnelConfig {
             "single_every",
             #[cfg(feature = "tree-polish")]
             "tree_polish",
+            #[cfg(feature = "min-cut-polish")]
+            "min_cut_polish",
             #[cfg(feature = "pair-worm-polish")]
             "pair_worm_polish",
             "shared_cache",
@@ -308,6 +323,8 @@ impl FunnelConfig {
             let value = match key {
                 #[cfg(feature = "tree-polish")]
                 "tree_polish" => raw.parse::<bool>().ok().map(toml::Value::Boolean),
+                #[cfg(feature = "min-cut-polish")]
+                "min_cut_polish" => raw.parse::<bool>().ok().map(toml::Value::Boolean),
                 #[cfg(feature = "pair-worm-polish")]
                 "pair_worm_polish" => raw.parse::<bool>().ok().map(toml::Value::Boolean),
                 "screen"
@@ -675,6 +692,11 @@ pub fn tuned_reads(
         {
             return Ok(None);
         }
+        #[cfg(feature = "min-cut-polish")]
+        if config.min_cut_polish && cut::polish(&truth, &mut reads, params.seed, &stopped).is_none()
+        {
+            return Ok(None);
+        }
         return Ok(Some(reads));
     }
     for read in &mut reads {
@@ -763,6 +785,10 @@ pub fn tuned_reads(
     }
     #[cfg(feature = "pair-worm-polish")]
     if config.pair_worm_polish && !polish_pair_worm(instance, &mut reads, params.seed, &stopped)? {
+        return Ok(None);
+    }
+    #[cfg(feature = "min-cut-polish")]
+    if config.min_cut_polish && cut::polish(&truth, &mut reads, params.seed, &stopped).is_none() {
         return Ok(None);
     }
     Ok(Some(reads))

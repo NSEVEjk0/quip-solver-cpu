@@ -1,11 +1,21 @@
 //! Canonical current-recipe CPU benchmark with independent optimization flags.
 use clap::{Parser, ValueEnum};
+use quip_protocol::diversity::diversity_milli;
 use quip_solver_conformance::families::{export_instances, reference_revision};
+#[cfg(feature = "zephyr-spine-polish")]
+use quip_solver_core::ising_generators::descriptor::{Params, Value};
 use quip_solver_core::ising_generators::family::BaseTopology;
 use quip_solver_core::ising_generators::ice::TWISTED_DIMER_V1;
-use quip_solver_core::SampleParams;
+#[cfg(feature = "zephyr-spine-polish")]
+use quip_solver_core::SamplerResult;
+use quip_solver_core::{IsingGraph, SampleParams};
 use quip_solver_cpu::families::funnel::{instance_energy, prepared, tuned_reads, FunnelConfig};
 use quip_solver_cpu::families::otsuka::{anneal_population_observed, PopulationOptions, Schedule};
+#[cfg(feature = "zephyr-spine-polish")]
+use quip_solver_cpu::families::otsuka::{SpinePolishOptions, ZephyrSpinePolish};
+use quip_solver_cpu::sb_core::{sample_sb, DSB};
+#[cfg(feature = "zephyr-spine-polish")]
+use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::Deserialize;
 use std::error::Error;
 use std::path::PathBuf;
@@ -27,6 +37,26 @@ enum Preset {
     Archive,
 }
 
+#[derive(Clone, Copy, Debug, Default, ValueEnum)]
+enum Backend {
+    #[default]
+    Native,
+    DiscreteSb,
+    #[cfg(feature = "zephyr-spine-polish")]
+    ZephyrSpine,
+}
+
+impl Backend {
+    const fn name(self) -> &'static str {
+        match self {
+            Self::Native => "native",
+            Self::DiscreteSb => "discrete-sb",
+            #[cfg(feature = "zephyr-spine-polish")]
+            Self::ZephyrSpine => "zephyr-spine",
+        }
+    }
+}
+
 #[derive(Parser)]
 struct Args {
     #[arg(
@@ -40,6 +70,26 @@ struct Args {
     mode: Mode,
     #[arg(long, value_enum, default_value = "baseline")]
     preset: Preset,
+    #[arg(long, value_enum, default_value = "native")]
+    backend: Backend,
+    #[cfg(feature = "zephyr-spine-polish")]
+    #[arg(long)]
+    spine_blocks: Option<usize>,
+    #[cfg(feature = "zephyr-spine-polish")]
+    #[arg(long, default_value_t = 1)]
+    spine_span: usize,
+    #[cfg(feature = "zephyr-spine-polish")]
+    #[arg(long, requires = "spine_blocks")]
+    spine_plateaus: bool,
+    #[cfg(feature = "zephyr-spine-polish")]
+    #[arg(long, requires = "spine_blocks")]
+    spine_perturbation: Option<u16>,
+    #[cfg(feature = "zephyr-spine-polish")]
+    #[arg(long, requires = "spine_blocks", conflicts_with_all = ["spine_plateaus", "spine_perturbation"])]
+    spine_batch: bool,
+    #[cfg(feature = "zephyr-spine-polish")]
+    #[arg(long, requires = "spine_blocks")]
+    spine_snapshot: Option<PathBuf>,
     #[arg(long, default_value_t = 1001)]
     seed: u64,
     #[arg(long, default_value_t = 16)]
@@ -85,6 +135,29 @@ struct Topology {
 #[expect(clippy::print_stdout, reason = "benchmark emits one JSON result")]
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
+    if matches!(args.mode, Mode::Kernel) && !matches!(args.backend, Backend::Native) {
+        return Err("the alternate backend requires pipeline mode".into());
+    }
+    #[cfg(feature = "zephyr-spine-polish")]
+    if args.spine_blocks.is_some()
+        && (!matches!(args.mode, Mode::Pipeline) || args.spine_blocks == Some(0))
+    {
+        return Err("spine polishing requires pipeline mode and a positive block count".into());
+    }
+    #[cfg(feature = "zephyr-spine-polish")]
+    if !(1..=4).contains(&args.spine_span)
+        || (args.spine_blocks.is_none() && matches!(args.backend, Backend::ZephyrSpine))
+    {
+        return Err("Zephyr spine search requires --spine-blocks and a span in 1..=4".into());
+    }
+    #[cfg(feature = "zephyr-spine-polish")]
+    if args.spine_snapshot.is_some()
+        && (args.spine_blocks != Some(1)
+            || args.reads != 1
+            || args.spine_perturbation.unwrap_or(0) != 0)
+    {
+        return Err("a spine snapshot requires one read and one unperturbed block".into());
+    }
     let spec: Topology = serde_json::from_slice(&std::fs::read(&args.topology)?)?;
     let edges: Vec<_> = spec.edges.into_iter().map(|[u, v]| (u, v)).collect();
     let topology = BaseTopology::new(spec.nodes, &edges).map_err(|e| format!("topology: {e:?}"))?;
@@ -117,6 +190,8 @@ fn main() -> Result<(), Box<dyn Error>> {
         houdayer_every: args.houdayer_every,
         #[cfg(feature = "tree-polish")]
         tree_polish: true,
+        #[cfg(feature = "min-cut-polish")]
+        min_cut_polish: true,
         #[cfg(feature = "pair-worm-polish")]
         pair_worm_polish: true,
         cache_slots: args.cache_slots,
@@ -147,7 +222,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         args.beta_max
     };
     let mut fingerprint = blake3::Hasher::new();
-    let (seconds, energies, metrics) = match args.mode {
+    let (seconds, energies, metrics, diversity) = match args.mode {
         Mode::Kernel => {
             let graph = prepared(&instance, &config, true).map_err(|e| format!("graph: {e:?}"))?;
             let betas: Vec<f64> = (0..args.sweeps)
@@ -210,14 +285,117 @@ fn main() -> Result<(), Box<dyn Error>> {
                     "fallbacks":c.fallbacks,"temperatures":c.temperatures,
                     "epoch_wraps":c.epoch_wraps,
                 }),
+                None,
             )
         }
         Mode::Pipeline => {
             let started = Instant::now();
-            let reads = tuned_reads(&instance, &sample_params, &config, || false)
-                .map_err(|e| format!("pipeline: {e:?}"))?
-                .ok_or("unexpected cancellation")?;
+            let reads = match args.backend {
+                Backend::Native => tuned_reads(&instance, &sample_params, &config, || false)
+                    .map_err(|e| format!("pipeline: {e:?}"))?
+                    .ok_or("unexpected cancellation")?,
+                Backend::DiscreteSb => {
+                    let graph = IsingGraph::new(
+                        instance
+                            .h()
+                            .iter()
+                            .map(|&h| f64::from(h) / 1000.0)
+                            .collect(),
+                        instance
+                            .j()
+                            .iter()
+                            .map(|&j| f64::from(j) / 1000.0)
+                            .collect(),
+                        instance
+                            .edges()
+                            .iter()
+                            .map(|&(u, v)| (u as usize, v as usize))
+                            .collect(),
+                    );
+                    sample_sb(&graph, &sample_params, DSB)
+                }
+                #[cfg(feature = "zephyr-spine-polish")]
+                Backend::ZephyrSpine => {
+                    let mut rng =
+                        SmallRng::seed_from_u64(sample_params.seed ^ 0xfc39_1569_7ab3_f8aa);
+                    (0..args.reads)
+                        .map(|_| {
+                            let spins: Vec<i8> = (0..instance.node_ids().len())
+                                .map(|_| if rng.gen() { 1 } else { -1 })
+                                .collect();
+                            SamplerResult {
+                                energy_milli: instance_energy(&instance, &spins)
+                                    - instance.offset_milli(),
+                                spins,
+                            }
+                        })
+                        .collect()
+                }
+            };
+            #[cfg(feature = "zephyr-spine-polish")]
+            let mut reads = reads;
+            #[cfg(feature = "zephyr-spine-polish")]
+            let spine_stats = args
+                .spine_blocks
+                .map(|blocks| {
+                    let spine_started = Instant::now();
+                    let initial_energies: Vec<_> = reads
+                        .iter()
+                        .map(|read| read.energy_milli + instance.offset_milli())
+                        .collect();
+                    let p = Params::parse(TWISTED_DIMER_V1.schema, &params)
+                        .map_err(|error| format!("invalid Zephyr shape parameters: {error:?}"))?;
+                    let (Some(Value::Unsigned(m)), Some(Value::Unsigned(t))) = (p.get(1), p.get(2))
+                    else {
+                        return Err("missing Zephyr shape".into());
+                    };
+                    let graph = prepared(&instance, &config, false)
+                        .map_err(|error| format!("spine graph: {error:?}"))?;
+                    let snapshot = args.spine_snapshot.as_ref().map(|_| reads[0].spins.clone());
+                    let stats = ZephyrSpinePolish::new(
+                        &graph,
+                        instance.node_ids(),
+                        u16::try_from(m)?,
+                        u8::try_from(t)?,
+                    )
+                    .and_then(|polish| {
+                        polish.improve(
+                            &mut reads,
+                            SpinePolishOptions {
+                                blocks,
+                                span: args.spine_span,
+                                explore_plateaus: args.spine_plateaus,
+                                perturbation_milli: args.spine_perturbation.unwrap_or(0),
+                                batch_reads: args.spine_batch,
+                            },
+                            sample_params.seed,
+                            || false,
+                        )
+                    })
+                    .ok_or("spine elimination failed")?;
+                    let seconds = spine_started.elapsed().as_secs_f64();
+                    if let Some((path, before)) = args.spine_snapshot.as_ref().zip(snapshot) {
+                        let data = serde_json::json!({
+                            "seed": args.seed, "m": m, "t": t, "spines": stats.first_spines,
+                            "ids": instance.node_ids(), "edges": instance.edges(), "j": instance.j(),
+                            "h": instance.h(), "offset_milli": instance.offset_milli(),
+                            "before": before, "after": reads[0].spins,
+                            "before_energy_milli": initial_energies[0],
+                            "after_energy_milli": reads[0].energy_milli + instance.offset_milli(),
+                            "free": stats.max_free, "width": stats.max_width, "seconds": seconds,
+                        });
+                        serde_json::to_writer(std::fs::File::create_new(path)?, &data)?;
+                    }
+                    Ok::<_, Box<dyn Error>>((stats, seconds, initial_energies))
+                })
+                .transpose()?;
             let seconds = started.elapsed().as_secs_f64();
+            let diversity = diversity_milli(
+                &reads
+                    .iter()
+                    .map(|read| read.spins.as_slice())
+                    .collect::<Vec<_>>(),
+            );
             let energies: Vec<_> = reads
                 .iter()
                 .map(|r| {
@@ -232,17 +410,40 @@ fn main() -> Result<(), Box<dyn Error>> {
                     Ok(original)
                 })
                 .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
-            (seconds, energies, serde_json::Value::Null)
+            #[cfg(feature = "zephyr-spine-polish")]
+            let metrics =
+                spine_stats.map_or(serde_json::Value::Null, |(s, spine_seconds, initial)| {
+                    serde_json::json!({
+                        "spine_blocks": s.blocks,
+                        "spine_span": args.spine_span,
+                        "spine_plateaus": args.spine_plateaus,
+                        "spine_plateau_moves": s.plateau_moves,
+                        "spine_uphill_moves": s.uphill_moves,
+                        "spine_perturbation_milli": args.spine_perturbation.unwrap_or(0),
+                        "spine_batch": args.spine_batch,
+                        "spine_seconds": spine_seconds,
+                        "spine_initial_energies_milli": initial,
+                        "spine_min_free": s.min_free,
+                        "spine_max_free": s.max_free,
+                        "spine_max_width": s.max_width,
+                        "spine_accepted": s.accepted,
+                        "spine_gain_milli": s.gain_milli,
+                    })
+                });
+            #[cfg(not(feature = "zephyr-spine-polish"))]
+            let metrics = serde_json::Value::Null;
+            (seconds, energies, metrics, Some(diversity))
         }
     };
     let best = energies.iter().min().copied().ok_or("no reads")?;
     let mut row = serde_json::json!({"mode":format!("{:?}",args.mode),"preset":format!("{:?}",args.preset),
+        "backend":args.backend.name(),
         "seed":args.seed,"nonce":blake3::Hash::from(nonce).to_hex().to_string(),
         "reads":args.reads,"sweeps":args.sweeps,"beta_max":effective_beta_max,
         "weak_theta":args.weak_theta,"polish_beta":args.polish_beta,"cache_slots":args.cache_slots,
         "cache_disabled":args.disable_cache,"motif_score_disabled":args.disable_motif_score,
         "selective_resampling":args.selective_resampling,
-        "seconds":seconds,"best_energy_milli":best,
+        "seconds":seconds,"best_energy_milli":best,"diversity_milli":diversity,
         "energies_milli":energies,"trajectory_digest":fingerprint.finalize().to_hex().to_string(),"metrics":metrics});
     let build = serde_json::json!({
         "compact_local_fields":cfg!(feature="compact-local-fields"),
@@ -257,6 +458,7 @@ fn main() -> Result<(), Box<dyn Error>> {
         "packed_residual_fields":cfg!(feature="packed-residual-fields"),
         "tree_polish":cfg!(feature="tree-polish"),
         "cyclic_polish":cfg!(feature="cyclic-polish"),
+        "min_cut_polish":cfg!(feature="min-cut-polish"),
         "pair_worm_polish":cfg!(feature="pair-worm-polish"),
     });
     let schedule = serde_json::json!({

@@ -211,6 +211,10 @@ packed-residual-fields = ["row-grouped-residual-deltas"]
 tree-polish = []
 # Mix exact tree moves with small cyclic neighborhoods during polishing.
 cyclic-polish = ["tree-polish"]
+# Solve balanced signed neighborhoods with the surrounding spins fixed.
+min-cut-polish = []
+# Reoptimize a spine and its perpendicular neighbors by variable elimination.
+zephyr-spine-polish = []
 # Find collective ice moves by alternating disjoint pair flips and tile repairs.
 pair-worm-polish = []
 # Off by default. Adds per-spin-decision and per-flip spans INSIDE the hot loop.

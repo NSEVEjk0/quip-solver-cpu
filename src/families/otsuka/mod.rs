@@ -17,7 +17,11 @@
 //! `quip/twisted-ice-dimer` instance. The family's metadata check does that
 //! with the declared parameters, before preparation.
 
+#[cfg(feature = "min-cut-polish")]
+pub(super) mod cut;
 mod graph;
+#[cfg(feature = "zephyr-spine-polish")]
+mod spine;
 #[cfg(feature = "tree-polish")]
 mod tree;
 mod update;
@@ -32,6 +36,8 @@ use update::LocalField;
 pub use graph::{
     GraphError, Model, Motifs, OtsukaGraph, Weights, MAX_NODES, PAIR_MILLI, STRONG_MILLI,
 };
+#[cfg(feature = "zephyr-spine-polish")]
+pub use spine::{SpinePolishOptions, SpinePolishStats, ZephyrSpinePolish};
 #[cfg(feature = "tree-polish")]
 pub(crate) use tree::TreePolish;
 pub use update::{CacheStats, Chain, SpinError, SweepCache};
