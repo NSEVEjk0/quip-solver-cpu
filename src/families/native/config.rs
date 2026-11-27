@@ -29,6 +29,15 @@ pub struct NativeConfig {
     /// Four-spine conditional moves per candidate. Zero disables this pass.
     #[cfg(feature = "zephyr-spine-polish")]
     pub zephyr_blocks: usize,
+    /// Skip repeated Zephyr evaluations for a batch with unchanged spins.
+    #[cfg(feature = "zephyr-spine-polish")]
+    pub zephyr_skip_unchanged: bool,
+    /// Motif component partitions per read after the configured Zephyr pass.
+    #[cfg(feature = "motif-descent")]
+    pub motif_rounds: usize,
+    /// Passes through the available donors for the best candidate.
+    #[cfg(feature = "motif-descent")]
+    pub motif_mixtures: usize,
     /// Share temperature-local probabilities across replicas.
     pub shared_cache: bool,
     /// Positive half-delta capacity of the shared probability table.
@@ -67,6 +76,12 @@ impl Default for NativeConfig {
             pair_worm_polish: false,
             #[cfg(feature = "zephyr-spine-polish")]
             zephyr_blocks: 0,
+            #[cfg(feature = "zephyr-spine-polish")]
+            zephyr_skip_unchanged: false,
+            #[cfg(feature = "motif-descent")]
+            motif_rounds: 0,
+            #[cfg(feature = "motif-descent")]
+            motif_mixtures: 0,
             shared_cache: false,
             cache_slots: 8192,
             copy_resampling: false,
@@ -99,6 +114,11 @@ impl NativeConfig {
             ("native_fused_updates", &mut self.fused_updates),
             ("native_archive", &mut self.archive),
             ("native_motif_score", &mut self.motif_score),
+            #[cfg(feature = "zephyr-spine-polish")]
+            (
+                "native_zephyr_skip_unchanged",
+                &mut self.zephyr_skip_unchanged,
+            ),
         ] {
             if let Some(v) = table.get(key) {
                 *value = v
@@ -182,6 +202,19 @@ impl NativeConfig {
                 .filter(|n| *n <= 200)
                 .ok_or("native_zephyr_blocks must be in 0..=200")?;
         }
+        #[cfg(feature = "motif-descent")]
+        for (key, value, max) in [
+            ("native_motif_rounds", &mut self.motif_rounds, 128),
+            ("native_motif_mixtures", &mut self.motif_mixtures, 8),
+        ] {
+            if let Some(entry) = table.get(key) {
+                *value = entry
+                    .as_integer()
+                    .and_then(|n| usize::try_from(n).ok())
+                    .filter(|n| *n <= max)
+                    .ok_or_else(|| format!("{key} must be in 0..={max}"))?;
+            }
+        }
         if let Some(v) = table.get("native_weak_scale") {
             self.weak_scale = v
                 .as_float()
@@ -219,6 +252,12 @@ impl NativeConfig {
             "pair_worm_polish",
             #[cfg(feature = "zephyr-spine-polish")]
             "zephyr_blocks",
+            #[cfg(feature = "zephyr-spine-polish")]
+            "zephyr_skip_unchanged",
+            #[cfg(feature = "motif-descent")]
+            "motif_rounds",
+            #[cfg(feature = "motif-descent")]
+            "motif_mixtures",
             "shared_cache",
             "cache_slots",
             "copy_resampling",
@@ -237,6 +276,8 @@ impl NativeConfig {
                 "tree_polish" => raw.parse::<bool>().ok().map(toml::Value::Boolean),
                 #[cfg(feature = "pair-worm-polish")]
                 "pair_worm_polish" => raw.parse::<bool>().ok().map(toml::Value::Boolean),
+                #[cfg(feature = "zephyr-spine-polish")]
+                "zephyr_skip_unchanged" => raw.parse::<bool>().ok().map(toml::Value::Boolean),
                 "shared_cache" | "copy_resampling" | "inline_union" | "fused_updates"
                 | "archive" | "motif_score" => raw.parse::<bool>().ok().map(toml::Value::Boolean),
                 "weak_scale" | "weak_beta_end" | "polish_beta" => {

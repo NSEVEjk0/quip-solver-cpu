@@ -6,9 +6,9 @@ use quip_solver_core::ising_generators::family::BaseTopology;
 use quip_solver_core::ising_generators::ice::TWISTED_DIMER_V1;
 use quip_solver_core::{SampleParams, SamplerResult};
 use quip_solver_cpu::families::native::{instance_energy, prepared, tuned_reads, NativeConfig};
-use quip_solver_cpu::families::otsuka::{anneal_population_observed, PopulationOptions, Schedule};
 #[cfg(feature = "motif-descent")]
-use quip_solver_cpu::families::otsuka::{polish_motifs, MotifDescentOptions};
+use quip_solver_cpu::families::otsuka::polish_motifs;
+use quip_solver_cpu::families::otsuka::{anneal_population_observed, PopulationOptions, Schedule};
 #[cfg(feature = "zephyr-spine-polish")]
 use quip_solver_cpu::families::{native::polish_zephyr, otsuka::SpinePolishOptions};
 #[cfg(feature = "zephyr-spine-polish")]
@@ -135,12 +135,6 @@ struct Args {
     #[cfg(feature = "motif-descent")]
     #[arg(long, default_value_t = 0)]
     motif_mixtures: usize,
-    #[cfg(feature = "motif-descent")]
-    #[arg(long)]
-    motif_pair_moves: bool,
-    #[cfg(feature = "motif-descent")]
-    #[arg(long, default_value_t = 0)]
-    motif_uphill_milli: u16,
 }
 
 #[derive(Deserialize)]
@@ -423,12 +417,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let stats = polish_motifs(
                     &graph,
                     &mut reads,
-                    MotifDescentOptions {
-                        rounds: args.motif_rounds,
-                        mixtures: args.motif_mixtures,
-                        pair_moves: args.motif_pair_moves,
-                        uphill_milli: args.motif_uphill_milli,
-                    },
+                    args.motif_rounds,
+                    args.motif_mixtures,
                     sample_params.seed,
                     &|| false,
                 )
@@ -500,8 +490,6 @@ fn main() -> Result<(), Box<dyn Error>> {
                 metrics["motif_max_component"] = stats.max_component.into();
                 metrics["motif_accepted"] = stats.accepted.into();
                 metrics["motif_mixed"] = stats.mixed.into();
-                metrics["motif_paired"] = stats.paired.into();
-                metrics["motif_kicks"] = stats.kicks.into();
                 metrics["motif_gain_milli"] = stats.gain_milli.into();
                 metrics
             } else {
