@@ -43,6 +43,8 @@ fn residual_field(value: LocalField) -> i64 {
 type CacheEpoch = u32;
 
 const END_OF_COMPONENT: u32 = u32::MAX;
+#[cfg(feature = "packed-interior-signs")]
+const COMPONENT_INDEX: u32 = i32::MAX as u32;
 
 /// Bond probabilities at one inverse temperature.
 #[derive(Clone, Copy, Debug)]
@@ -533,20 +535,26 @@ impl Workspace {
                     (self.start.len() - 2) as u32
                 }
             } else {
-                let c = self.label[up];
+                let c = self.component_label(up);
                 if linked {
                     self.members[u] = std::mem::replace(&mut self.start[c as usize], u as u32);
                 }
                 c
             };
             self.label[u] = c;
+            #[cfg(feature = "packed-interior-signs")]
+            {
+                self.label[u] |= u32::from(s[u] < 0) << 31;
+            }
             if !linked {
                 self.start[c as usize + 1] += 1;
             }
         }
         if linked {
-            self.delta.clear();
-            self.delta.resize(self.start.len(), 0);
+            if !cfg!(feature = "skip-packed-delta-init") {
+                self.delta.clear();
+                self.delta.resize(self.start.len(), 0);
+            }
             return;
         }
         for c in 1..self.start.len() {
@@ -562,6 +570,14 @@ impl Workspace {
             self.members[*at as usize] = u as u32;
             *at += 1;
         }
+    }
+
+    #[inline]
+    fn component_label(&self, u: usize) -> u32 {
+        let label = self.label[u];
+        #[cfg(feature = "packed-interior-signs")]
+        let label = label & COMPONENT_INDEX;
+        label
     }
 
     #[inline]
@@ -717,7 +733,12 @@ impl Workspace {
         let tile_energy = i64::from(graph.weights.tile_milli - super::graph::STRONG_MILLI);
         let pair_energy = i64::from(graph.weights.pair_milli - super::graph::STRONG_MILLI);
         let mut change = 0;
-        for c in 0..self.delta.len() {
+        let components = if cfg!(feature = "skip-packed-delta-init") {
+            self.start.len()
+        } else {
+            self.delta.len()
+        };
+        for c in 0..components {
             let (start, end) = self.component_range(c);
             let mut at = start;
             let first = self.next_member(&mut at);
@@ -756,8 +777,20 @@ impl Workspace {
                 let mut interior = 0_i32;
                 for &link in forward.row(u) {
                     let v = link.node();
-                    let inside = -i32::from(self.label[v] as usize == c);
-                    interior += (link.j() * i32::from(s[v])) & inside;
+                    #[cfg(not(feature = "packed-interior-signs"))]
+                    {
+                        let inside = -i32::from(self.label[v] as usize == c);
+                        interior += (link.j() * i32::from(s[v])) & inside;
+                    }
+                    #[cfg(feature = "packed-interior-signs")]
+                    {
+                        // Nodes of the component have not flipped yet. Only
+                        // their recorded signs contribute to this correction.
+                        let label = self.label[v];
+                        let inside = -i32::from((label & COMPONENT_INDEX) as usize == c);
+                        let sign = (label as i32) >> 31;
+                        interior += ((link.j() ^ sign) - sign) & inside;
+                    }
                 }
                 delta +=
                     i64::from(s[u]) * (4 * i64::from(interior) - 2 * residual_field(self.field[u]));
@@ -991,9 +1024,21 @@ impl<'g> Chain<'g> {
         cache.prepare(beta, self.graph.weights);
         let (graph, s, work) = (self.graph, &mut self.spins, &mut self.work);
         let mut change = 0;
+        #[cfg(feature = "metropolis-rejection-bound")]
+        let certain_reject_above = ((4000.0 / beta).ceil() as i64).max(1);
         for u in 0..graph.n {
             let delta = -2 * i64::from(s[u]) * field_energy(work.field[u]);
-            if delta <= 0 || rng.gen::<f64>() < cache.metropolis_probability(delta) {
+            let accepted = delta <= 0 || {
+                let draw = rng.gen::<f64>();
+                #[cfg(not(feature = "metropolis-rejection-bound"))]
+                let needs_probability = true;
+                #[cfg(feature = "metropolis-rejection-bound")]
+                // For this delta range the true probability is at most
+                // exp(-4), safely below 1/32 even with floating-point rounding.
+                let needs_probability = delta < certain_reject_above || draw < 1.0 / 32.0;
+                needs_probability && draw < cache.metropolis_probability(delta)
+            };
+            if accepted {
                 change += work.flip(graph, s, u);
             }
         }
@@ -1115,7 +1160,7 @@ fn packed_heat_bath_deltas_match_rescoring_at_each_component() {
                 &mut rng,
                 |delta, _| {
                     let members: Vec<_> = (0..graph.n)
-                        .filter(|&u| partition.label[u] == component)
+                        .filter(|&u| partition.component_label(u) == component)
                         .collect();
                     let kind = match members.as_slice() {
                         [_] => 0,
@@ -1140,7 +1185,12 @@ fn packed_heat_bath_deltas_match_rescoring_at_each_component() {
                     accept
                 },
             );
-            assert_eq!(component as usize, partition.delta.len());
+            let components = if cfg!(feature = "skip-packed-delta-init") {
+                partition.start.len()
+            } else {
+                partition.delta.len()
+            };
+            assert_eq!(component as usize, components);
             assert_eq!(spins, expected);
             assert_eq!(change, graph.energy(&spins) - before);
             assert_eq!(rng.gen::<u64>(), partition_rng.gen::<u64>());

@@ -4,16 +4,14 @@ use quip_protocol::diversity::diversity_milli;
 use quip_solver_conformance::families::{export_instances, reference_revision};
 use quip_solver_core::ising_generators::family::BaseTopology;
 use quip_solver_core::ising_generators::ice::TWISTED_DIMER_V1;
-use quip_solver_core::SampleParams;
-#[cfg(feature = "zephyr-spine-polish")]
-use quip_solver_core::SamplerResult;
+use quip_solver_core::{SampleParams, SamplerResult};
 use quip_solver_cpu::families::native::{instance_energy, prepared, tuned_reads, NativeConfig};
 use quip_solver_cpu::families::otsuka::{anneal_population_observed, PopulationOptions, Schedule};
 #[cfg(feature = "zephyr-spine-polish")]
 use quip_solver_cpu::families::{native::polish_zephyr, otsuka::SpinePolishOptions};
 #[cfg(feature = "zephyr-spine-polish")]
 use rand::{rngs::SmallRng, Rng, SeedableRng};
-use serde::Deserialize;
+use serde::{Deserialize, Serialize};
 use std::error::Error;
 use std::path::PathBuf;
 use std::time::Instant;
@@ -122,12 +120,22 @@ struct Args {
     #[cfg(feature = "pair-worm-polish")]
     #[arg(long)]
     pair_worm_polish: bool,
+    #[arg(long)]
+    load_reads: Option<PathBuf>,
+    #[arg(long)]
+    save_reads: Option<PathBuf>,
 }
 
 #[derive(Deserialize)]
 struct Topology {
     nodes: Vec<u32>,
     edges: Vec<[u32; 2]>,
+}
+
+#[derive(Deserialize, Serialize)]
+struct CandidateBatch {
+    instance_digest: [u8; 32],
+    reads: Vec<(i64, Vec<i8>)>,
 }
 
 #[expect(clippy::print_stdout, reason = "benchmark emits one JSON result")]
@@ -138,6 +146,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     }
     if matches!(args.mode, Mode::Kernel) && !matches!(args.backend, Backend::Native) {
         return Err("the alternate backend requires pipeline mode".into());
+    }
+    if (args.load_reads.is_some() || args.save_reads.is_some())
+        && !matches!(args.mode, Mode::Pipeline)
+    {
+        return Err("saving and loading candidates requires pipeline mode".into());
     }
     #[cfg(feature = "zephyr-spine-polish")]
     if args.spine_blocks.is_some()
@@ -168,6 +181,31 @@ fn main() -> Result<(), Box<dyn Error>> {
         .next()
         .ok_or("no instance")?
         .map_err(|e| format!("salt generation: {e:?}"))?;
+    let restored = if let Some(path) = &args.load_reads {
+        let batch: CandidateBatch = serde_json::from_reader(std::fs::File::open(path)?)?;
+        if batch.instance_digest != instance.digest()
+            || batch.reads.len() != args.reads
+            || batch.reads.iter().any(|(energy, spins)| {
+                spins.len() != instance.node_ids().len()
+                    || spins.iter().any(|&s| s != -1 && s != 1)
+                    || *energy != instance_energy(&instance, spins) - instance.offset_milli()
+            })
+        {
+            return Err("saved candidates do not match this instance and read count".into());
+        }
+        Some(
+            batch
+                .reads
+                .into_iter()
+                .map(|(energy_milli, spins)| SamplerResult {
+                    energy_milli,
+                    spins,
+                })
+                .collect::<Vec<_>>(),
+        )
+    } else {
+        None
+    };
     let all = matches!(args.preset, Preset::Core | Preset::Archive);
     let config = NativeConfig {
         shared_cache: !args.disable_cache && (all || matches!(args.preset, Preset::Cache)),
@@ -283,26 +321,30 @@ fn main() -> Result<(), Box<dyn Error>> {
         }
         Mode::Pipeline => {
             let started = Instant::now();
-            let reads = match args.backend {
-                Backend::Native => tuned_reads(&instance, &sample_params, &config, || false)
-                    .map_err(|e| format!("pipeline: {e:?}"))?
-                    .ok_or("unexpected cancellation")?,
-                #[cfg(feature = "zephyr-spine-polish")]
-                Backend::ZephyrSpine => {
-                    let mut rng =
-                        SmallRng::seed_from_u64(sample_params.seed ^ 0xfc39_1569_7ab3_f8aa);
-                    (0..args.reads)
-                        .map(|_| {
-                            let spins: Vec<i8> = (0..instance.node_ids().len())
-                                .map(|_| if rng.gen() { 1 } else { -1 })
-                                .collect();
-                            SamplerResult {
-                                energy_milli: instance_energy(&instance, &spins)
-                                    - instance.offset_milli(),
-                                spins,
-                            }
-                        })
-                        .collect()
+            let reads = if let Some(reads) = restored {
+                reads
+            } else {
+                match args.backend {
+                    Backend::Native => tuned_reads(&instance, &sample_params, &config, || false)
+                        .map_err(|e| format!("pipeline: {e:?}"))?
+                        .ok_or("unexpected cancellation")?,
+                    #[cfg(feature = "zephyr-spine-polish")]
+                    Backend::ZephyrSpine => {
+                        let mut rng =
+                            SmallRng::seed_from_u64(sample_params.seed ^ 0xfc39_1569_7ab3_f8aa);
+                        (0..args.reads)
+                            .map(|_| {
+                                let spins: Vec<i8> = (0..instance.node_ids().len())
+                                    .map(|_| if rng.gen() { 1 } else { -1 })
+                                    .collect();
+                                SamplerResult {
+                                    energy_milli: instance_energy(&instance, &spins)
+                                        - instance.offset_milli(),
+                                    spins,
+                                }
+                            })
+                            .collect()
+                    }
                 }
             };
             #[cfg(feature = "zephyr-spine-polish")]
@@ -372,6 +414,16 @@ fn main() -> Result<(), Box<dyn Error>> {
                     Ok(original)
                 })
                 .collect::<Result<Vec<_>, Box<dyn Error>>>()?;
+            if let Some(path) = &args.save_reads {
+                let batch = CandidateBatch {
+                    instance_digest: instance.digest(),
+                    reads: reads
+                        .into_iter()
+                        .map(|read| (read.energy_milli, read.spins))
+                        .collect(),
+                };
+                serde_json::to_writer(std::fs::File::create_new(path)?, &batch)?;
+            }
             #[cfg(feature = "zephyr-spine-polish")]
             let metrics =
                 spine_stats.map_or(serde_json::Value::Null, |(s, spine_seconds, initial)| {
