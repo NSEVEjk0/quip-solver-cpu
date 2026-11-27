@@ -6,6 +6,8 @@ use quip_solver_core::ising_generators::family::BaseTopology;
 use quip_solver_core::ising_generators::ice::TWISTED_DIMER_V1;
 use quip_solver_core::{SampleParams, SamplerResult};
 use quip_solver_cpu::families::native::{instance_energy, prepared, tuned_reads, NativeConfig};
+#[cfg(feature = "motif-descent")]
+use quip_solver_cpu::families::otsuka::polish_motifs;
 use quip_solver_cpu::families::otsuka::{anneal_population_observed, PopulationOptions, Schedule};
 #[cfg(feature = "zephyr-spine-polish")]
 use quip_solver_cpu::families::{native::polish_zephyr, otsuka::SpinePolishOptions};
@@ -124,6 +126,12 @@ struct Args {
     load_reads: Option<PathBuf>,
     #[arg(long)]
     save_reads: Option<PathBuf>,
+    #[cfg(feature = "motif-descent")]
+    #[arg(long, default_value_t = 0)]
+    motif_rounds: usize,
+    #[cfg(feature = "motif-descent")]
+    #[arg(long, default_value_t = 0)]
+    motif_mixtures: usize,
 }
 
 #[derive(Deserialize)]
@@ -151,6 +159,10 @@ fn main() -> Result<(), Box<dyn Error>> {
         && !matches!(args.mode, Mode::Pipeline)
     {
         return Err("saving and loading candidates requires pipeline mode".into());
+    }
+    #[cfg(feature = "motif-descent")]
+    if (args.motif_rounds > 0 || args.motif_mixtures > 0) && !matches!(args.mode, Mode::Pipeline) {
+        return Err("motif descent requires pipeline mode".into());
     }
     #[cfg(feature = "zephyr-spine-polish")]
     if args.spine_blocks.is_some()
@@ -347,7 +359,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                     }
                 }
             };
-            #[cfg(feature = "zephyr-spine-polish")]
+            #[cfg(any(feature = "zephyr-spine-polish", feature = "motif-descent"))]
             let mut reads = reads;
             #[cfg(feature = "zephyr-spine-polish")]
             let spine_stats = args
@@ -393,6 +405,24 @@ fn main() -> Result<(), Box<dyn Error>> {
                     Ok::<_, Box<dyn Error>>((stats, seconds, initial_energies))
                 })
                 .transpose()?;
+            #[cfg(feature = "motif-descent")]
+            let motif_stats = if args.motif_rounds > 0 || args.motif_mixtures > 0 {
+                let motif_started = Instant::now();
+                let graph = prepared(&instance, &config, false)
+                    .map_err(|e| format!("motif descent preparation: {e:?}"))?;
+                let stats = polish_motifs(
+                    &graph,
+                    &mut reads,
+                    args.motif_rounds,
+                    args.motif_mixtures,
+                    sample_params.seed,
+                    &|| false,
+                )
+                .ok_or("motif descent failed")?;
+                Some((stats, motif_started.elapsed().as_secs_f64()))
+            } else {
+                None
+            };
             let seconds = started.elapsed().as_secs_f64();
             let diversity = diversity_milli(
                 &reads
@@ -445,6 +475,21 @@ fn main() -> Result<(), Box<dyn Error>> {
                 });
             #[cfg(not(feature = "zephyr-spine-polish"))]
             let metrics = serde_json::Value::Null;
+            #[cfg(feature = "motif-descent")]
+            let metrics = if let Some((stats, elapsed)) = motif_stats {
+                let mut metrics = metrics;
+                metrics["motif_rounds"] = args.motif_rounds.into();
+                metrics["motif_mixtures"] = args.motif_mixtures.into();
+                metrics["motif_seconds"] = elapsed.into();
+                metrics["motif_partitions"] = stats.partitions.into();
+                metrics["motif_max_component"] = stats.max_component.into();
+                metrics["motif_accepted"] = stats.accepted.into();
+                metrics["motif_mixed"] = stats.mixed.into();
+                metrics["motif_gain_milli"] = stats.gain_milli.into();
+                metrics
+            } else {
+                metrics
+            };
             (seconds, energies, metrics, Some(diversity))
         }
     };

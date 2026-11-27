@@ -199,6 +199,7 @@ packed-residual-fields = ["row-grouped-residual-deltas"]
 packed-interior-signs = ["packed-residual-fields", "linked-component-lists"]
 skip-packed-delta-init = ["packed-residual-fields", "linked-component-lists"]
 metropolis-rejection-bound = []
+motif-descent = ["experimental"]
 # Reoptimize connected induced trees against their fixed boundary spins.
 tree-polish = ["experimental"]
 # Reoptimize a spine and its perpendicular neighbors by variable elimination.

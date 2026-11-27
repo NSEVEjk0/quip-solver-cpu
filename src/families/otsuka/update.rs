@@ -1025,7 +1025,11 @@ impl<'g> Chain<'g> {
         let (graph, s, work) = (self.graph, &mut self.spins, &mut self.work);
         let mut change = 0;
         #[cfg(feature = "metropolis-rejection-bound")]
-        let certain_reject_above = ((4000.0 / beta).ceil() as i64).max(1);
+        let certain_reject_above = if beta > 0.0 {
+            ((4000.0 / beta).ceil() as i64).max(1)
+        } else {
+            i64::MAX
+        };
         for u in 0..graph.n {
             let delta = -2 * i64::from(s[u]) * field_energy(work.field[u]);
             let accepted = delta <= 0 || {

@@ -18,6 +18,8 @@
 //! with the declared parameters, before preparation.
 
 mod graph;
+#[cfg(feature = "motif-descent")]
+mod motif_descent;
 #[cfg(feature = "zephyr-spine-polish")]
 mod spine;
 #[cfg(feature = "tree-polish")]
@@ -34,6 +36,8 @@ use update::LocalField;
 pub use graph::{
     GraphError, Model, Motifs, OtsukaGraph, Weights, MAX_NODES, PAIR_MILLI, STRONG_MILLI,
 };
+#[cfg(feature = "motif-descent")]
+pub use motif_descent::{polish_motifs, MotifDescentStats};
 #[cfg(feature = "zephyr-spine-polish")]
 pub use spine::{SpinePolishOptions, SpinePolishStats, ZephyrSpinePolish};
 #[cfg(feature = "tree-polish")]
