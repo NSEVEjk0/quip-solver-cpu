@@ -6,9 +6,9 @@ use quip_solver_core::ising_generators::family::BaseTopology;
 use quip_solver_core::ising_generators::ice::TWISTED_DIMER_V1;
 use quip_solver_core::{SampleParams, SamplerResult};
 use quip_solver_cpu::families::native::{instance_energy, prepared, tuned_reads, NativeConfig};
-#[cfg(feature = "motif-descent")]
-use quip_solver_cpu::families::otsuka::polish_motifs;
 use quip_solver_cpu::families::otsuka::{anneal_population_observed, PopulationOptions, Schedule};
+#[cfg(feature = "motif-descent")]
+use quip_solver_cpu::families::otsuka::{polish_motifs, MotifDescentOptions};
 #[cfg(feature = "zephyr-spine-polish")]
 use quip_solver_cpu::families::{native::polish_zephyr, otsuka::SpinePolishOptions};
 #[cfg(feature = "zephyr-spine-polish")]
@@ -80,6 +80,9 @@ struct Args {
     #[arg(long, requires = "spine_blocks")]
     spine_cache_plans: bool,
     #[cfg(feature = "zephyr-spine-polish")]
+    #[arg(long, requires = "spine_batch")]
+    spine_skip_unchanged: bool,
+    #[cfg(feature = "zephyr-spine-polish")]
     #[arg(long, requires = "spine_blocks")]
     spine_snapshot: Option<PathBuf>,
     #[arg(long, default_value_t = 1001)]
@@ -132,6 +135,12 @@ struct Args {
     #[cfg(feature = "motif-descent")]
     #[arg(long, default_value_t = 0)]
     motif_mixtures: usize,
+    #[cfg(feature = "motif-descent")]
+    #[arg(long)]
+    motif_pair_moves: bool,
+    #[cfg(feature = "motif-descent")]
+    #[arg(long, default_value_t = 0)]
+    motif_uphill_milli: u16,
 }
 
 #[derive(Deserialize)]
@@ -381,6 +390,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                             span: args.spine_span,
                             batch_reads: args.spine_batch,
                             cache_plans: args.spine_cache_plans,
+                            skip_unchanged: args.spine_skip_unchanged,
                         },
                         sample_params.seed,
                         &|| false,
@@ -413,8 +423,12 @@ fn main() -> Result<(), Box<dyn Error>> {
                 let stats = polish_motifs(
                     &graph,
                     &mut reads,
-                    args.motif_rounds,
-                    args.motif_mixtures,
+                    MotifDescentOptions {
+                        rounds: args.motif_rounds,
+                        mixtures: args.motif_mixtures,
+                        pair_moves: args.motif_pair_moves,
+                        uphill_milli: args.motif_uphill_milli,
+                    },
                     sample_params.seed,
                     &|| false,
                 )
@@ -464,6 +478,7 @@ fn main() -> Result<(), Box<dyn Error>> {
                         "spine_cache_plans": args.spine_cache_plans,
                         "spine_plans_built": s.plans_built,
                         "spine_cached_plan_bytes": s.cached_plan_bytes,
+                        "spine_skipped_batches": s.skipped_batches,
                         "spine_seconds": spine_seconds,
                         "spine_initial_energies_milli": initial,
                         "spine_min_free": s.min_free,
@@ -485,6 +500,8 @@ fn main() -> Result<(), Box<dyn Error>> {
                 metrics["motif_max_component"] = stats.max_component.into();
                 metrics["motif_accepted"] = stats.accepted.into();
                 metrics["motif_mixed"] = stats.mixed.into();
+                metrics["motif_paired"] = stats.paired.into();
+                metrics["motif_kicks"] = stats.kicks.into();
                 metrics["motif_gain_milli"] = stats.gain_milli.into();
                 metrics
             } else {

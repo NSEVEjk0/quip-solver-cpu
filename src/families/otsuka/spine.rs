@@ -38,6 +38,8 @@ pub struct SpinePolishOptions {
     pub batch_reads: bool,
     /// Retain up to 64 MiB of plan buffers for repeated neighborhoods.
     pub cache_plans: bool,
+    /// Reuse an unchanged batch's conditional optimality on repeated visits.
+    pub skip_unchanged: bool,
 }
 
 /// Neighborhoods visited by a bounded polish.
@@ -49,6 +51,8 @@ pub struct SpinePolishStats {
     pub plans_built: usize,
     /// Allocated bytes retained in the plans' buffers for reuse.
     pub cached_plan_bytes: usize,
+    /// Batch evaluations elided after a previous visit on the same spins.
+    pub skipped_batches: usize,
     /// Minimum number of free spins among the plans used.
     pub min_free: usize,
     /// Maximum number of free spins among the plans used.
@@ -172,6 +176,7 @@ impl<'a> ZephyrSpinePolish<'a> {
             span,
             batch_reads,
             cache_plans,
+            skip_unchanged,
         } = options;
         if !(1..=4).contains(&span)
             || (batch_reads && !Batch::fits(self.graph))
@@ -196,6 +201,14 @@ impl<'a> ZephyrSpinePolish<'a> {
                 .map(|chunk| Batch::new(chunk, self.graph.n))
                 .collect::<Vec<_>>()
         });
+        let batch_count = batches.as_ref().map_or(0, Vec::len);
+        let mut versions = Vec::new();
+        let mut evaluated_versions = if skip_unchanged && batch_count > 0 {
+            versions.resize(batch_count, 0_usize);
+            Some(vec![vec![usize::MAX; batch_count]; centers.len()])
+        } else {
+            None
+        };
         let first_energy: i64 = reads.iter().map(|read| read.energy_milli).sum();
         let mut scratch = Scratch::default();
         let mut stats = SpinePolishStats::default();
@@ -205,6 +218,18 @@ impl<'a> ZephyrSpinePolish<'a> {
             for &index in order.iter().take(blocks - done) {
                 if stopped() {
                     return None;
+                }
+                let mut stamps = evaluated_versions
+                    .as_mut()
+                    .map(|visited| visited[index].as_mut_slice());
+                if stamps
+                    .as_deref()
+                    .is_some_and(|visited| visited == versions.as_slice())
+                {
+                    stats.skipped_batches += batch_count;
+                    stats.blocks += 1;
+                    done += 1;
+                    continue;
                 }
                 let group = &centers[index];
                 let slot = cache.get_mut(index);
@@ -239,8 +264,25 @@ impl<'a> ZephyrSpinePolish<'a> {
                 stats.max_free = stats.max_free.max(free);
                 stats.max_width = stats.max_width.max(plan.width);
                 if let Some(batches) = &mut batches {
-                    for (batch, chunk) in batches.iter_mut().zip(reads.chunks_mut(LANES)) {
+                    for (batch_index, (batch, chunk)) in
+                        batches.iter_mut().zip(reads.chunks_mut(LANES)).enumerate()
+                    {
+                        if stamps
+                            .as_deref()
+                            .is_some_and(|visited| visited[batch_index] == versions[batch_index])
+                        {
+                            stats.skipped_batches += 1;
+                            continue;
+                        }
                         let gains = batch.descend(plan, &stopped)?;
+                        if let Some(visited) = stamps.as_deref_mut() {
+                            if gains[..chunk.len()].iter().any(|&gain| gain > 0) {
+                                versions[batch_index] = versions[batch_index].checked_add(1)?;
+                            }
+                            // The exact move leaves this batch optimal for
+                            // the block. A later move revises its version.
+                            visited[batch_index] = versions[batch_index];
+                        }
                         for (read, gain) in chunk.iter_mut().zip(gains) {
                             read.energy_milli -= gain;
                             stats.accepted += usize::from(gain > 0);
@@ -543,10 +585,69 @@ struct Scratch {
 
 #[cfg(test)]
 mod tests {
-    use super::{projection_tables, Batch, Plan, Scratch, MAX_WIDTH};
+    use super::{
+        projection_tables, Batch, Plan, Scratch, SpinePolishOptions, ZephyrSpinePolish, MAX_WIDTH,
+    };
     use crate::families::otsuka::{Model, Motifs, OtsukaGraph, Weights};
     use quip_solver_core::SamplerResult;
     use rand::{rngs::SmallRng, Rng, SeedableRng};
+
+    #[test]
+    fn unchanged_batches_reuse_conditional_optima_without_changing_reads() {
+        let graph = OtsukaGraph::new(
+            &Model {
+                h_milli: &[0; 8],
+                edges: &[(0, 1), (2, 3), (4, 5), (6, 7)],
+                j_milli: &[35, -80, 45, 75],
+            },
+            &Motifs {
+                tiles: &[],
+                gauges: &[],
+                pairs: &[],
+            },
+            Weights::FULL,
+        )
+        .unwrap();
+        let polish = ZephyrSpinePolish::new(&graph, &[0, 1, 2, 3, 4, 5, 6, 7], 2, 1).unwrap();
+        let mut a: Vec<_> = (0..11)
+            .map(|r| {
+                let spins: Vec<_> = (0..8)
+                    .map(|u| if (r & (1 << (u % 4))) == 0 { 1 } else { -1 })
+                    .collect();
+                SamplerResult {
+                    energy_milli: graph.energy(&spins),
+                    spins,
+                }
+            })
+            .collect();
+        let mut b = a.clone();
+        let options = SpinePolishOptions {
+            blocks: 10,
+            span: 1,
+            batch_reads: true,
+            cache_plans: false,
+            skip_unchanged: false,
+        };
+        let reference = polish.improve(&mut a, options, 239, || false).unwrap();
+        let reuse = polish
+            .improve(
+                &mut b,
+                SpinePolishOptions {
+                    skip_unchanged: true,
+                    ..options
+                },
+                239,
+                || false,
+            )
+            .unwrap();
+        for (a, b) in a.iter().zip(b) {
+            assert_eq!(a.spins, b.spins);
+            assert_eq!(a.energy_milli, b.energy_milli);
+        }
+        assert_eq!(reference.accepted, reuse.accepted);
+        assert_eq!(reference.blocks, reuse.blocks);
+        assert!(reuse.skipped_batches > 0 && reuse.plans_built < reference.plans_built);
+    }
 
     #[test]
     fn projection_tables_match_all_explicit_bit_gathers() {

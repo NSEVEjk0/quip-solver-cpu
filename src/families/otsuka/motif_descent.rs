@@ -7,6 +7,20 @@ use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
 const FIXED: usize = usize::MAX;
 const MAX_PASSES: usize = 4;
 
+/// Search budgets for motif descent and recombination.
+#[derive(Clone, Copy, Debug, Default)]
+pub struct MotifDescentOptions {
+    /// Number of component partitions explored per read.
+    pub rounds: usize,
+    /// Number of passes through the donors for the best read.
+    pub mixtures: usize,
+    /// Try downhill flips of adjacent components together.
+    pub pair_moves: bool,
+    /// Maximum temporary uphill change in milli units between partitions.
+    /// Zero selects strict descent.
+    pub uphill_milli: u16,
+}
+
 /// Counts and checked energy change from motif descent.
 #[derive(Debug, Default)]
 pub struct MotifDescentStats {
@@ -18,6 +32,10 @@ pub struct MotifDescentStats {
     pub accepted: usize,
     /// Improving recombinations accepted into the candidate batch.
     pub mixed: usize,
+    /// Accepted downhill two-component moves.
+    pub paired: usize,
+    /// Bounded kicks between partitions.
+    pub kicks: usize,
     /// Total decrease of the original energy across the candidates.
     pub gain_milli: i64,
 }
@@ -31,8 +49,7 @@ pub struct MotifDescentStats {
 pub fn polish_motifs(
     graph: &OtsukaGraph,
     reads: &mut [SamplerResult],
-    rounds: usize,
-    mixtures: usize,
+    options: MotifDescentOptions,
     seed: u64,
     stopped: &impl Fn() -> bool,
 ) -> Option<MotifDescentStats> {
@@ -46,24 +63,43 @@ pub fn polish_motifs(
     let mut stats = MotifDescentStats::default();
     let mut workspace = Workspace::new(graph.n);
     let mut rng = SmallRng::seed_from_u64(seed ^ 0x4d4f_5449_465f_434c);
+    let mut trial = Vec::with_capacity(graph.n);
     for read in reads.iter_mut() {
         let initial = read.energy_milli;
-        for _ in 0..rounds {
+        trial.clone_from(&read.spins);
+        let mut energy = read.energy_milli;
+        for round in 0..options.rounds {
             if stopped() {
                 return None;
             }
-            workspace.partition(graph, &read.spins, None, &mut rng, &mut stats);
-            read.energy_milli += workspace.descend(graph, &mut read.spins, &mut rng, &mut stats);
+            workspace.partition(graph, &trial, None, &mut rng, &mut stats);
+            energy += workspace.descend(graph, &mut trial, &mut rng, &mut stats);
+            if options.pair_moves {
+                energy += workspace.descend_pairs(graph, &mut trial, &mut stats);
+            }
+            if energy < read.energy_milli {
+                read.energy_milli = energy;
+                read.spins.copy_from_slice(&trial);
+            }
+            if options.uphill_milli != 0 && round + 1 < options.rounds {
+                if let Some(&group) = workspace.order.iter().find(|&&c| {
+                    (0..=i64::from(options.uphill_milli)).contains(&workspace.deltas[c])
+                        && workspace.offsets[c + 1] - workspace.offsets[c] < graph.n
+                }) {
+                    energy += workspace.flip(graph, &mut trial, group);
+                    stats.kicks += 1;
+                }
+            }
         }
         stats.gain_milli += initial - read.energy_milli;
     }
 
-    if mixtures > 0 && reads.len() > 1 {
+    if options.mixtures > 0 && reads.len() > 1 {
         let best = (0..reads.len()).min_by_key(|&index| reads[index].energy_milli)?;
         let mut donors: Vec<_> = (0..reads.len()).filter(|&index| index != best).collect();
         donors.sort_by_key(|&index| reads[index].energy_milli);
         let mut child = Vec::with_capacity(graph.n);
-        for trial in 0..mixtures {
+        for trial in 0..options.mixtures {
             for &donor in &donors {
                 if stopped() {
                     return None;
@@ -92,8 +128,11 @@ pub fn polish_motifs(
                     &mut rng,
                     &mut stats,
                 );
-                let energy =
+                let mut energy =
                     start_energy + workspace.descend(graph, &mut child, &mut rng, &mut stats);
+                if options.pair_moves {
+                    energy += workspace.descend_pairs(graph, &mut child, &mut stats);
+                }
                 if energy < reads[best].energy_milli {
                     stats.gain_milli += reads[best].energy_milli - energy;
                     stats.mixed += 1;
@@ -117,6 +156,8 @@ struct Workspace {
     offsets: Vec<usize>,
     deltas: Vec<i64>,
     order: Vec<usize>,
+    between: Vec<Option<i64>>,
+    touched: Vec<usize>,
 }
 
 impl Workspace {
@@ -128,6 +169,8 @@ impl Workspace {
             offsets: Vec::with_capacity(n + 1),
             deltas: Vec::with_capacity(n),
             order: Vec::with_capacity(n),
+            between: Vec::new(),
+            touched: Vec::new(),
         }
     }
 
@@ -255,29 +298,78 @@ impl Workspace {
         for _ in 0..MAX_PASSES {
             self.order.shuffle(rng);
             let before = change;
-            for &c in &self.order {
-                let delta = self.deltas[c];
-                if delta >= 0 {
-                    continue;
+            for index in 0..self.order.len() {
+                let c = self.order[index];
+                if self.deltas[c] < 0 {
+                    change += self.flip(graph, spins, c);
+                    stats.accepted += 1;
                 }
-                for &u in &self.members[self.offsets[c]..self.offsets[c + 1]] {
-                    let old = i64::from(spins[u]);
-                    for &edge in graph.all.row(u) {
-                        let v = edge.node();
-                        let other = self.labels[v];
-                        if other != c && other != FIXED {
-                            self.deltas[other] +=
-                                4 * old * i64::from(edge.j()) * i64::from(spins[v]);
-                        }
-                    }
-                    spins[u] = -spins[u];
-                }
-                self.deltas[c] = -delta;
-                change += delta;
-                stats.accepted += 1;
             }
             if change == before {
                 break;
+            }
+        }
+        change
+    }
+
+    fn flip(&mut self, graph: &OtsukaGraph, spins: &mut [i8], group: usize) -> i64 {
+        for &u in &self.members[self.offsets[group]..self.offsets[group + 1]] {
+            let old = i64::from(spins[u]);
+            for &edge in graph.all.row(u) {
+                let v = edge.node();
+                let other = self.labels[v];
+                if other != group && other != FIXED {
+                    self.deltas[other] += 4 * old * i64::from(edge.j()) * i64::from(spins[v]);
+                }
+            }
+            spins[u] = -spins[u];
+        }
+        let delta = self.deltas[group];
+        self.deltas[group] = -delta;
+        delta
+    }
+
+    fn descend_pairs(
+        &mut self,
+        graph: &OtsukaGraph,
+        spins: &mut [i8],
+        stats: &mut MotifDescentStats,
+    ) -> i64 {
+        self.between.resize(self.deltas.len(), None);
+        let mut change = 0;
+        for index in 0..self.order.len() {
+            let c = self.order[index];
+            self.touched.clear();
+            for &u in &self.members[self.offsets[c]..self.offsets[c + 1]] {
+                for edge in graph.all.row(u) {
+                    let v = edge.node();
+                    let other = self.labels[v];
+                    if other == c || other == FIXED {
+                        continue;
+                    }
+                    let sum = &mut self.between[other];
+                    if sum.is_none() {
+                        self.touched.push(other);
+                    }
+                    *sum.get_or_insert(0) += i64::from(edge.j()) * i64::from(spins[u] * spins[v]);
+                }
+            }
+            let mut best = 0;
+            let mut partner = None;
+            for &other in &self.touched {
+                // The sum of the individual flips counts mutual edges
+                // twice. They retain their sign when the pair flips.
+                let between = self.between[other].take().unwrap_or_default();
+                let delta = self.deltas[c] + self.deltas[other] + 4 * between;
+                if delta < best {
+                    best = delta;
+                    partner = Some(other);
+                }
+            }
+            if let Some(other) = partner {
+                change += self.flip(graph, spins, c);
+                change += self.flip(graph, spins, other);
+                stats.paired += 1;
             }
         }
         change
@@ -361,6 +453,16 @@ mod tests {
                 let change = workspace.descend(&graph, &mut spins, &mut rng, &mut stats);
                 assert!(change <= 0);
                 assert_eq!(graph.energy(&spins) - before, change);
+                let before_pairs = graph.energy(&spins);
+                let pair_change = workspace.descend_pairs(&graph, &mut spins, &mut stats);
+                assert!(pair_change <= 0);
+                assert_eq!(graph.energy(&spins) - before_pairs, pair_change);
+                if reference.is_none() {
+                    assert_eq!(
+                        graph.full_strong_energy(&original),
+                        graph.full_strong_energy(&spins)
+                    );
+                }
                 if let Some(reference) = reference {
                     for ((&initial, &other), &after) in original.iter().zip(&reference).zip(&spins)
                     {

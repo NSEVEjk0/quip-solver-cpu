@@ -121,6 +121,7 @@ fn solve_family(
                 span: 4,
                 batch_reads: true,
                 cache_plans: true,
+                skip_unchanged: false,
             },
             params.seed,
             &stopped,
