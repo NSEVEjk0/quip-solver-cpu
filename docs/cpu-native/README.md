@@ -5,22 +5,24 @@ Benchmarks and implementation notes for the Quip CPU solver on
 and 41,205 edges. Each study records the build features and runtime settings
 used in its comparisons.
 
-## Quick navigation
+## Solid results
 
-Wall-time ratios divide reference time by candidate time. Lower canonical
-energy is better.
+The full-budget studies used 16 replicas × 8,192 annealing sweeps on the
+canonical 4,560-spin graph. Timing ratios divide reference time by candidate
+time. The timing studies ran on one AMD EPYC 7663 VPS.
 
-| Finding | Summary | Result | Details |
-|---|---|---|---|
-| [C30–C38](FINDINGS.md#c30) | Live operation, storage, and timing experiments | C38 returned identical outputs in eight pairs. The observed median wall-time ratio was 1.028×. The timing gain remains inconclusive. | [C30–C38 timing](C30-C38-timing.md) |
-| [C41](FINDINGS.md#c41) | Packed local fields and component construction | 1.341× median over C39 on the same CPU. The median against the earlier native build was 1.516× side by side. | [C41 full-budget comparisons](C41-full-budget.md) |
-| [C53](FINDINGS.md#c53) | Exact optimization of up to 2,385 Zephyr spins with the boundary fixed | Best energy improved on five of eight full-budget instances and tied on three. The median best-energy gain was 90 milli units across all eight. | [C51–C55 Zephyr studies](C51-C55-zephyr-exact.md#c53-full-budget-quality) |
-| [C55](FINDINGS.md#c55) | Batched Zephyr conditional optimization | 1.440× median for the conditional stage over its scalar implementation. All 12 paired outputs matched exactly. | [C55 stage timing](C51-C55-zephyr-exact.md#c55-conditional-stage-timing) |
-| [C57](FINDINGS.md#c57) | Compact, reusable Zephyr neighborhood plans | 1.561× median over C55 for 200 conditional blocks per read. All 12 paired outputs matched exactly. | [C57 plan reuse](EXPERIMENTS.md#reusing-zephyr-neighborhood-plans) |
+| Finding | Result | Evidence |
+|---|---|---|
+| C41 packed fields and component membership | **1.341×** median pipeline speedup over C39 at full budget, with identical outputs in eight same-CPU pairs. | [Full-budget comparisons](C41-full-budget.md) |
+| C53 exact Zephyr optimization | Verified ten fixed-boundary optima independently, including a 2,385-spin block at elimination width nine. At full budget, the best canonical energy improved on five of eight instances and tied on three versus C41 with worm polish. Median gain was 90 milli units across all eight. | [Exactness and full-budget quality](C51-C55-zephyr-exact.md#c53-full-budget-quality) |
+| C43 tree descent and recombination | Lower best canonical energy on 15 of 20 full-budget instances versus C41, with five ties and a median gain of 90 milli units. | [Full-budget pairs](EXPERIMENTS.md#full-budget-candidate-quality) |
+| C47 pair-aware worm polish | Lower best canonical energy on 14 of 20 full-budget instances versus C41, with six ties and a median gain of 145 milli units. | [Full-budget pairs](EXPERIMENTS.md#canonical-energy-and-runtime-comparisons) |
+| C55 batching and C57 plan reuse | With 16 random starts and 200 blocks per read, the conditional stage ran **1.440×** as fast as scalar in C55 and **1.561×** as fast as the C55 batched stage in C57. Each study matched all 12 paired outputs. C57 whole-solver timing remains inconclusive. | [C55 stage timing](C51-C55-zephyr-exact.md#c55-conditional-stage-timing) · [C57 plan reuse](EXPERIMENTS.md#reusing-zephyr-neighborhood-plans) |
 
 ## Find by number
 
 The complete index gives the subject and result of every numbered finding. [Findings index](FINDINGS.md#entry-index)
+The C38 wall-time effect remains inconclusive. [C30–C38 timing](C30-C38-timing.md#c38-wall-time)
 
 | Range | Subject | Direct links |
 |---|---|---|
