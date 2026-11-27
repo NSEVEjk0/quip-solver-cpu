@@ -5,6 +5,8 @@ structured proof-of-work solver. The project combines specialized CPU
 execution, exact state reuse, and original-objective candidate preservation
 within the standard Quip solver protocol.
 
+**Start here** [CPU-native research log](docs/cpu-native/README.md)
+
 The current implementation targets `quip/twisted-ice-dimer` revision 1 and
 runs entirely on CPU. Its evaluated graph has **4,560 nodes and 41,205 edges**,
 with weak magnitude 45 and 1,350 pairs. Search reweighting remains internal;
@@ -42,8 +44,9 @@ These are separate comparisons; their speedups are not multiplied.
 
 A later opt-in build groups residual edges by endpoint and masks the
 component-membership branch in the scan. In eight held-out full-pipeline
-pairs it achieved **1.028× median speedup** over the native path with identical
-candidate outputs. [Finding C38 and paired measurements](docs/cpu-native/FINDINGS.md#c38).
+pairs, the observed median wall-time ratio was **1.028×** over the native path
+with identical candidate outputs. The timing gain remains inconclusive.
+[C38 timing evidence](docs/cpu-native/C30-C38-timing.md#c38-wall-time).
 
 An opt-in lookup table for the four-spin tile patterns reached a **1.129× median
 full-pipeline speedup** over that masked build. All eight paired runs returned
