@@ -1,0 +1,71 @@
+{
+  "cohorts": [
+    "spine-wide-full-a",
+    "spine-wide-full-b"
+  ],
+  "cases": 8,
+  "anneal_sweeps": 8192,
+  "reads": 16,
+  "spine_blocks": 50,
+  "spine_span": 4,
+  "repeats_per_arm": 2,
+  "cohorts_overlapped": true,
+  "timing_note": "Other offline workloads overlapped this quality study on the host.",
+  "best_energy_gain_milli": {
+    "median": 90.0,
+    "range": [
+      0,
+      270
+    ],
+    "positive": 5,
+    "ties": 3,
+    "negative": 0
+  },
+  "batch_median_energy_gain_milli": {
+    "median": 325.0,
+    "range": [
+      45.0,
+      550.0
+    ],
+    "positive": 8,
+    "ties": 0,
+    "negative": 0
+  },
+  "batch_worst_energy_gain_milli": {
+    "median": 460.0,
+    "range": [
+      90,
+      830
+    ],
+    "positive": 8,
+    "ties": 0,
+    "negative": 0
+  },
+  "individual_read_gain_milli": {
+    "median": 200.0,
+    "range": [
+      0,
+      1390
+    ],
+    "positive": 109,
+    "ties": 19,
+    "negative": 0
+  },
+  "batch_diversity_change_milli": {
+    "median": -1.0,
+    "range": [
+      -2,
+      0
+    ],
+    "positive": 0,
+    "ties": 1,
+    "negative": 7
+  },
+  "median_spine_seconds": 0.451345542,
+  "median_wall_ratio": 1.0219012232129114,
+  "wall_bootstrap95_median": [
+    0.9770016987851541,
+    1.0648824879238528
+  ],
+  "median_cycle_ratio": 0.9861127098720612
+}

@@ -1,0 +1,13 @@
+{
+  "label": "incumbent-default-replay",
+  "pairs": 4,
+  "median_speedup": 0.8142095635334297,
+  "bootstrap95_median": [
+    0.6721246067882101,
+    0.8784377493245007
+  ],
+  "mean_reference_seconds": 4.684888664,
+  "mean_candidate_seconds": 5.9854000015,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -5007.27
+}

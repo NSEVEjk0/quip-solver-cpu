@@ -648,7 +648,10 @@ an induced problem with up to 2,313 free spins and an elimination width of
 three on this graph. Freeing all four spines in one row expands the
 neighborhood to 2,385 spins at width nine. An independent integer
 implementation verified ten conditional optima and the fixed boundaries,
-including the largest block.
+including the largest block. Adding 50 four-spine moves to each candidate
+from C41 plus worm improved best energy on five of eight 16 × 8,192
+instances and tied on three. The median best gain was 90 milli units,
+and the median candidate improved on all eight.
 [Method and evidence](EXPERIMENTS.md#exact-conditional-zephyr-neighborhoods).
 
 <a id="c54"></a>

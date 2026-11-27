@@ -1,0 +1,95 @@
+{
+  "source_revision": "57d63c1e68d2935657b5335f3cd10e48c2391111",
+  "checks": [
+    {
+      "check": "formatting",
+      "command": [
+        "cargo",
+        "fmt",
+        "--all",
+        "--check"
+      ],
+      "result": "pass"
+    },
+    {
+      "check": "default-feature library and benchmark",
+      "command": [
+        "cargo",
+        "check",
+        "--locked",
+        "--lib",
+        "--example",
+        "cpu_native_bench"
+      ],
+      "result": "pass"
+    },
+    {
+      "check": "all-feature Clippy",
+      "command": [
+        "cargo",
+        "clippy",
+        "--locked",
+        "--lib",
+        "--example",
+        "cpu_native_bench",
+        "--all-features",
+        "--",
+        "-D",
+        "warnings"
+      ],
+      "result": "pass"
+    },
+    {
+      "check": "family library tests",
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "--lib",
+        "--features",
+        "min-cut-polish,zephyr-spine-polish",
+        "families::"
+      ],
+      "passed": 34
+    },
+    {
+      "check": "native protocol and Otsuka kernel tests",
+      "command": [
+        "cargo",
+        "test",
+        "--release",
+        "--locked",
+        "--features",
+        "experimental,masked-residual-deltas,table-tile-bonds,linked-component-lists,shallow-union-roots,packed-residual-fields,pair-worm-polish,min-cut-polish",
+        "--test",
+        "native_conformance",
+        "--test",
+        "otsuka_kernel"
+      ],
+      "test_environment": {
+        "QUIP_CPU_NATIVE_MIN_CUT_POLISH": "true",
+        "QUIP_CPU_NATIVE_PAIR_WORM_POLISH": "true"
+      },
+      "passed": {
+        "native_conformance": 1,
+        "otsuka_kernel": 23
+      }
+    },
+    {
+      "check": "partial eight-read groups",
+      "seed": 1862,
+      "reads": [
+        1,
+        7,
+        8,
+        9,
+        15,
+        17
+      ],
+      "spine_blocks": 8,
+      "spine_span": 4,
+      "exact_matches": 6
+    }
+  ]
+}

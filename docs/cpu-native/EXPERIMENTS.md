@@ -685,26 +685,35 @@ reverse order. The largest table has eight entries for a one-spine block
 and 512 entries for a four-spine row on the recorded topology.
 
 The topology has 200 center spines. A single center frees 1,772–2,313 of the
-4,560 spins at width at most three. A four-spine row frees up to 2,385 spins
-at width at most nine. The independent audit rebuilds the fixed-boundary
+4,560 spins at width at most three. A four-spine row frees 2,191–2,385 spins
+at width at most nine. The scan visited every single spine and every
+four-spine row. The independent audit rebuilds the fixed-boundary
 objective from canonical edges and minimizes it using separate integer
 factor tables. It checks both energy scores, all fixed boundary spins and
 the elimination width. All ten cases matched, including the 2,385-spin
 block at seed 1852. Three generic SciPy/HiGHS MILP runs hit their
 20-second limit without establishing the optimum. Their incumbents and
 dual bounds are recorded separately.
-[Conditional optimum audits](data/conditional-search/exact-audit.json).
+[Topology scan](data/conditional-search/structural-scan.json),
+[conditional optimum audits](data/conditional-search/exact-audit.json).
 
 | Added stage vs C41 plus worm | Anneal budget | Best lower / tied / higher | Median best gain | Median batch gain |
 |---|---:|---:|---:|---:|
 | [40 one-spine blocks](data/conditional-search/spine-pilot/results.json) | 16 × 2,048 | 5/1/0 | 90 | 225 |
 | [40 one-spine blocks](data/conditional-search/spine-single-full/results.json) | 16 × 8,192 | 1/3/0 | 0 | 135 |
 | [50 four-spine rows](data/conditional-search/spine-wide-pilot/results.json) | 16 × 2,048 | 5/1/0 | 135 | 622.5 |
+| [50 four-spine rows, confirmation](data/conditional-search/spine-wide-full-summary.json) | 16 × 8,192 | 5/3/0 | 90 | 325 |
 
 Gains are reference minus candidate in milli units. Batch gain uses the
 median of the 16 candidates for each instance before taking the median over
-instances. The benchmark records the protocol's integer flip-invariant
-diversity metric for each complete batch.
+instances. In the confirmation, the strict pass improved 109 of the 128
+individual reads and tied on the other 19. Mean flip-invariant Hamming
+diversity for the complete batch fell by one milli at the median, with
+changes from −2 to 0. Each instance used the same pinned CPU with two
+repeats per arm. The two seed cohorts shared the host alongside other
+offline work. The paired median wall interval covered parity.
+[First cohort](data/conditional-search/spine-wide-full-a/results.json),
+[second cohort](data/conditional-search/spine-wide-full-b/results.json).
 
 ## Random starts, plateaus and perturbations
 
@@ -783,6 +792,19 @@ conditional blocks. To compare the strict pass against the incumbent, omit
 `--candidate-backend zephyr-spine` and `--compare-spine-batch`, pass
 `--compare-energy`, and set `--sweeps 8192 --candidate-spine-blocks 50`.
 The audit takes an optional `--milp-seconds 20` argument with SciPy installed.
+
+With the spine stage disabled, the research binary matched the saved C41
+plus worm spins and scores in eight short-budget replays. The four
+same-core timing control pairs gave a median wall ratio of 1.022× and
+an interval of 0.916–1.119×. Retired instructions differed by less than
+0.01% at the median. The other four replays overlapped the full-budget study
+and record output parity. [Same-core controls](data/conditional-search/incumbent-default-control/results.json),
+[overlapping replays](data/conditional-search/incumbent-default-replay/results.json).
+
+The family library, native protocol and Otsuka kernel suites passed with
+the recorded feature sets. Batched outputs also matched scalar outputs
+with read counts from 1 to 17, including partial eight-read groups.
+[Validation record](data/conditional-search/validation.json).
 
 ## Correctness and protocol checks
 
