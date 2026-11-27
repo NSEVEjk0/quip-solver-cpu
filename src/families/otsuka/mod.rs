@@ -18,6 +18,10 @@
 //! with the declared parameters, before preparation.
 
 mod graph;
+#[cfg(feature = "zephyr-spine-polish")]
+mod spine;
+#[cfg(feature = "tree-polish")]
+mod tree;
 mod update;
 
 use quip_solver_core::CancelToken;
@@ -30,6 +34,10 @@ use update::LocalField;
 pub use graph::{
     GraphError, Model, Motifs, OtsukaGraph, Weights, MAX_NODES, PAIR_MILLI, STRONG_MILLI,
 };
+#[cfg(feature = "zephyr-spine-polish")]
+pub use spine::{SpinePolishOptions, SpinePolishStats, ZephyrSpinePolish};
+#[cfg(feature = "tree-polish")]
+pub(crate) use tree::TreePolish;
 pub use update::{CacheStats, Chain, SpinError, SweepCache};
 
 /// Why a schedule cannot drive an anneal.
