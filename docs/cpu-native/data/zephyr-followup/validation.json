@@ -1,0 +1,47 @@
+{
+  "source_revision": "a96e69bc72cf5b3b4ea0e045082e3d3158f3a19c",
+  "all_feature_clippy": "passed with warnings denied for the library and benchmark example",
+  "otsuka_library_tests_passed": 5,
+  "check_scope": "exhaustive conditional assignments, assignment bit projections, cache and snapshot tests",
+  "compatibility": [
+    {
+      "mode": "strict",
+      "seed": 1981,
+      "reads": 9,
+      "blocks": 52,
+      "span": 4,
+      "trajectory_digest": "341fdb589bdf0329c474f24a339f1daa0baef9d62aaeb88a03dce35e1b6b9c96"
+    },
+    {
+      "mode": "equal-energy",
+      "seed": 1981,
+      "reads": 9,
+      "blocks": 52,
+      "span": 4,
+      "trajectory_digest": "d763e8b58589aaa5001a1132cb829d81c456960750dbf0ed13a2e6d4876c9a7b"
+    },
+    {
+      "mode": "perturbed",
+      "seed": 1981,
+      "reads": 9,
+      "blocks": 52,
+      "span": 4,
+      "trajectory_digest": "81c8bb081d06480c359ffc500dd0c4c86fd8d3f2b4179b503a2fc4ec6541d913"
+    },
+    {
+      "mode": "partial-batch",
+      "seed": 1981,
+      "reads": 9,
+      "blocks": 52,
+      "span": 4,
+      "trajectory_digest": "341fdb589bdf0329c474f24a339f1daa0baef9d62aaeb88a03dce35e1b6b9c96"
+    },
+    {
+      "mode": "weak-theta",
+      "seed": 1982,
+      "sweeps": 128,
+      "reads": 4,
+      "trajectory_digest": "76d8996f34c99126998bd555c9fcaea967688ab661efc17b90d84014cc99e94c"
+    }
+  ]
+}

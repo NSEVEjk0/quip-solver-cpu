@@ -1,0 +1,30 @@
+{
+  "label": "zephyr-shared-projection-pilot",
+  "pairs": 6,
+  "median_speedup": 1.3432497917576987,
+  "bootstrap95_median": [
+    1.1766318968963212,
+    1.864404333557493
+  ],
+  "mean_reference_seconds": 1.8168136438333333,
+  "mean_candidate_seconds": 1.266776812,
+  "exact_output_pairs": 6,
+  "mean_best_original_energy": -4901.635,
+  "spine_stage_median_speedup": 1.3436787605866312,
+  "spine_stage_bootstrap95": [
+    1.1778766574501147,
+    1.8650259096142028
+  ],
+  "spine_stage_speedup_range": [
+    1.175410092052075,
+    2.0457759331970906
+  ],
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.3277634305386306,
+    "cycles": 1.2340783526627117,
+    "instructions": 1.1564275793339038,
+    "branches": 1.1094286831847313,
+    "branch-misses": 1.6542368703659909,
+    "cache-misses": 1.5979719998811317
+  }
+}

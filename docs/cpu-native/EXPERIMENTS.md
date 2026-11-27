@@ -806,6 +806,100 @@ the recorded feature sets. Batched outputs also matched scalar outputs
 with read counts from 1 to 17, including partial eight-read groups.
 [Validation record](data/conditional-search/validation.json).
 
+## Shorter anneals with exact Zephyr polishing
+
+The first pilot retained the geometric β=1 to 12 range and reduced the
+anneal from 8,192 to 6,144 sweeps with 16 reads. Both arms used C41 with
+the worm. The shorter arm applied 200 strictly downhill four-spine
+moves per read. Its best energy was lower on one instance and higher on
+three. The median best-energy regression was 1,450 milli units. The exact
+pass lowered the shorter arm's best energy by 0, 90, 0, and 180 milli
+units, respectively, on seeds 1901–1904.
+[Matched pairs](data/zephyr-followup/shorter-6144/results.json)
+
+The second pilot held the same 6,144-sweep and post-polish budgets and
+used the cold segment of the full ladder. It started at
+β=`12^(2048/8191)` and used 384 resampling checkpoints to keep the
+16-sweep interval. Across the same four seeds, best energy was higher
+on every instance, with a median regression of 9,765 milli units.
+[Cold-segment pairs](data/zephyr-followup/cold-tail-6144/results.json)
+
+## Reusing Zephyr neighborhood plans
+
+Each of the 50 four-spine neighborhoods has an immutable elimination
+plan for a given canonical instance. The solver shuffles the neighborhood
+order between passes. The optional cache retains a plan when the search
+will revisit it and caps retained plan buffers at 64 MiB.
+
+Each factor message now stores its table offset and a bit mask for its
+surviving variables. The shared assignment-projection table uses about
+256 KiB once per process. A direct cost contains at most nine couplings
+of magnitude at most 1,000 milli and fits in a signed 16-bit entry.
+Boundary fields and factor accumulators use 64-bit scalar and 32-bit
+batched arithmetic. The original cache pilot retained 21–23 plans at
+the 64 MiB bound. With the shared projections and narrower direct costs,
+all 50 fit in 35.45 MiB of retained plan buffers.
+[Original cache pilot](data/zephyr-followup/plan-cache-pilot/results.json) ·
+[Projection pilot](data/zephyr-followup/projection-pilot/results.json) ·
+[Shared-table cache pilot](data/zephyr-followup/full-plan-cache-pilot/results.json)
+
+The confirmation compared the compact plans with reuse enabled against
+the C55 batched implementation on 12 fresh canonical instances. Both arms
+used the same 16 random starts and 200 four-spine blocks per read. Each
+instance ran twice per arm on the same pinned core in balanced ABBA or
+BAAB order on one EPYC 7663 VPS. All spins, canonical energies, and
+accepted-move counts matched. The candidate built 50 plans per instance
+instead of 200. The conditional stage, including its preparation, reached
+**1.561×** at the median, equivalent to **35.9% less elapsed time**.
+The paired bootstrap 95% median interval was 1.417–1.685×.
+Whole-process cycles fell 36.0% at the median and fell in every pair.
+[Confirmation pairs](data/zephyr-followup/packed-plan-confirm/results.json) ·
+[Summary and counters](data/zephyr-followup/packed-plan-confirm/summary.json)
+
+Four follow-up pairs used 16 × 8,192 annealing sweeps before the same
+200-block pass. The final outputs matched exactly in all four. The added
+stage measured a 1.451× median ratio and the whole-solver interval was
+0.980–1.122×. This pilot ran alongside the shorter-anneal comparison on the
+same VPS with disjoint CPU assignments.
+[Full-budget pairs](data/zephyr-followup/packed-plan-warm/results.json)
+
+Exact-output checks also passed for scalar descent, equal-energy moves,
+perturbations, and a partial eight-read batch.
+[Validation](data/zephyr-followup/validation.json)
+
+### Reproduce the plan study
+
+The reference uses revision `57d63c1` and the candidate uses `a96e69b`.
+Build both with the same Cargo flags as the C55 reproduction above.
+[Zephyr build command](#reproduce-the-zephyr-tests)
+
+```sh
+python3 tools/cpu-native/compare_builds.py \
+  --reference-binary /path/to/c55-bench --candidate-binary /path/to/packed-plan-bench \
+  --mode pipeline --preset archive --candidate-backend zephyr-spine \
+  --candidate-spine-blocks 200 --candidate-spine-span 4 --compare-spine-plan-cache \
+  --seed-start 1951 --instances 12 --reads 16 --sweeps 1 \
+  --serial --bracket --perf --cpus 2 5 --label zephyr-packed-plan-confirm \
+  --output /tmp/quip-packed-plan-confirm
+```
+
+The comparison runs both arms with eight-read batching and enables
+`--spine-cache-plans` in the candidate. The standalone backend applies
+only conditional moves, so the harness uses `--sweeps 1` as a placeholder.
+
+## Bounded residual scan and packed links
+
+The annealing prototype stored the signed field adjustment above the
+node index for a one-shift decode. It also sorted forward residual rows
+and restricted each interior correction to destinations at or below the
+largest spin index in the component. The two changes were evaluated
+together on four 16 × 2,048 pairs, with same-core ABBA or BAAB repeats.
+All four candidate digests matched. The median wall-time ratio was
+0.967×, with an interval of 0.839–1.086×. Cycles increased by 1.3%
+at the median. The prototype is archived with the benchmark evidence.
+[Raw pairs](data/zephyr-followup/bounded-scan-pilot/results.json) ·
+[Prototype patch](data/zephyr-followup/bounded-scan-prototype.patch)
+
 ## Correctness and protocol checks
 
 The release validation checks the actual native binary and its family adapter:

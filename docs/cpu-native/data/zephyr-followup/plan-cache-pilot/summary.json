@@ -1,0 +1,30 @@
+{
+  "label": "zephyr-plan-cache-pilot",
+  "pairs": 6,
+  "median_speedup": 1.3413923261156813,
+  "bootstrap95_median": [
+    1.0438011562663156,
+    1.480413635154743
+  ],
+  "mean_reference_seconds": 1.5151959873333334,
+  "mean_candidate_seconds": 1.1921364298333335,
+  "exact_output_pairs": 6,
+  "mean_best_original_energy": -4907.131666666666,
+  "spine_stage_median_speedup": 1.3416778033826513,
+  "spine_stage_bootstrap95": [
+    1.0438811742643128,
+    1.4808383294438083
+  ],
+  "spine_stage_speedup_range": [
+    0.9802516888022629,
+    1.5189116252872281
+  ],
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.327123429744839,
+    "cycles": 1.2522196479078846,
+    "instructions": 1.120236626040401,
+    "branches": 1.2719684118014236,
+    "branch-misses": 1.9148458179655061,
+    "cache-misses": 1.3456056761238657
+  }
+}

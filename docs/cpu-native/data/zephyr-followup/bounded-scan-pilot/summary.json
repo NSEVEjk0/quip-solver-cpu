@@ -1,0 +1,21 @@
+{
+  "label": "bounded-residual-scan-and-low-node-links",
+  "pairs": 4,
+  "median_speedup": 0.9667000331939206,
+  "bootstrap95_median": [
+    0.839018795388712,
+    1.0855131698074099
+  ],
+  "mean_reference_seconds": 6.879636845875,
+  "mean_candidate_seconds": 7.189358752625,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -5031.6525,
+  "perf_median_reference_over_candidate": {
+    "task-clock": 0.9619206862587726,
+    "cycles": 0.9868952418637507,
+    "instructions": 1.0079445129873008,
+    "branches": 1.0074014733527543,
+    "branch-misses": 0.9491212923380856,
+    "cache-misses": 0.955037566629997
+  }
+}

@@ -1,0 +1,30 @@
+{
+  "label": "zephyr-complete-cache-pilot",
+  "pairs": 6,
+  "median_speedup": 1.3653750403440248,
+  "bootstrap95_median": [
+    1.1417120823572033,
+    1.4938554421290915
+  ],
+  "mean_reference_seconds": 1.3094506786666666,
+  "mean_candidate_seconds": 0.9909329006666667,
+  "exact_output_pairs": 6,
+  "mean_best_original_energy": -4906.4366666666665,
+  "spine_stage_median_speedup": 1.3657784551658771,
+  "spine_stage_bootstrap95": [
+    1.1419393376772455,
+    1.4943730052586779
+  ],
+  "spine_stage_speedup_range": [
+    1.0698436180532436,
+    1.4981694667983643
+  ],
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.3486826821513178,
+    "cycles": 1.2158348489212711,
+    "instructions": 1.1650277892460537,
+    "branches": 1.3919407627519127,
+    "branch-misses": 1.9077737611600303,
+    "cache-misses": 1.197353382349447
+  }
+}

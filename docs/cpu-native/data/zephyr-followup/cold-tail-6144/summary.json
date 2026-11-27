@@ -1,0 +1,56 @@
+{
+  "label": "zephyr-6144-cold-tail",
+  "pairs": 4,
+  "median_speedup": 1.2863398786629407,
+  "bootstrap95_median": [
+    1.1892630142416383,
+    1.3942753003051285
+  ],
+  "mean_reference_seconds": 26.82152684525,
+  "mean_candidate_seconds": 20.8392525295,
+  "exact_output_pairs": 0,
+  "mean_best_original_energy": -5033.4725,
+  "energy": {
+    "best_gain_milli": {
+      "median": -9765.0,
+      "mean": -10697.5,
+      "range": [
+        -17530,
+        -5730
+      ],
+      "improved": 0,
+      "tied": 0,
+      "regressed": 4
+    },
+    "median_gain_milli": {
+      "median": -10927.5,
+      "mean": -11278.75,
+      "range": [
+        -17740.0,
+        -5520.0
+      ],
+      "improved": 0,
+      "tied": 0,
+      "regressed": 4
+    },
+    "worst_gain_milli": {
+      "median": -11630.0,
+      "mean": -11242.5,
+      "range": [
+        -17280,
+        -4430
+      ],
+      "improved": 0,
+      "tied": 0,
+      "regressed": 4
+    }
+  },
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.2867932512536995,
+    "cycles": 1.3126547517636578,
+    "instructions": 1.1704240795052354,
+    "branches": 1.1563456259723517,
+    "branch-misses": 1.5352700099109646,
+    "cache-misses": 1.8801595588178408
+  }
+}

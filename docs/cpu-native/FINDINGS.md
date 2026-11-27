@@ -71,6 +71,9 @@ with block eligibility checked separately by the coordinator and runtime.
 | [C53](#c53) | Exact conditional Zephyr neighborhoods | Up to 2,385 spins free at an elimination width of nine |
 | [C54](#c54) | Zephyr search from random starts and across plateaus | Random starts fell short of the incumbent's energy |
 | [C55](#c55) | Eight-read batched conditional optimization | 1.440× median for the Zephyr stage with 12/12 exact matches |
+| [C56](#c56) | Shorter anneals with exact Zephyr polishing | The 6,144-sweep trials regressed on three of four instances with the original temperature range and four of four after trimming the hottest rungs |
+| [C57](#c57) | Compact, reusable Zephyr neighborhood plans | 1.561× median over C55 for the repeated conditional stage with 12/12 exact matches |
+| [C58](#c58) | Bounded residual scan and packed links | Four exact matches. Whole-process cycles increased 1.3% at the median |
 
 <a id="c01"></a>
 ## C01. Packed adjacency fusion
@@ -675,3 +678,31 @@ took **30.6% less elapsed time** at the median, a **1.440×** ratio on one
 EPYC 7663 VPS. Whole-process cycles fell 28.0% and retired instructions fell
 43.8%. The test used 200 exact four-spine blocks per read and the same 16
 random starts in both arms. [Study](EXPERIMENTS.md#batched-zephyr-conditional-optimization).
+
+<a id="c56"></a>
+## C56. Shorter anneals with exact Zephyr polishing
+
+Both shorter runs used 6,144 sweeps and 200 exact four-spine blocks per
+read against C41 plus worm at 8,192 sweeps. Keeping the full temperature
+range raised best energy on three of four instances. Starting at the
+colder point and preserving the 16-sweep resampling interval raised
+best energy on all four. [Quality comparisons](EXPERIMENTS.md#shorter-anneals-with-exact-zephyr-polishing).
+
+<a id="c57"></a>
+## C57. Compact, reusable Zephyr neighborhood plans
+
+Shared projection tables and 16-bit direct costs let all 50 four-spine
+plans fit in 35.45 MiB of retained plan buffers. The 200-block comparison
+built each plan once and matched the C55 output on all 12 instances.
+The conditional stage came in at **1.561×** the C55 speed at the median,
+equivalent to **35.9% less elapsed time**. The four full-budget pilot
+pairs matched exactly and their whole-solver timing interval spanned
+parity. [Methods and raw pairs](EXPERIMENTS.md#reusing-zephyr-neighborhood-plans).
+
+<a id="c58"></a>
+## C58. Bounded residual scan and packed links
+
+The prototype decoded the field adjustment with one shift and bounded
+the residual scan by the largest component member. It matched all four
+output digests and increased median CPU cycles by 1.3%. The wall-time
+interval spanned parity. [Prototype and raw pairs](EXPERIMENTS.md#bounded-residual-scan-and-packed-links).

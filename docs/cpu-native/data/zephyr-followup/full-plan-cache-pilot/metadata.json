@@ -1,0 +1,47 @@
+{
+  "started_utc": "2026-11-27T12:31:35.016189+00:00",
+  "label": "zephyr-complete-cache-pilot",
+  "source_revision": "8ea613e897ecc8e0f29ef03d1eda5a61f342677b",
+  "source_dirty": true,
+  "platform": "Linux-7.0.0-14-generic-x86_64-with-glibc2.43",
+  "rustc": "rustc 1.97.1 (8bab26f4f 2026-07-14)\nbinary: rustc\ncommit-hash: 8bab26f4f68e0e26f0bb7960be334d5b520ea452\ncommit-date: 2026-07-14\nhost: x86_64-unknown-linux-gnu\nrelease: 1.97.1\nLLVM version: 22.1.6",
+  "cpus": [
+    2,
+    5
+  ],
+  "concurrent_processes": 1,
+  "mode": "pipeline",
+  "preset": "archive",
+  "reads": 16,
+  "sweeps": 1,
+  "seed_start": 1931,
+  "instances": 6,
+  "candidate_selective_resampling": false,
+  "candidate_cache_slots": 8192,
+  "reference_cache_slots": 8192,
+  "binary_sha256": {
+    "reference": "8be0b9aa85fdf4272669183964e68d80482b64883b36d8783d6c4d748b28ab7b",
+    "candidate": "8be0b9aa85fdf4272669183964e68d80482b64883b36d8783d6c4d748b28ab7b"
+  },
+  "input_sha256": {
+    "tools/cpu-funnel/inputs/current-topology.spec.json": "a8e00f86543c45eb14a91f12725ff4dad42f5482451923d12d639a606bbd0e15",
+    "tools/cpu-funnel/inputs/current-family.params": "dcb359726b1efb2a453b6af7c158b163155855f63ada4b6a5ae6d0f9dab2081d"
+  },
+  "candidate_backend": "zephyr-spine",
+  "candidate_spine_blocks": 200,
+  "candidate_spine_span": 4,
+  "candidate_spine_plateaus": false,
+  "candidate_spine_perturbation_milli": 0,
+  "comparison": "exact-spine-plan-cache",
+  "repeats_per_build": 2,
+  "perf_events": [
+    "task-clock",
+    "cycles",
+    "instructions",
+    "branches",
+    "branch-misses",
+    "cache-misses"
+  ],
+  "perf_task_clock_unit": "ms",
+  "completed_utc": "2026-11-27T12:32:04.706642+00:00"
+}

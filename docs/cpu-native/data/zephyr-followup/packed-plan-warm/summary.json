@@ -1,0 +1,30 @@
+{
+  "label": "packed-plan-warm-8192",
+  "pairs": 4,
+  "median_speedup": 1.0694963304503422,
+  "bootstrap95_median": [
+    0.980314243495929,
+    1.1219634603161555
+  ],
+  "mean_reference_seconds": 28.71707563575,
+  "mean_candidate_seconds": 27.119799483,
+  "exact_output_pairs": 4,
+  "mean_best_original_energy": -5042.2475,
+  "spine_stage_median_speedup": 1.4505044431109813,
+  "spine_stage_bootstrap95": [
+    1.0210718804484662,
+    1.552843491310723
+  ],
+  "spine_stage_speedup_range": [
+    1.0210718804484662,
+    1.552843491310723
+  ],
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.0748684253065481,
+    "cycles": 1.0028621965118312,
+    "instructions": 1.0100012074509293,
+    "branches": 1.0062089315437732,
+    "branch-misses": 1.0033086033989664,
+    "cache-misses": 0.9760336630961857
+  }
+}

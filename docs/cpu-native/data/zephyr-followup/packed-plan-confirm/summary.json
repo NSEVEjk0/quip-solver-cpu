@@ -1,0 +1,30 @@
+{
+  "label": "zephyr-packed-plan-confirm",
+  "pairs": 12,
+  "median_speedup": 1.560186092172519,
+  "bootstrap95_median": [
+    1.415984608571301,
+    1.6841819954241317
+  ],
+  "mean_reference_seconds": 1.505175049625,
+  "mean_candidate_seconds": 0.9779645610833333,
+  "exact_output_pairs": 12,
+  "mean_best_original_energy": -4905.954166666666,
+  "spine_stage_median_speedup": 1.560804152606893,
+  "spine_stage_bootstrap95": [
+    1.416536487114735,
+    1.6848534980295136
+  ],
+  "spine_stage_speedup_range": [
+    1.2642040705632946,
+    1.8364896350999633
+  ],
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.5422946223625154,
+    "cycles": 1.5625798704407197,
+    "instructions": 1.3473382135032834,
+    "branches": 1.6184876566177655,
+    "branch-misses": 3.7948266204999284,
+    "cache-misses": 2.575966503104163
+  }
+}

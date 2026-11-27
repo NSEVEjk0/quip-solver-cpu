@@ -1,0 +1,121 @@
+diff --git a/Cargo.toml b/Cargo.toml
+index f5a5cd8..7babc9d 100644
+--- a/Cargo.toml
++++ b/Cargo.toml
+@@ -207,6 +207,10 @@ shallow-union-roots = []
+ linked-component-lists = []
+ # Update full and residual local fields through one packed integer addition.
+ packed-residual-fields = ["row-grouped-residual-deltas"]
++# Put the signed adjustment above the node index to decode it with one shift.
++low-node-packed-links = ["packed-residual-fields"]
++# Bound the residual correction by the largest member of each component.
++bounded-residual-scan = ["packed-residual-fields", "linked-component-lists"]
+ # Reoptimize connected induced trees against their fixed boundary spins.
+ tree-polish = []
+ # Mix exact tree moves with small cyclic neighborhoods during polishing.
+diff --git a/src/families/otsuka/graph.rs b/src/families/otsuka/graph.rs
+index 94362a3..51b7e6f 100644
+--- a/src/families/otsuka/graph.rs
++++ b/src/families/otsuka/graph.rs
+@@ -224,10 +224,14 @@ pub(crate) struct FusedLink(u64);
+
+ impl FusedLink {
+     const PACKED_FIELD_BITS: u32 = 43;
++    const NODE_BITS: u32 = u64::BITS - Self::PACKED_FIELD_BITS;
+
+     fn new(node: u32, full: i32, residual: i32) -> Self {
+         if cfg!(feature = "packed-residual-fields") {
+             let adjustment = (i64::from(full) << 32) + i64::from(residual);
++            if cfg!(feature = "low-node-packed-links") {
++                return Self(((adjustment as u64) << Self::NODE_BITS) | u64::from(node));
++            }
+             let payload = adjustment as u64 & ((1 << Self::PACKED_FIELD_BITS) - 1);
+             Self((u64::from(node) << Self::PACKED_FIELD_BITS) | payload)
+         } else {
+@@ -239,6 +243,9 @@ impl FusedLink {
+
+     #[inline]
+     pub(crate) fn node(self) -> usize {
++        if cfg!(feature = "low-node-packed-links") {
++            return self.0 as usize & ((1 << Self::NODE_BITS) - 1);
++        }
+         let shift = if cfg!(feature = "packed-residual-fields") {
+             Self::PACKED_FIELD_BITS
+         } else {
+@@ -262,8 +269,27 @@ impl FusedLink {
+     #[cfg(feature = "packed-residual-fields")]
+     #[inline]
+     pub(crate) fn field_adjustment(self) -> i64 {
+-        let shift = u64::BITS - Self::PACKED_FIELD_BITS;
+-        ((self.0 << shift) as i64) >> shift
++        if cfg!(feature = "low-node-packed-links") {
++            return (self.0 as i64) >> Self::NODE_BITS;
++        }
++        ((self.0 << Self::NODE_BITS) as i64) >> Self::NODE_BITS
++    }
++}
++
++#[cfg(all(test, feature = "low-node-packed-links"))]
++#[test]
++fn packed_links_decode_signed_adjustments_and_the_last_node() {
++    for node in [0, 1, (MAX_NODES - 1) as u32] {
++        for full in [-1000, -67, 0, 67, 1000] {
++            for residual in [-1000, -67, 0, 67, 1000] {
++                let link = FusedLink::new(node, full, residual);
++                assert_eq!(link.node(), node as usize);
++                assert_eq!(
++                    link.field_adjustment(),
++                    (i64::from(full) << 32) + i64::from(residual)
++                );
++            }
++        }
+     }
+ }
+
+@@ -532,6 +558,7 @@ impl OtsukaGraph {
+             let mut adj = Vec::with_capacity(self.weak_edges.len());
+             start.push(0);
+             for u in 0..self.n {
++                let begin = adj.len();
+                 adj.extend(
+                     self.weak
+                         .row(u)
+@@ -539,6 +566,9 @@ impl OtsukaGraph {
+                         .copied()
+                         .filter(|link| link.node() > u),
+                 );
++                if cfg!(feature = "bounded-residual-scan") {
++                    adj[begin..].sort_unstable_by_key(|link| link.node());
++                }
+                 start.push(adj.len());
+             }
+             Csr { start, adj }
+diff --git a/src/families/otsuka/update.rs b/src/families/otsuka/update.rs
+index fa1cc4f..eb8be70 100644
+--- a/src/families/otsuka/update.rs
++++ b/src/families/otsuka/update.rs
+@@ -884,10 +884,23 @@ impl Workspace {
+             // that contribution once per interior edge using the forward rows.
+             let mut delta = 0;
+             let mut at = start;
++            if cfg!(feature = "bounded-residual-scan") {
++                // Linked lists prepend nodes in ascending label order, so
++                // their head has the largest node index in the component.
++                // Its forward row cannot contain any interior edge.
++                delta = -2 * i64::from(s[first]) * residual_field(self.field[first]);
++                at = self.members[first];
++            }
+             while at != end {
+                 let u = self.next_member(&mut at);
+                 let mut interior = 0_i32;
+-                for &link in forward.row(u) {
++                let mut row = forward.row(u);
++                if cfg!(feature = "bounded-residual-scan")
++                    && row.last().is_some_and(|link| link.node() > first)
++                {
++                    row = &row[..row.partition_point(|link| link.node() <= first)];
++                }
++                for &link in row {
+                     let v = link.node();
+                     let inside = -i32::from(self.label[v] as usize == c);
+                     interior += (link.j() * i32::from(s[v])) & inside;

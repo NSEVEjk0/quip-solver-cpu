@@ -1,0 +1,56 @@
+{
+  "label": "zephyr-6144-plus-200",
+  "pairs": 4,
+  "median_speedup": 1.1624034365139277,
+  "bootstrap95_median": [
+    1.0502071418794632,
+    1.3764349222519723
+  ],
+  "mean_reference_seconds": 27.356702853999998,
+  "mean_candidate_seconds": 23.10618648825,
+  "exact_output_pairs": 0,
+  "mean_best_original_energy": -5042.6875,
+  "energy": {
+    "best_gain_milli": {
+      "median": -1450.0,
+      "mean": -1482.5,
+      "range": [
+        -11750,
+        8720
+      ],
+      "improved": 1,
+      "tied": 0,
+      "regressed": 3
+    },
+    "median_gain_milli": {
+      "median": -1852.5,
+      "mean": -1496.25,
+      "range": [
+        -11365.0,
+        9085.0
+      ],
+      "improved": 1,
+      "tied": 0,
+      "regressed": 3
+    },
+    "worst_gain_milli": {
+      "median": -2055.0,
+      "mean": -1207.5,
+      "range": [
+        -10580,
+        9860
+      ],
+      "improved": 2,
+      "tied": 0,
+      "regressed": 2
+    }
+  },
+  "perf_median_reference_over_candidate": {
+    "task-clock": 1.1625449971680464,
+    "cycles": 1.206220098351758,
+    "instructions": 1.1783344926658739,
+    "branches": 1.170294581123633,
+    "branch-misses": 1.2842372207935115,
+    "cache-misses": 1.1869249793924002
+  }
+}
