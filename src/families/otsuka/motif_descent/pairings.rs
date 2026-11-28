@@ -1,4 +1,5 @@
 mod cut;
+mod eliminate;
 
 use super::{MotifDescentStats, OtsukaGraph, Workspace, FIXED};
 use quip_solver_core::SamplerResult;
@@ -15,6 +16,8 @@ pub enum CoupledMoves {
     Cut {
         /// Release every such tile in shuffled order. Zero keeps all pairings.
         release_period: usize,
+        /// Try exact elimination before the cut relaxation.
+        eliminate: bool,
     },
 }
 
@@ -48,6 +51,20 @@ pub struct PairingStats {
     pub joint_moves: usize,
     /// Strictly improving completed cut assignments.
     pub cut_moves: usize,
+    /// Number of cut relaxations attempted.
+    pub cut_attempts: usize,
+    /// Quotients solved by dominance and exact elimination.
+    pub elimination_solved: usize,
+    /// Strictly improving exact assignments.
+    pub elimination_moves: usize,
+    /// Largest elimination width used for an exact quotient.
+    pub elimination_max_width: usize,
+    /// Sum of component counts fixed before elimination, excluding the anchor.
+    pub elimination_fixed_sum: usize,
+    /// Most unpinned original spins in an exact elimination.
+    pub elimination_largest_region: usize,
+    /// Most unpinned motif components in an exact elimination.
+    pub elimination_largest_quotient: usize,
     /// Conditional quotients with a feasible assignment attaining the cut bound.
     pub certified_quotients: usize,
     /// Most free original spins in a certified quotient.
@@ -90,7 +107,7 @@ pub fn polish_pairings(
     let strong = graph.full_strong_energy(&read.spins);
     let mut workspace = Workspace::new(graph.n);
     let release_period = match options.coupled_moves {
-        CoupledMoves::Cut { release_period } => release_period,
+        CoupledMoves::Cut { release_period, .. } => release_period,
         _ => 0,
     };
     let mut balance = (options.balance_sizes || release_period > 0)
@@ -138,9 +155,9 @@ pub fn polish_pairings(
                     stats.joint_moves += 1;
                 }
             }
-            CoupledMoves::Cut { .. } => {
+            CoupledMoves::Cut { eliminate, .. } => {
                 quotient(&workspace, graph, &read.spins, &mut edges);
-                improve_cut(&mut workspace, graph, read, &edges, &mut stats)?;
+                improve_quotient(&mut workspace, graph, read, &edges, eliminate, &mut stats)?;
             }
         }
     }
@@ -153,41 +170,58 @@ pub fn polish_pairings(
         .then_some(stats)
 }
 
-fn improve_cut(
+fn improve_quotient(
     workspace: &mut Workspace,
     graph: &OtsukaGraph,
     read: &mut SamplerResult,
     bonds: &[(usize, usize, i64)],
+    eliminate: bool,
     stats: &mut PairingStats,
 ) -> Option<()> {
     let sizes = || workspace.offsets.windows(2).map(|w| w[1] - w[0]);
     let (anchor, largest) = sizes().enumerate().max_by_key(|&(_, size)| size)?;
     let count = workspace.deltas.len();
-    let cut = cut::roof_dual(count, anchor, bonds)?;
-    stats.cut_gap_sum += cut.gap;
-    stats.cut_labeled_spins_sum += sizes()
-        .enumerate()
-        .filter(|&(i, _)| i != anchor && cut.labeled[i])
-        .map(|(_, size)| size)
-        .sum::<usize>();
-    if cut.gap == 0 {
+    let exact = if eliminate {
+        eliminate::minimize(count, anchor, bonds).ok()?
+    } else {
+        None
+    };
+    let (flips, delta, certified) = if let Some(exact) = exact {
+        stats.elimination_solved += 1;
+        stats.elimination_max_width = stats.elimination_max_width.max(exact.width);
+        stats.elimination_largest_region = stats.elimination_largest_region.max(graph.n - largest);
+        stats.elimination_largest_quotient = stats.elimination_largest_quotient.max(count - 1);
+        stats.elimination_fixed_sum += exact.fixed - 1;
+        stats.elimination_moves += usize::from(exact.delta < 0);
+        (exact.flips, exact.delta, true)
+    } else {
+        let cut = cut::roof_dual(count, anchor, bonds)?;
+        stats.cut_attempts += 1;
+        stats.cut_gap_sum += cut.gap;
+        stats.cut_labeled_spins_sum += sizes()
+            .enumerate()
+            .filter(|&(i, _)| i != anchor && cut.labeled[i])
+            .map(|(_, size)| size)
+            .sum::<usize>();
+        stats.cut_moves += usize::from(cut.delta < 0);
+        (cut.flips, cut.delta, cut.gap == 0)
+    };
+    if certified {
         stats.certified_quotients += 1;
         stats.largest_certified_region = stats.largest_certified_region.max(graph.n - largest);
         stats.largest_certified_quotient = stats.largest_certified_quotient.max(count - 1);
     }
-    if cut.delta < 0 {
-        let actual = cut
-            .flips
+    if delta < 0 {
+        let actual = flips
             .iter()
             .enumerate()
             .filter(|&(_, &flip)| flip)
             .map(|(i, _)| workspace.flip(i, graph, &mut read.spins))
             .sum::<i64>();
         read.energy_milli += actual;
-        if actual != cut.delta {
+        if actual != delta {
             return None;
         }
-        stats.cut_moves += 1;
     }
     Some(())
 }

@@ -46,6 +46,8 @@ enum PairingMode {
     Cut,
     CutQuarter,
     CutHalf,
+    Exact,
+    ExactLight,
 }
 
 #[derive(Clone, Copy, Debug, Default, ValueEnum)]
@@ -465,9 +467,26 @@ fn main() -> Result<(), Box<dyn Error>> {
                         PairingMode::ShuffledPairs | PairingMode::BalancedPairs => {
                             CoupledMoves::Pairs
                         }
-                        PairingMode::Cut => CoupledMoves::Cut { release_period: 0 },
-                        PairingMode::CutQuarter => CoupledMoves::Cut { release_period: 4 },
-                        PairingMode::CutHalf => CoupledMoves::Cut { release_period: 2 },
+                        PairingMode::Cut => CoupledMoves::Cut {
+                            release_period: 0,
+                            eliminate: false,
+                        },
+                        PairingMode::CutQuarter => CoupledMoves::Cut {
+                            release_period: 4,
+                            eliminate: false,
+                        },
+                        PairingMode::CutHalf => CoupledMoves::Cut {
+                            release_period: 2,
+                            eliminate: false,
+                        },
+                        PairingMode::Exact => CoupledMoves::Cut {
+                            release_period: 0,
+                            eliminate: true,
+                        },
+                        PairingMode::ExactLight => CoupledMoves::Cut {
+                            release_period: 16,
+                            eliminate: true,
+                        },
                     },
                 };
                 let stats =
@@ -557,6 +576,14 @@ fn main() -> Result<(), Box<dyn Error>> {
                 metrics["pairing_single_moves"] = s.single_moves.into();
                 metrics["pairing_joint_moves"] = s.joint_moves.into();
                 metrics["pairing_cut_moves"] = s.cut_moves.into();
+                metrics["pairing_cut_attempts"] = s.cut_attempts.into();
+                metrics["pairing_elimination_solved"] = s.elimination_solved.into();
+                metrics["pairing_elimination_moves"] = s.elimination_moves.into();
+                metrics["pairing_elimination_max_width"] = s.elimination_max_width.into();
+                metrics["pairing_elimination_fixed_sum"] = s.elimination_fixed_sum.into();
+                metrics["pairing_elimination_largest_region"] = s.elimination_largest_region.into();
+                metrics["pairing_elimination_largest_quotient"] =
+                    s.elimination_largest_quotient.into();
                 metrics["pairing_certified"] = s.certified_quotients.into();
                 metrics["pairing_largest_certified_region"] = s.largest_certified_region.into();
                 metrics["pairing_largest_certified_quotient"] = s.largest_certified_quotient.into();
