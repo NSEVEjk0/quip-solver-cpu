@@ -177,6 +177,10 @@ required-features = ["experimental"]
 name = "cpu_native_bench"
 required-features = ["experimental"]
 
+[[example]]
+name = "cpu_nonce_rank"
+required-features = ["experimental"]
+
 # The experimental backends stay behind this feature, so a plain `cargo build`
 # produces only the four production binaries. CI builds, tests and lints with
 # --all-features, and a tag publishes every binary, with the release notes
