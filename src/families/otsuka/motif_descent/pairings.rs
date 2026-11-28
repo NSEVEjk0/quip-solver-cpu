@@ -1,6 +1,22 @@
+mod cut;
+
 use super::{MotifDescentStats, OtsukaGraph, Workspace, FIXED};
 use quip_solver_core::SamplerResult;
 use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
+
+/// Joint optimization to try after each single-component pass.
+#[derive(Clone, Copy, Debug)]
+pub enum CoupledMoves {
+    /// Use single-component moves only.
+    None,
+    /// Try the best pair of coupled components.
+    Pairs,
+    /// Optimize the signed quotient using a roof-duality cut.
+    Cut {
+        /// Release every such tile in shuffled order. Zero keeps all pairings.
+        release_period: usize,
+    },
+}
 
 /// Budget and move selection for the experimental motif search.
 #[derive(Clone, Copy, Debug)]
@@ -9,8 +25,8 @@ pub struct PairingOptions {
     pub rounds: usize,
     /// Favor pairings that limit the growth of large components.
     pub balance_sizes: bool,
-    /// Consider coupled pairs of components after each single-move pass.
-    pub joint_moves: bool,
+    /// Joint optimization to try after each single-component pass.
+    pub coupled_moves: CoupledMoves,
 }
 
 /// Counts and checked energy gain for the selected read.
@@ -30,11 +46,25 @@ pub struct PairingStats {
     pub single_moves: usize,
     /// Strictly improving coupled pairs.
     pub joint_moves: usize,
+    /// Strictly improving completed cut assignments.
+    pub cut_moves: usize,
+    /// Conditional quotients with a feasible assignment attaining the cut bound.
+    pub certified_quotients: usize,
+    /// Most free original spins in a certified quotient.
+    pub largest_certified_region: usize,
+    /// Most free motif components in a certified quotient.
+    pub largest_certified_quotient: usize,
+    /// Sum of the number of labeled original spins, excluding the anchor.
+    pub cut_labeled_spins_sum: usize,
+    /// Sum of the feasible completions' energy gaps to their cut bounds.
+    pub cut_gap_sum: i64,
+    /// Decrease in strong energy in milli-units.
+    pub strong_gain_milli: i64,
     /// Decrease in the original energy in milli-units.
     pub gain_milli: i64,
 }
 
-/// Improve the best read using partitions that preserve its strong energy.
+/// Improve the best read using partitions of the original objective.
 /// Returns `None` on cancellation or inconsistent input or output energies.
 pub fn polish_pairings(
     graph: &OtsukaGraph,
@@ -59,8 +89,11 @@ pub fn polish_pairings(
     let initial = read.energy_milli;
     let strong = graph.full_strong_energy(&read.spins);
     let mut workspace = Workspace::new(graph.n);
-    let mut balance = options
-        .balance_sizes
+    let release_period = match options.coupled_moves {
+        CoupledMoves::Cut { release_period } => release_period,
+        _ => 0,
+    };
+    let mut balance = (options.balance_sizes || release_period > 0)
         .then(|| Balance::new(graph.n, graph.tiles.len()));
     let mut edges = Vec::new();
     let mut rng = SmallRng::seed_from_u64(seed ^ 0x5041_4952_5f53_5243);
@@ -71,9 +104,14 @@ pub fn polish_pairings(
         }
         moves.max_component = 0;
         match &mut balance {
-            Some(balance) => {
-                balance.partition(&mut workspace, graph, &read.spins, &mut rng, &mut moves)
-            }
+            Some(balance) => balance.partition(
+                &mut workspace,
+                graph,
+                &read.spins,
+                &mut rng,
+                &mut moves,
+                release_period,
+            ),
             None => workspace.partition(graph, &read.spins, None, &mut rng, &mut moves),
         }
         let largest = moves.max_component;
@@ -86,24 +124,72 @@ pub fn polish_pairings(
         stats.component_count_sum += workspace.deltas.len();
         stats.partitions += 1;
         read.energy_milli += workspace.descend(graph, &mut read.spins, &mut rng, &mut moves);
-        if options.joint_moves {
-            if let Some((a, b, expected)) = best_joint(&workspace, graph, &read.spins, &mut edges) {
-                let first = workspace.flip(a, graph, &mut read.spins);
-                let second = workspace.flip(b, graph, &mut read.spins);
-                read.energy_milli += first + second;
-                if first + second != expected {
-                    return None;
+        match options.coupled_moves {
+            CoupledMoves::None => {}
+            CoupledMoves::Pairs => {
+                quotient(&workspace, graph, &read.spins, &mut edges);
+                if let Some((a, b, expected)) = best_joint(&workspace, &edges) {
+                    let first = workspace.flip(a, graph, &mut read.spins);
+                    let second = workspace.flip(b, graph, &mut read.spins);
+                    read.energy_milli += first + second;
+                    if first + second != expected {
+                        return None;
+                    }
+                    stats.joint_moves += 1;
                 }
-                stats.joint_moves += 1;
+            }
+            CoupledMoves::Cut { .. } => {
+                quotient(&workspace, graph, &read.spins, &mut edges);
+                improve_cut(&mut workspace, graph, read, &edges, &mut stats)?;
             }
         }
     }
     stats.single_moves = moves.accepted;
     stats.gain_milli = initial - read.energy_milli;
+    stats.strong_gain_milli = strong - graph.full_strong_energy(&read.spins);
     (read.energy_milli == graph.energy(&read.spins)
-        && strong == graph.full_strong_energy(&read.spins)
+        && (release_period > 0 || stats.strong_gain_milli == 0)
         && stats.gain_milli >= 0)
         .then_some(stats)
+}
+
+fn improve_cut(
+    workspace: &mut Workspace,
+    graph: &OtsukaGraph,
+    read: &mut SamplerResult,
+    bonds: &[(usize, usize, i64)],
+    stats: &mut PairingStats,
+) -> Option<()> {
+    let sizes = || workspace.offsets.windows(2).map(|w| w[1] - w[0]);
+    let (anchor, largest) = sizes().enumerate().max_by_key(|&(_, size)| size)?;
+    let count = workspace.deltas.len();
+    let cut = cut::roof_dual(count, anchor, bonds)?;
+    stats.cut_gap_sum += cut.gap;
+    stats.cut_labeled_spins_sum += sizes()
+        .enumerate()
+        .filter(|&(i, _)| i != anchor && cut.labeled[i])
+        .map(|(_, size)| size)
+        .sum::<usize>();
+    if cut.gap == 0 {
+        stats.certified_quotients += 1;
+        stats.largest_certified_region = stats.largest_certified_region.max(graph.n - largest);
+        stats.largest_certified_quotient = stats.largest_certified_quotient.max(count - 1);
+    }
+    if cut.delta < 0 {
+        let actual = cut
+            .flips
+            .iter()
+            .enumerate()
+            .filter(|&(_, &flip)| flip)
+            .map(|(i, _)| workspace.flip(i, graph, &mut read.spins))
+            .sum::<i64>();
+        read.energy_milli += actual;
+        if actual != cut.delta {
+            return None;
+        }
+        stats.cut_moves += 1;
+    }
+    Some(())
 }
 
 struct Balance {
@@ -154,6 +240,7 @@ impl Balance {
         spins: &[i8],
         rng: &mut SmallRng,
         stats: &mut MotifDescentStats,
+        release_period: usize,
     ) {
         self.sizes.fill(1);
         for (u, parent) in workspace.parents.iter_mut().enumerate() {
@@ -163,7 +250,10 @@ impl Balance {
             Self::join(&mut self.sizes, workspace, a as usize, b as usize);
         }
         self.tile_order.shuffle(rng);
-        for &index in &self.tile_order {
+        for (at, &index) in self.tile_order.iter().enumerate() {
+            if release_period != 0 && (at + 1).is_multiple_of(release_period) {
+                continue;
+            }
             let tile = &graph.tiles[index];
             let mut by_sign = [[0; 4]; 2];
             let mut count = [0; 2];
@@ -201,12 +291,12 @@ impl Balance {
     }
 }
 
-fn best_joint(
+fn quotient(
     workspace: &Workspace,
     graph: &OtsukaGraph,
     spins: &[i8],
     edges: &mut Vec<(usize, usize, i64)>,
-) -> Option<(usize, usize, i64)> {
+) {
     edges.clear();
     for (u, &a) in workspace.labels.iter().enumerate() {
         if a == FIXED {
@@ -222,11 +312,25 @@ fn best_joint(
         }
     }
     edges.sort_unstable_by_key(|&(a, b, _)| (a, b));
+    let mut read = 0;
+    let mut used = 0;
+    while read < edges.len() {
+        let (a, b, mut weight) = edges[read];
+        read += 1;
+        while read < edges.len() && (edges[read].0, edges[read].1) == (a, b) {
+            weight += edges[read].2;
+            read += 1;
+        }
+        edges[used] = (a, b, weight);
+        used += 1;
+    }
+    edges.truncate(used);
+}
+
+fn best_joint(workspace: &Workspace, edges: &[(usize, usize, i64)]) -> Option<(usize, usize, i64)> {
     let mut best = None;
     let mut lowest = 0;
-    for group in edges.chunk_by(|a, b| a.0 == b.0 && a.1 == b.1) {
-        let (a, b, _) = group[0];
-        let cross = group.iter().map(|&(_, _, w)| w).sum::<i64>();
+    for &(a, b, cross) in edges {
         let delta = workspace.deltas[a] + workspace.deltas[b] + 4 * cross;
         if delta < lowest {
             lowest = delta;
@@ -269,7 +373,7 @@ mod tests {
             PairingOptions {
                 rounds: 1,
                 balance_sizes: true,
-                joint_moves: true,
+                coupled_moves: CoupledMoves::Pairs,
             },
             68,
             &|| false,

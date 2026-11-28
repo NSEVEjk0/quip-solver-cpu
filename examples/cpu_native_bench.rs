@@ -8,7 +8,9 @@ use quip_solver_core::{SampleParams, SamplerResult};
 use quip_solver_cpu::families::native::{instance_energy, prepared, tuned_reads, NativeConfig};
 use quip_solver_cpu::families::otsuka::{anneal_population_observed, PopulationOptions, Schedule};
 #[cfg(feature = "motif-descent")]
-use quip_solver_cpu::families::otsuka::{polish_motifs, polish_pairings, PairingOptions};
+use quip_solver_cpu::families::otsuka::{
+    polish_motifs, polish_pairings, CoupledMoves, PairingOptions,
+};
 #[cfg(feature = "zephyr-spine-polish")]
 use quip_solver_cpu::families::{native::polish_zephyr, otsuka::SpinePolishOptions};
 #[cfg(feature = "zephyr-spine-polish")]
@@ -41,6 +43,9 @@ enum PairingMode {
     Balanced,
     ShuffledPairs,
     BalancedPairs,
+    Cut,
+    CutQuarter,
+    CutHalf,
 }
 
 #[derive(Clone, Copy, Debug, Default, ValueEnum)]
@@ -451,14 +456,19 @@ fn main() -> Result<(), Box<dyn Error>> {
                     .map_err(|e| format!("motif pairing preparation: {e:?}"))?;
                 let options = PairingOptions {
                     rounds: args.pairing_rounds,
-                    balance_sizes: matches!(
+                    balance_sizes: !matches!(
                         args.pairing_mode,
-                        PairingMode::Balanced | PairingMode::BalancedPairs
+                        PairingMode::Shuffled | PairingMode::ShuffledPairs
                     ),
-                    joint_moves: matches!(
-                        args.pairing_mode,
-                        PairingMode::ShuffledPairs | PairingMode::BalancedPairs
-                    ),
+                    coupled_moves: match args.pairing_mode {
+                        PairingMode::Shuffled | PairingMode::Balanced => CoupledMoves::None,
+                        PairingMode::ShuffledPairs | PairingMode::BalancedPairs => {
+                            CoupledMoves::Pairs
+                        }
+                        PairingMode::Cut => CoupledMoves::Cut { release_period: 0 },
+                        PairingMode::CutQuarter => CoupledMoves::Cut { release_period: 4 },
+                        PairingMode::CutHalf => CoupledMoves::Cut { release_period: 2 },
+                    },
                 };
                 let stats =
                     polish_pairings(&graph, &mut reads, options, sample_params.seed, &|| false)
@@ -546,6 +556,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 metrics["pairing_largest_max"] = s.largest_component.into();
                 metrics["pairing_single_moves"] = s.single_moves.into();
                 metrics["pairing_joint_moves"] = s.joint_moves.into();
+                metrics["pairing_cut_moves"] = s.cut_moves.into();
+                metrics["pairing_certified"] = s.certified_quotients.into();
+                metrics["pairing_largest_certified_region"] = s.largest_certified_region.into();
+                metrics["pairing_largest_certified_quotient"] = s.largest_certified_quotient.into();
+                metrics["pairing_cut_labeled_spins_sum"] = s.cut_labeled_spins_sum.into();
+                metrics["pairing_cut_gap_sum"] = s.cut_gap_sum.into();
+                metrics["pairing_strong_gain_milli"] = s.strong_gain_milli.into();
                 metrics["pairing_gain_milli"] = s.gain_milli.into();
                 metrics
             } else {

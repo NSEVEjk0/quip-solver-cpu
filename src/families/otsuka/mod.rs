@@ -38,7 +38,7 @@ pub use graph::{
 };
 #[cfg(feature = "motif-descent")]
 pub use motif_descent::{
-    polish_motifs, polish_pairings, MotifDescentStats, PairingOptions, PairingStats,
+    polish_motifs, polish_pairings, CoupledMoves, MotifDescentStats, PairingOptions, PairingStats,
 };
 #[cfg(feature = "zephyr-spine-polish")]
 pub use spine::{SpinePolishOptions, SpinePolishStats, ZephyrSpinePolish};

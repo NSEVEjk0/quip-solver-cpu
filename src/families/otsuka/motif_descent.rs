@@ -6,7 +6,7 @@ use super::OtsukaGraph;
 use quip_solver_core::SamplerResult;
 use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
 
-pub use pairings::{polish_pairings, PairingOptions, PairingStats};
+pub use pairings::{polish_pairings, CoupledMoves, PairingOptions, PairingStats};
 
 const FIXED: usize = usize::MAX;
 const MAX_PASSES: usize = 4;
