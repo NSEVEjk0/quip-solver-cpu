@@ -332,12 +332,34 @@ pub fn anneal_population_observed(
     seed: u64,
     options: PopulationOptions,
     stopped: impl Fn() -> bool,
-    mut observe: impl FnMut(i64, &[i8]),
+    observe: impl FnMut(i64, &[i8]),
 ) -> Result<PopulationOutcome, AnnealError> {
+    let (chains, rng) = random_population(graph, replicas, seed);
+    anneal_population_on_chains(graph, schedule, chains, rng, options, stopped, observe)
+}
+
+pub(super) fn random_population(
+    graph: &OtsukaGraph,
+    replicas: usize,
+    seed: u64,
+) -> (Vec<Chain<'_>>, SmallRng) {
     let mut rng = SmallRng::seed_from_u64(seed);
-    let mut chains: Vec<Chain<'_>> = (0..replicas)
+    let chains = (0..replicas)
         .map(|_| Chain::random(graph, &mut rng))
         .collect();
+    (chains, rng)
+}
+
+pub(super) fn anneal_population_on_chains(
+    graph: &OtsukaGraph,
+    schedule: &Schedule<'_>,
+    mut chains: Vec<Chain<'_>>,
+    mut rng: SmallRng,
+    options: PopulationOptions,
+    stopped: impl Fn() -> bool,
+    mut observe: impl FnMut(i64, &[i8]),
+) -> Result<PopulationOutcome, AnnealError> {
+    let replicas = chains.len();
     let mut energy: Vec<i64> = chains.iter().map(|c| graph.energy(c.spins())).collect();
     let mut best: Vec<(Vec<i8>, i64)> = chains
         .iter()

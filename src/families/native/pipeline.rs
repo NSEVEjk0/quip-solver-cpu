@@ -3,8 +3,8 @@
 #[cfg(feature = "tree-polish")]
 use super::super::otsuka::TreePolish;
 use super::super::otsuka::{
-    anneal_population_observed, AnnealError, Chain, Model, Motifs, OtsukaGraph, PopulationOptions,
-    Schedule, SweepCache, Weights,
+    anneal_population_on_chains, random_population, AnnealError, Chain, Model, Motifs, OtsukaGraph,
+    PopulationOptions, Schedule, SweepCache, Weights,
 };
 #[cfg(feature = "zephyr-spine-polish")]
 use super::super::otsuka::{SpinePolishOptions, SpinePolishStats, ZephyrSpinePolish};
@@ -159,10 +159,25 @@ pub fn tuned_reads(
     config: &NativeConfig,
     stopped: impl Fn() -> bool,
 ) -> Result<Option<Vec<SamplerResult>>, SampleError> {
+    tuned_reads_from(instance, params, config, &[], stopped)
+}
+
+/// Run the native anneal with supplied initial spins in the first replica
+/// slots. The remaining replicas and initial random draws match a cold run.
+///
+/// # Errors
+/// Returns capacity if the budget, initial spins or model are invalid.
+pub fn tuned_reads_from(
+    instance: &Instance,
+    params: &SampleParams,
+    config: &NativeConfig,
+    initial: &[Vec<i8>],
+    stopped: impl Fn() -> bool,
+) -> Result<Option<Vec<SamplerResult>>, SampleError> {
     if stopped() {
         return Ok(None);
     }
-    if params.num_reads == 0 || params.num_reads > 128 {
+    if params.num_reads == 0 || params.num_reads > 128 || initial.len() > params.num_reads {
         return Err(SampleError::Capacity);
     }
     let biased = prepared(instance, config, true)?;
@@ -201,11 +216,15 @@ pub fn tuned_reads(
         .flatten();
     let mut archive: Option<SamplerResult> = None;
     let mut last_scored: Option<SamplerResult> = None;
-    let outcome = match anneal_population_observed(
+    let (mut chains, rng) = random_population(&biased, params.num_reads, params.seed);
+    for (chain, spins) in chains.iter_mut().zip(initial) {
+        chain.reset(spins).map_err(|_| SampleError::Capacity)?;
+    }
+    let outcome = match anneal_population_on_chains(
         &biased,
         &schedule,
-        params.num_reads,
-        params.seed,
+        chains,
+        rng,
         PopulationOptions {
             resamples: config.resamples,
             houdayer_every: config.houdayer_every,

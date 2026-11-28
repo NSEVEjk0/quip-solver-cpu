@@ -4,7 +4,7 @@ mod config;
 mod pipeline;
 
 pub use config::NativeConfig;
-pub use pipeline::{instance_energy, prepared, tuned_reads};
+pub use pipeline::{instance_energy, prepared, tuned_reads, tuned_reads_from};
 #[cfg(feature = "zephyr-spine-polish")]
 pub use pipeline::{polish_zephyr, zephyr_shape};
 

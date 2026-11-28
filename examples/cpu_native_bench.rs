@@ -5,7 +5,9 @@ use quip_solver_conformance::families::{export_instances, reference_revision};
 use quip_solver_core::ising_generators::family::BaseTopology;
 use quip_solver_core::ising_generators::ice::TWISTED_DIMER_V1;
 use quip_solver_core::{SampleParams, SamplerResult};
-use quip_solver_cpu::families::native::{instance_energy, prepared, tuned_reads, NativeConfig};
+use quip_solver_cpu::families::native::{
+    instance_energy, prepared, tuned_reads_from, NativeConfig,
+};
 #[cfg(feature = "motif-descent")]
 use quip_solver_cpu::families::otsuka::polish_motifs;
 use quip_solver_cpu::families::otsuka::{anneal_population_observed, PopulationOptions, Schedule};
@@ -87,6 +89,8 @@ struct Args {
     spine_snapshot: Option<PathBuf>,
     #[arg(long, default_value_t = 1001)]
     seed: u64,
+    #[arg(long)]
+    solver_seed: Option<u64>,
     #[arg(long, default_value_t = 16)]
     reads: usize,
     #[arg(long, default_value_t = 1024)]
@@ -127,6 +131,8 @@ struct Args {
     pair_worm_polish: bool,
     #[arg(long)]
     load_reads: Option<PathBuf>,
+    #[arg(long, conflicts_with = "load_reads")]
+    warm_starts: Option<PathBuf>,
     #[arg(long)]
     save_reads: Option<PathBuf>,
     #[cfg(feature = "motif-descent")]
@@ -163,6 +169,11 @@ fn main() -> Result<(), Box<dyn Error>> {
     {
         return Err("saving and loading candidates requires pipeline mode".into());
     }
+    if args.warm_starts.is_some()
+        && (!matches!(args.mode, Mode::Pipeline) || !matches!(args.backend, Backend::Native))
+    {
+        return Err("warm starts require the native pipeline".into());
+    }
     #[cfg(feature = "motif-descent")]
     if (args.motif_rounds > 0 || args.motif_mixtures > 0) && !matches!(args.mode, Mode::Pipeline) {
         return Err("motif descent requires pipeline mode".into());
@@ -196,10 +207,16 @@ fn main() -> Result<(), Box<dyn Error>> {
         .next()
         .ok_or("no instance")?
         .map_err(|e| format!("salt generation: {e:?}"))?;
-    let restored = if let Some(path) = &args.load_reads {
+    let mut initial_spins = Vec::new();
+    let restored = if let Some(path) = args.load_reads.as_ref().or(args.warm_starts.as_ref()) {
         let batch: CandidateBatch = serde_json::from_reader(std::fs::File::open(path)?)?;
+        let valid_count = if args.warm_starts.is_some() {
+            !batch.reads.is_empty() && batch.reads.len() <= args.reads
+        } else {
+            batch.reads.len() == args.reads
+        };
         if batch.instance_digest != instance.digest()
-            || batch.reads.len() != args.reads
+            || !valid_count
             || batch.reads.iter().any(|(energy, spins)| {
                 spins.len() != instance.node_ids().len()
                     || spins.iter().any(|&s| s != -1 && s != 1)
@@ -208,16 +225,21 @@ fn main() -> Result<(), Box<dyn Error>> {
         {
             return Err("saved candidates do not match this instance and read count".into());
         }
-        Some(
-            batch
-                .reads
-                .into_iter()
-                .map(|(energy_milli, spins)| SamplerResult {
-                    energy_milli,
-                    spins,
-                })
-                .collect::<Vec<_>>(),
-        )
+        if args.warm_starts.is_some() {
+            initial_spins = batch.reads.into_iter().map(|(_, spins)| spins).collect();
+            None
+        } else {
+            Some(
+                batch
+                    .reads
+                    .into_iter()
+                    .map(|(energy_milli, spins)| SamplerResult {
+                        energy_milli,
+                        spins,
+                    })
+                    .collect::<Vec<_>>(),
+            )
+        }
     } else {
         None
     };
@@ -248,7 +270,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let sample_params = SampleParams {
         num_reads: args.reads,
         num_sweeps: args.sweeps,
-        seed: args.seed ^ 0x4350_5542_454e_4348,
+        seed: args
+            .solver_seed
+            .unwrap_or(args.seed ^ 0x4350_5542_454e_4348),
         beta_range: args
             .weak_theta
             .is_none()
@@ -340,9 +364,13 @@ fn main() -> Result<(), Box<dyn Error>> {
                 reads
             } else {
                 match args.backend {
-                    Backend::Native => tuned_reads(&instance, &sample_params, &config, || false)
+                    Backend::Native => {
+                        tuned_reads_from(&instance, &sample_params, &config, &initial_spins, || {
+                            false
+                        })
                         .map_err(|e| format!("pipeline: {e:?}"))?
-                        .ok_or("unexpected cancellation")?,
+                        .ok_or("unexpected cancellation")?
+                    }
                     #[cfg(feature = "zephyr-spine-polish")]
                     Backend::ZephyrSpine => {
                         let mut rng =
@@ -502,6 +530,7 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut row = serde_json::json!({"mode":format!("{:?}",args.mode),"preset":format!("{:?}",args.preset),
         "backend":args.backend.name(),
         "seed":args.seed,"nonce":blake3::Hash::from(nonce).to_hex().to_string(),
+        "solver_seed":sample_params.seed,"warm_start_reads":initial_spins.len(),
         "reads":args.reads,"sweeps":args.sweeps,"beta_min":args.beta_min,"beta_max":effective_beta_max,
         "weak_theta":args.weak_theta,"polish_beta":args.polish_beta,"cache_slots":args.cache_slots,
         "cache_disabled":args.disable_cache,"motif_score_disabled":args.disable_motif_score,
