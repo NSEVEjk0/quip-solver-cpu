@@ -103,3 +103,10 @@ The standalone FastDimer replay verifies canonical couplings and exact
 score equality across all 204 archived nonces. It includes the two
 paired timing workloads and an auditor for the published point estimates.
 [C61–C63 replay commands](C61-C63-screening.md#reproduce-the-scoring-paths)
+
+## Replay and audit exact motif search
+
+Use the archived C60 checkpoints and the pinned research benchmark for
+the 64-round comparison. The independent auditor also rebuilds both
+conditional objectives from the archived original weights and spins.
+[C64 replay and audit commands](C64-exact-motif-search.md#reproduce)
