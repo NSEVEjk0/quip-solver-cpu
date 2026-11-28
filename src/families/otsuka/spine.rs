@@ -583,14 +583,178 @@ struct Scratch {
     choice: Vec<bool>,
 }
 
+/// Counts from exact minimization in the disagreement regions of a read batch.
+#[derive(Debug, Default)]
+pub struct DisagreementStats {
+    /// Nonempty regions considered.
+    pub attempted: usize,
+    /// Regions solved within the elimination width cap.
+    pub solved: usize,
+    /// Strictly improving regions.
+    pub accepted: usize,
+    /// Largest solved region, in free spins.
+    pub max_free: usize,
+    /// Largest elimination width of a solved region.
+    pub max_width: usize,
+    /// Improvement of the best read in original energy milli-units.
+    pub gain_milli: i64,
+}
+
+fn agreement_orientation(a: &[i8], b: &[i8]) -> i8 {
+    let differences = a.iter().zip(b).filter(|(x, y)| x != y).count();
+    if differences > a.len() / 2 {
+        -1
+    } else {
+        1
+    }
+}
+
+fn try_disagreement(
+    graph: &OtsukaGraph,
+    child: &mut SamplerResult,
+    nodes: &[usize],
+    scratch: &mut Scratch,
+    stats: &mut DisagreementStats,
+    stopped: &impl Fn() -> bool,
+) -> Option<()> {
+    if stopped() {
+        return None;
+    }
+    if nodes.is_empty() {
+        return Some(());
+    }
+    stats.attempted += 1;
+    if let Some(plan) = Plan::new(graph, nodes, 0, stopped) {
+        let gain = plan.descend(&mut child.spins, scratch, stopped)?;
+        child.energy_milli -= gain;
+        stats.solved += 1;
+        stats.accepted += usize::from(gain > 0);
+        stats.max_free = stats.max_free.max(nodes.len());
+        stats.max_width = stats.max_width.max(plan.width);
+        stats.gain_milli += gain;
+    }
+    (!stopped()).then_some(())
+}
+
+/// Fix agreement with a donor and minimize the remaining spins exactly when
+/// the chosen elimination order fits width nine. Only the best read can
+/// change. The optional union trial frees any spin on which an aligned donor
+/// disagrees. All conditional moves use the graph's original objective.
+/// Returns `None` on cancellation or inconsistent input energies.
+pub fn polish_disagreements(
+    graph: &OtsukaGraph,
+    reads: &mut [SamplerResult],
+    rounds: usize,
+    union: bool,
+    stopped: &impl Fn() -> bool,
+) -> Option<DisagreementStats> {
+    if stopped()
+        || reads.iter().any(|read| {
+            read.spins.len() != graph.n
+                || read.spins.iter().any(|&s| s != -1 && s != 1)
+                || read.energy_milli != graph.energy(&read.spins)
+        })
+    {
+        return None;
+    }
+    let mut stats = DisagreementStats::default();
+    let mut order: Vec<_> = (0..reads.len()).collect();
+    order.sort_by_key(|&i| reads[i].energy_milli);
+    let Some((&best, donors)) = order.split_first() else {
+        return Some(stats);
+    };
+    let (before, tail) = reads.split_at_mut(best);
+    let (child, after) = tail.split_first_mut()?;
+    let donor_spins: Vec<_> = donors
+        .iter()
+        .map(|&i| {
+            if i < best {
+                before[i].spins.as_slice()
+            } else {
+                after[i - best - 1].spins.as_slice()
+            }
+        })
+        .collect();
+    let mut scratch = Scratch::default();
+    let mut nodes = Vec::new();
+    let mut disagreements = vec![false; if union { graph.n } else { 0 }];
+    for _ in 0..rounds {
+        let previous_gain = stats.gain_milli;
+        if union && donor_spins.len() > 1 {
+            disagreements.fill(false);
+            for donor in &donor_spins {
+                let sign = agreement_orientation(&child.spins, donor);
+                for ((flag, &a), &b) in disagreements.iter_mut().zip(&child.spins).zip(*donor) {
+                    *flag |= a != sign * b;
+                }
+            }
+            nodes.clear();
+            nodes.extend((0..graph.n).filter(|&u| disagreements[u]));
+            try_disagreement(graph, child, &nodes, &mut scratch, &mut stats, stopped)?;
+        }
+        for donor in &donor_spins {
+            let sign = agreement_orientation(&child.spins, donor);
+            nodes.clear();
+            nodes.extend((0..graph.n).filter(|&u| child.spins[u] != sign * donor[u]));
+            try_disagreement(graph, child, &nodes, &mut scratch, &mut stats, stopped)?;
+        }
+        if stats.gain_milli == previous_gain {
+            break;
+        }
+    }
+    (child.energy_milli == graph.energy(&child.spins)).then_some(stats)
+}
+
 #[cfg(test)]
 mod tests {
     use super::{
-        projection_tables, Batch, Plan, Scratch, SpinePolishOptions, ZephyrSpinePolish, MAX_WIDTH,
+        polish_disagreements, projection_tables, Batch, Plan, Scratch, SpinePolishOptions,
+        ZephyrSpinePolish, MAX_WIDTH,
     };
     use crate::families::otsuka::{Model, Motifs, OtsukaGraph, Weights};
     use quip_solver_core::SamplerResult;
     use rand::{rngs::SmallRng, Rng, SeedableRng};
+
+    #[test]
+    fn exact_disagreement_child_reaches_exhaustive_minimum() {
+        let graph = OtsukaGraph::new(
+            &Model {
+                h_milli: &[0; 6],
+                edges: &[(0, 1), (1, 2), (2, 3), (1, 4), (2, 5)],
+                j_milli: &[35, 50, -20, 15, 65],
+            },
+            &Motifs {
+                tiles: &[],
+                gauges: &[],
+                pairs: &[],
+            },
+            Weights::FULL,
+        )
+        .unwrap();
+        let a = vec![1; 6];
+        let b = vec![1, -1, -1, 1, 1, 1];
+        let optimum = [-1, 1]
+            .into_iter()
+            .flat_map(|u| [-1, 1].map(move |v| [1, u, v, 1, 1, 1]))
+            .map(|spins| graph.energy(&spins))
+            .min()
+            .unwrap();
+        let mut reads = [a, b].map(|spins| SamplerResult {
+            energy_milli: graph.energy(&spins),
+            spins,
+        });
+        let other = if reads[0].energy_milli < reads[1].energy_milli {
+            1
+        } else {
+            0
+        };
+        let unchanged = reads[other].spins.clone();
+        let stats = polish_disagreements(&graph, &mut reads, 1, true, &|| false).unwrap();
+        assert_eq!(stats.accepted, 1);
+        assert_eq!(stats.max_free, 2);
+        assert_eq!(reads[1 - other].energy_milli, optimum);
+        assert_eq!(reads[other].spins, unchanged);
+    }
 
     #[test]
     fn unchanged_batches_reuse_conditional_optima_without_changing_reads() {

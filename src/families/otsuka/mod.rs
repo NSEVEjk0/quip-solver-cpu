@@ -39,7 +39,10 @@ pub use graph::{
 #[cfg(feature = "motif-descent")]
 pub use motif_descent::{polish_motifs, MotifDescentStats};
 #[cfg(feature = "zephyr-spine-polish")]
-pub use spine::{SpinePolishOptions, SpinePolishStats, ZephyrSpinePolish};
+pub use spine::{
+    polish_disagreements, DisagreementStats, SpinePolishOptions, SpinePolishStats,
+    ZephyrSpinePolish,
+};
 #[cfg(feature = "tree-polish")]
 pub(crate) use tree::TreePolish;
 pub use update::{CacheStats, Chain, SpinError, SweepCache};

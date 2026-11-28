@@ -10,7 +10,10 @@ use quip_solver_cpu::families::native::{instance_energy, prepared, tuned_reads, 
 use quip_solver_cpu::families::otsuka::polish_motifs;
 use quip_solver_cpu::families::otsuka::{anneal_population_observed, PopulationOptions, Schedule};
 #[cfg(feature = "zephyr-spine-polish")]
-use quip_solver_cpu::families::{native::polish_zephyr, otsuka::SpinePolishOptions};
+use quip_solver_cpu::families::{
+    native::polish_zephyr,
+    otsuka::{polish_disagreements, SpinePolishOptions},
+};
 #[cfg(feature = "zephyr-spine-polish")]
 use rand::{rngs::SmallRng, Rng, SeedableRng};
 use serde::{Deserialize, Serialize};
@@ -85,6 +88,12 @@ struct Args {
     #[cfg(feature = "zephyr-spine-polish")]
     #[arg(long, requires = "spine_blocks")]
     spine_snapshot: Option<PathBuf>,
+    #[cfg(feature = "zephyr-spine-polish")]
+    #[arg(long)]
+    disagreement_rounds: Option<usize>,
+    #[cfg(feature = "zephyr-spine-polish")]
+    #[arg(long, requires = "disagreement_rounds")]
+    disagreement_union: bool,
     #[arg(long, default_value_t = 1001)]
     seed: u64,
     #[arg(long, default_value_t = 16)]
@@ -152,6 +161,16 @@ struct CandidateBatch {
 #[expect(clippy::print_stdout, reason = "benchmark emits one JSON result")]
 fn main() -> Result<(), Box<dyn Error>> {
     let args = Args::parse();
+    #[cfg(feature = "zephyr-spine-polish")]
+    if args
+        .disagreement_rounds
+        .is_some_and(|rounds| rounds == 0 || !matches!(args.mode, Mode::Pipeline) || args.reads < 2)
+    {
+        return Err(
+            "disagreement search requires a positive round count and at least two pipeline reads"
+                .into(),
+        );
+    }
     if !args.beta_min.is_finite() || args.beta_min <= 0.0 {
         return Err("initial beta must be finite and positive".into());
     }
@@ -427,6 +446,24 @@ fn main() -> Result<(), Box<dyn Error>> {
             } else {
                 None
             };
+            #[cfg(feature = "zephyr-spine-polish")]
+            let disagreement_stats = args
+                .disagreement_rounds
+                .map(|rounds| {
+                    let started = Instant::now();
+                    let graph = prepared(&instance, &config, false)
+                        .map_err(|e| format!("disagreement preparation: {e:?}"))?;
+                    let stats = polish_disagreements(
+                        &graph,
+                        &mut reads,
+                        rounds,
+                        args.disagreement_union,
+                        &|| false,
+                    )
+                    .ok_or("disagreement search failed")?;
+                    Ok::<_, Box<dyn Error>>((stats, started.elapsed().as_secs_f64()))
+                })
+                .transpose()?;
             let seconds = started.elapsed().as_secs_f64();
             let diversity = diversity_milli(
                 &reads
@@ -491,6 +528,20 @@ fn main() -> Result<(), Box<dyn Error>> {
                 metrics["motif_accepted"] = stats.accepted.into();
                 metrics["motif_mixed"] = stats.mixed.into();
                 metrics["motif_gain_milli"] = stats.gain_milli.into();
+                metrics
+            } else {
+                metrics
+            };
+            #[cfg(feature = "zephyr-spine-polish")]
+            let metrics = if let Some((s, elapsed)) = disagreement_stats {
+                let mut metrics = metrics;
+                metrics["disagreement_seconds"] = elapsed.into();
+                metrics["disagreement_attempted"] = s.attempted.into();
+                metrics["disagreement_solved"] = s.solved.into();
+                metrics["disagreement_accepted"] = s.accepted.into();
+                metrics["disagreement_max_free"] = s.max_free.into();
+                metrics["disagreement_max_width"] = s.max_width.into();
+                metrics["disagreement_gain_milli"] = s.gain_milli.into();
                 metrics
             } else {
                 metrics
