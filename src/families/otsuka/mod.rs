@@ -37,7 +37,9 @@ pub use graph::{
     GraphError, Model, Motifs, OtsukaGraph, Weights, MAX_NODES, PAIR_MILLI, STRONG_MILLI,
 };
 #[cfg(feature = "motif-descent")]
-pub use motif_descent::{polish_motifs, MotifDescentStats};
+pub use motif_descent::{
+    polish_motifs, polish_pairings, MotifDescentStats, PairingOptions, PairingStats,
+};
 #[cfg(feature = "zephyr-spine-polish")]
 pub use spine::{SpinePolishOptions, SpinePolishStats, ZephyrSpinePolish};
 #[cfg(feature = "tree-polish")]

@@ -6,9 +6,9 @@ use quip_solver_core::ising_generators::family::BaseTopology;
 use quip_solver_core::ising_generators::ice::TWISTED_DIMER_V1;
 use quip_solver_core::{SampleParams, SamplerResult};
 use quip_solver_cpu::families::native::{instance_energy, prepared, tuned_reads, NativeConfig};
-#[cfg(feature = "motif-descent")]
-use quip_solver_cpu::families::otsuka::polish_motifs;
 use quip_solver_cpu::families::otsuka::{anneal_population_observed, PopulationOptions, Schedule};
+#[cfg(feature = "motif-descent")]
+use quip_solver_cpu::families::otsuka::{polish_motifs, polish_pairings, PairingOptions};
 #[cfg(feature = "zephyr-spine-polish")]
 use quip_solver_cpu::families::{native::polish_zephyr, otsuka::SpinePolishOptions};
 #[cfg(feature = "zephyr-spine-polish")]
@@ -32,6 +32,15 @@ enum Preset {
     Fusion,
     Core,
     Archive,
+}
+
+#[cfg(feature = "motif-descent")]
+#[derive(Clone, Copy, Debug, ValueEnum)]
+enum PairingMode {
+    Shuffled,
+    Balanced,
+    ShuffledPairs,
+    BalancedPairs,
 }
 
 #[derive(Clone, Copy, Debug, Default, ValueEnum)]
@@ -135,6 +144,12 @@ struct Args {
     #[cfg(feature = "motif-descent")]
     #[arg(long, default_value_t = 0)]
     motif_mixtures: usize,
+    #[cfg(feature = "motif-descent")]
+    #[arg(long, default_value_t = 0)]
+    pairing_rounds: usize,
+    #[cfg(feature = "motif-descent")]
+    #[arg(long, value_enum, default_value = "shuffled")]
+    pairing_mode: PairingMode,
 }
 
 #[derive(Deserialize)]
@@ -164,7 +179,9 @@ fn main() -> Result<(), Box<dyn Error>> {
         return Err("saving and loading candidates requires pipeline mode".into());
     }
     #[cfg(feature = "motif-descent")]
-    if (args.motif_rounds > 0 || args.motif_mixtures > 0) && !matches!(args.mode, Mode::Pipeline) {
+    if (args.motif_rounds > 0 || args.motif_mixtures > 0 || args.pairing_rounds > 0)
+        && !matches!(args.mode, Mode::Pipeline)
+    {
         return Err("motif descent requires pipeline mode".into());
     }
     #[cfg(feature = "zephyr-spine-polish")]
@@ -427,6 +444,29 @@ fn main() -> Result<(), Box<dyn Error>> {
             } else {
                 None
             };
+            #[cfg(feature = "motif-descent")]
+            let pairing_stats = if args.pairing_rounds > 0 {
+                let started = Instant::now();
+                let graph = prepared(&instance, &config, false)
+                    .map_err(|e| format!("motif pairing preparation: {e:?}"))?;
+                let options = PairingOptions {
+                    rounds: args.pairing_rounds,
+                    balance_sizes: matches!(
+                        args.pairing_mode,
+                        PairingMode::Balanced | PairingMode::BalancedPairs
+                    ),
+                    joint_moves: matches!(
+                        args.pairing_mode,
+                        PairingMode::ShuffledPairs | PairingMode::BalancedPairs
+                    ),
+                };
+                let stats =
+                    polish_pairings(&graph, &mut reads, options, sample_params.seed, &|| false)
+                        .ok_or("motif pairing search failed")?;
+                Some((stats, started.elapsed().as_secs_f64()))
+            } else {
+                None
+            };
             let seconds = started.elapsed().as_secs_f64();
             let diversity = diversity_milli(
                 &reads
@@ -491,6 +531,22 @@ fn main() -> Result<(), Box<dyn Error>> {
                 metrics["motif_accepted"] = stats.accepted.into();
                 metrics["motif_mixed"] = stats.mixed.into();
                 metrics["motif_gain_milli"] = stats.gain_milli.into();
+                metrics
+            } else {
+                metrics
+            };
+            #[cfg(feature = "motif-descent")]
+            let metrics = if let Some((s, elapsed)) = pairing_stats {
+                let mut metrics = metrics;
+                metrics["pairing_seconds"] = elapsed.into();
+                metrics["pairing_partitions"] = s.partitions.into();
+                metrics["pairing_component_count_sum"] = s.component_count_sum.into();
+                metrics["pairing_largest_min"] = s.smallest_max_component.into();
+                metrics["pairing_largest_sum"] = s.max_component_sum.into();
+                metrics["pairing_largest_max"] = s.largest_component.into();
+                metrics["pairing_single_moves"] = s.single_moves.into();
+                metrics["pairing_joint_moves"] = s.joint_moves.into();
+                metrics["pairing_gain_milli"] = s.gain_milli.into();
                 metrics
             } else {
                 metrics

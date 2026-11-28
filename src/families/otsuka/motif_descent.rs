@@ -1,8 +1,12 @@
 //! Downhill search over motif components and mixtures of parent assignments.
 
+mod pairings;
+
 use super::OtsukaGraph;
 use quip_solver_core::SamplerResult;
 use rand::{rngs::SmallRng, seq::SliceRandom, SeedableRng};
+
+pub use pairings::{polish_pairings, PairingOptions, PairingStats};
 
 const FIXED: usize = usize::MAX;
 const MAX_PASSES: usize = 4;
@@ -199,6 +203,10 @@ impl Workspace {
             }
         }
 
+        self.materialize(graph, spins, stats);
+    }
+
+    fn materialize(&mut self, graph: &OtsukaGraph, spins: &[i8], stats: &mut MotifDescentStats) {
         self.offsets.clear();
         self.offsets.push(0);
         for (u, &parent) in self.parents.iter().enumerate() {
@@ -247,6 +255,23 @@ impl Workspace {
         stats.partitions += 1;
     }
 
+    fn flip(&mut self, c: usize, graph: &OtsukaGraph, spins: &mut [i8]) -> i64 {
+        let delta = self.deltas[c];
+        for &u in &self.members[self.offsets[c]..self.offsets[c + 1]] {
+            let old = i64::from(spins[u]);
+            for &edge in graph.all.row(u) {
+                let v = edge.node();
+                let other = self.labels[v];
+                if other != c && other != FIXED {
+                    self.deltas[other] += 4 * old * i64::from(edge.j()) * i64::from(spins[v]);
+                }
+            }
+            spins[u] = -spins[u];
+        }
+        self.deltas[c] = -delta;
+        delta
+    }
+
     fn descend(
         &mut self,
         graph: &OtsukaGraph,
@@ -258,26 +283,12 @@ impl Workspace {
         for _ in 0..MAX_PASSES {
             self.order.shuffle(rng);
             let before = change;
-            for &c in &self.order {
-                let delta = self.deltas[c];
-                if delta >= 0 {
-                    continue;
+            for index in 0..self.order.len() {
+                let c = self.order[index];
+                if self.deltas[c] < 0 {
+                    change += self.flip(c, graph, spins);
+                    stats.accepted += 1;
                 }
-                for &u in &self.members[self.offsets[c]..self.offsets[c + 1]] {
-                    let old = i64::from(spins[u]);
-                    for &edge in graph.all.row(u) {
-                        let v = edge.node();
-                        let other = self.labels[v];
-                        if other != c && other != FIXED {
-                            self.deltas[other] +=
-                                4 * old * i64::from(edge.j()) * i64::from(spins[v]);
-                        }
-                    }
-                    spins[u] = -spins[u];
-                }
-                self.deltas[c] = -delta;
-                change += delta;
-                stats.accepted += 1;
             }
             if change == before {
                 break;
