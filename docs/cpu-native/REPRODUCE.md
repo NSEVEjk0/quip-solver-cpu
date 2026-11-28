@@ -96,3 +96,10 @@ reconstruct the fixed-boundary objective and check its exact minimum.
   --spine-blocks 1 --spine-span 4 --spine-snapshot "$quip_output/block.json"
 python3 tools/cpu-native/audit_spine_snapshot.py "$quip_output/block.json"
 ```
+
+## Replay CPU screening
+
+The standalone FastDimer replay verifies canonical couplings and exact
+score equality across all 204 archived nonces. It includes the two
+paired timing workloads and an auditor for the published point estimates.
+[C61–C63 replay commands](C61-C63-screening.md#reproduce-the-scoring-paths)
