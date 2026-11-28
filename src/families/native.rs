@@ -108,6 +108,8 @@ fn solve_family(
     let Some(reads) = tuned_reads(instance, params, config, &stopped)? else {
         return Ok(None);
     };
+    #[cfg(any(feature = "zephyr-spine-polish", feature = "motif-descent"))]
+    let mut reads = reads;
     #[cfg(feature = "zephyr-spine-polish")]
     if config.zephyr_blocks > 0 {
         let mut polished = reads.clone();
@@ -121,16 +123,41 @@ fn solve_family(
                 span: 4,
                 batch_reads: true,
                 cache_plans: true,
+                skip_unchanged: config.zephyr_skip_unchanged,
             },
             params.seed,
             &stopped,
         ) {
-            Ok(Some(_)) => return Ok(Some(polished)),
+            Ok(Some(_)) => reads = polished,
             Ok(None) => return Ok(None),
             Err(SampleError::Capacity) => {
                 tracing::debug!("Zephyr polish exceeded its bounds; retaining the anneal results");
             }
             Err(error) => return Err(error),
+        }
+    }
+    #[cfg(feature = "motif-descent")]
+    if config.motif_rounds > 0 || config.motif_mixtures > 0 {
+        if stopped() {
+            return Ok(None);
+        }
+        let truth = prepared(instance, config, false)?;
+        if super::otsuka::polish_motifs(
+            &truth,
+            &mut reads,
+            config.motif_rounds,
+            config.motif_mixtures,
+            params.seed,
+            &stopped,
+        )
+        .is_none()
+        {
+            if stopped() {
+                return Ok(None);
+            }
+            return Err(SampleError::DeviceFault(
+                "motif polish returned inconsistent canonical energies".into(),
+            ));
         }
     }
     let _ = descriptor;

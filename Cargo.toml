@@ -196,6 +196,7 @@ shallow-union-roots = []
 linked-component-lists = []
 # Update full and residual local fields through one packed integer addition.
 packed-residual-fields = ["row-grouped-residual-deltas"]
+motif-descent = ["experimental"]
 # Reoptimize connected induced trees against their fixed boundary spins.
 tree-polish = ["experimental"]
 # Reoptimize a spine and its perpendicular neighbors by variable elimination.
